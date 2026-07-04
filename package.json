@@ -1,0 +1,79 @@
+{
+  "name": "open-wiki-studio",
+  "version": "0.1.0",
+  "description": "Local desktop app that wraps a Pi agent running the pi-open-wiki extension.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./out/main/index.js",
+  "author": "Panzenbaby",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "check": "tsc --noEmit -p tsconfig.json",
+    "package": "electron-vite build && electron-builder",
+    "package:win": "electron-vite build && electron-builder --win",
+    "package:linux": "electron-vite build && electron-builder --linux"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.80.3",
+    "jotai": "^2.10.0",
+    "lucide-react": "^1.23.0",
+    "pi-okf-wiki": "github:Panzenbaby/pi-okf-wiki#0.1.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-force-graph-2d": "^1.29.1",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^2.3.0",
+    "typebox": "*",
+    "typescript": "^5.5.4",
+    "vite": "^5.3.3"
+  },
+  "build": {
+    "appId": "dev.panzenbaby.openwikistudio",
+    "productName": "Open Wiki Studio",
+    "files": [
+      "out/**/*",
+      "node_modules/**/*",
+      "!node_modules/pi-okf-wiki"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/pi-okf-wiki",
+        "to": "pi-okf-wiki",
+        "filter": [
+          "index.ts",
+          "wiki.ts",
+          "update.ts",
+          "query.ts",
+          "types.ts",
+          "files.ts",
+          "frontmatter.ts",
+          "prompts.ts",
+          "package.json",
+          "LICENSE"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Office"
+    }
+  }
+}

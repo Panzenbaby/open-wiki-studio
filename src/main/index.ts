@@ -1,0 +1,174 @@
+// Electron main entry: window lifecycle, workspace selection dialog,
+// activation of the AgentRepository + IpcBridge for the chosen workspace.
+import "./polyfill.ts"; // must run before pi-coding-agent loads (undici worker_threads polyfill)
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { AgentRepository } from "./agent.ts";
+import { IpcBridge } from "./ipc.ts";
+import {
+  getLlmConfig,
+  listRecentWorkspaces,
+  rememberWorkspace,
+} from "./config.ts";
+import { ok, err, errorMessage } from "../shared/result.ts";
+import { mainT } from "./i18n.ts";
+import type { ProviderId, Result, WorkspaceInfo } from "../shared/ipc-types.ts";
+
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+
+function log(...parts: unknown[]): void {
+  console.log("[open-wiki-studio]", ...parts);
+}
+
+interface AppState {
+  window: BrowserWindow | null;
+  repo: AgentRepository | null;
+  bridge: IpcBridge | null;
+  workspace: string | null;
+}
+
+const state: AppState = { window: null, repo: null, bridge: null, workspace: null };
+
+// Surface any startup failure instead of dying silently.
+function fatal(message: string, error?: unknown): void {
+  const detail = error ? errorMessage(error) : "";
+  log("FATAL", message, detail);
+  try {
+    dialog.showErrorBox(mainT("dialog.startupError"), `${message}\n${detail}`);
+  } catch {
+    /* dialog may not be available pre-ready */
+  }
+  app.quit();
+}
+
+async function activateWorkspace(folderPath: string): Promise<Result<WorkspaceInfo>> {
+  try {
+    if (state.repo) await state.repo.dispose();
+    state.repo = null;
+    state.bridge = null;
+    state.workspace = null;
+
+    const created = await AgentRepository.create(folderPath);
+    if (!created.success) return created;
+
+    const llm = await getLlmConfig();
+    if (llm) {
+      const applied = await created.data.configureLlm(llm);
+      if (!applied.success && state.window) {
+        state.window.webContents.send("okf:warning", applied.error.message);
+      }
+    }
+
+    state.repo = created.data;
+    state.workspace = folderPath;
+    if (state.window) {
+      state.bridge = new IpcBridge(state.window.webContents, state.repo, folderPath);
+      state.bridge.register();
+    }
+    return await rememberWorkspace(folderPath);
+  } catch (error) {
+    return err<WorkspaceInfo>(`Failed to activate workspace: ${errorMessage(error)}`);
+  }
+}
+
+function registerGlobalHandlers(): void {
+  ipcMain.handle("okf:listRecentWorkspaces", async () => listRecentWorkspaces());
+
+  ipcMain.handle("okf:getLlmConfig", async () => ok(await getLlmConfig()));
+
+  // App self-info is workspace-independent (global LLM config + platform).
+  // Registered globally so the renderer can call it at bootstrap, before
+  // any workspace is active.
+  ipcMain.handle("okf:getAppSelf", async () => {
+    const llm = await getLlmConfig();
+    const noKeyProviders: ReadonlyArray<ProviderId> = ["ollama", "openai-compatible"];
+    const hasLlmConfig =
+      !!llm &&
+      !!llm.modelId &&
+      (!!llm.apiKey || noKeyProviders.includes(llm.provider));
+    return ok({ version: "0.1.0", hasLlmConfig, platform: process.platform });
+  });
+
+  ipcMain.handle("okf:pickWorkspace", async (): Promise<Result<WorkspaceInfo | null>> => {
+    if (!state.window) return ok(null);
+    const result = await dialog.showOpenDialog(state.window, {
+      properties: ["openDirectory"],
+      title: mainT("dialog.chooseWorkspace"),
+    });
+    if (result.canceled || result.filePaths.length === 0) return ok(null);
+    return activateWorkspace(result.filePaths[0]);
+  });
+
+  ipcMain.handle("okf:openWorkspace", async (_event, path: string) =>
+    activateWorkspace(path),
+  );
+}
+
+async function createWindow(): Promise<BrowserWindow> {
+  const win = new BrowserWindow({
+    width: 1280,
+    height: 820,
+    minWidth: 960,
+    minHeight: 640,
+    backgroundColor: "#0e1214",
+    title: mainT("app.name"),
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.mjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  win.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    log("did-fail-load", errorCode, errorDescription, validatedURL);
+  });
+  win.webContents.on("console-message", (_event, level, message) => {
+    log("renderer:", level, message);
+  });
+
+  const devUrl = process.env["ELECTRON_RENDERER_URL"];
+  try {
+    if (devUrl) {
+      await win.loadURL(devUrl);
+      win.webContents.openDevTools({ mode: "right" });
+    } else {
+      await win.loadFile(join(__dirname, "../renderer/index.html"));
+    }
+  } catch (error) {
+    fatal(mainT("error.windowLoad"), error);
+    throw error;
+  }
+  return win;
+}
+
+app.whenReady().then(async () => {
+  log("ready");
+  registerGlobalHandlers();
+  try {
+    state.window = await createWindow();
+    log("window created");
+  } catch (error) {
+    fatal(mainT("error.windowCreate"), error);
+    return;
+  }
+  app.on("activate", async () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      state.window = await createWindow();
+    }
+  });
+});
+
+process.on("unhandledRejection", (reason) => {
+  log("unhandledRejection", reason);
+});
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit();
+});
+
+app.on("before-quit", async () => {
+  if (state.repo) await state.repo.dispose();
+});

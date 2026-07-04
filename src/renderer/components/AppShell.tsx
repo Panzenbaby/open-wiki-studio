@@ -1,0 +1,231 @@
+import { Fragment, useEffect } from "react";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { Menu as MenuIcon, Settings as SettingsIcon, X as CloseIcon } from "lucide-react";
+import { api } from "../ipc.ts";
+import { useT } from "../i18n.ts";
+import {
+  browserFolderAtom,
+  browserModeAtom,
+  chatTurnEndedAtom,
+  countsAtom,
+  currentSessionAtom,
+  ingestErrorAtom,
+  ingestStateAtom,
+  ingestStreamAtom,
+  ingestSummaryAtom,
+  messagesAtom,
+  screenAtom,
+  sessionsAtom,
+  sidebarOpenAtom,
+  viewAtom,
+  workspaceAtom,
+} from "../store.ts";
+import { Sidebar } from "./Sidebar.tsx";
+import { Dashboard } from "../screens/Dashboard.tsx";
+import { Chat } from "../screens/Chat.tsx";
+import { Browser } from "../screens/Browser.tsx";
+import { IngestView } from "../screens/IngestView.tsx";
+import { Settings } from "../screens/Settings.tsx";
+import { IngestBar } from "./IngestBar.tsx";
+
+export function AppShell(): JSX.Element {
+  const t = useT();
+  const workspace = useAtomValue(workspaceAtom);
+  const [view, setView] = useAtom(viewAtom);
+  const setCounts = useSetAtom(countsAtom);
+  const setSessions = useSetAtom(sessionsAtom);
+  const [currentSession, setCurrentSession] = useAtom(currentSessionAtom);
+  const setMessages = useSetAtom(messagesAtom);
+  const messages = useAtomValue(messagesAtom);
+  const ingestState = useAtomValue(ingestStateAtom);
+  const ingestSummary = useAtomValue(ingestSummaryAtom);
+  const setIngestError = useSetAtom(ingestErrorAtom);
+  const setIngestState = useSetAtom(ingestStateAtom);
+  const setIngestStream = useSetAtom(ingestStreamAtom);
+  const setIngestSummary = useSetAtom(ingestSummaryAtom);
+  const setScreen = useSetAtom(screenAtom);
+  const setBrowserFolder = useSetAtom(browserFolderAtom);
+  const setBrowserMode = useSetAtom(browserModeAtom);
+  const turnEnded = useAtomValue(chatTurnEndedAtom);
+  const [sidebarOpen, setSidebarOpen] = useAtom(sidebarOpenAtom);
+
+  async function refreshCounts(): Promise<void> {
+    const [input, wiki, archive] = await Promise.all([
+      api.listFolder("input"),
+      api.listFolder("wiki"),
+      api.listFolder("archive"),
+    ]);
+    setCounts({
+      input: input.success ? input.data.length : 0,
+      wiki: wiki.success ? wiki.data.length : 0,
+      archive: archive.success ? archive.data.length : 0,
+    });
+  }
+
+  async function refreshSessions(): Promise<void> {
+    const list = await api.listSessions();
+    if (list.success) setSessions(list.data);
+  }
+
+  async function loadMessages(): Promise<void> {
+    const result = await api.getMessages();
+    setMessages(result.success ? [...result.data] : []);
+  }
+
+  // Kick off /wiki-update from any entry point (dashboard button, ingest bar,
+  // ingest view). Resets the ingest state machine so the previous run's
+  // stream/summary/"done" state does not linger while the new run starts,
+  // navigates to the ingest view, and surfaces IPC-level errors (turn-level
+  // errors arrive via the ingest event stream and are handled in App.tsx).
+  async function runIngest(): Promise<void> {
+    setView("ingest");
+    setIngestSummary(null);
+    setIngestStream("");
+    setIngestError(null);
+    setIngestState("running");
+    const result = await api.ingest();
+    if (!result.success) {
+      setIngestState("idle");
+      setIngestError(result.error.message);
+    }
+  }
+
+  useEffect(() => {
+    void (async () => {
+      await refreshCounts();
+      await refreshSessions();
+      const list = await api.listSessions();
+      if (list.success && list.data.length > 0) {
+        const opened = await api.openSession(list.data[0].path);
+        if (opened.success) {
+          setCurrentSession(opened.data);
+          await loadMessages();
+        }
+      } else {
+        const created = await api.newSession();
+        if (created.success) {
+          setCurrentSession(created.data);
+          setMessages([]);
+          await refreshSessions();
+        }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+useEffect(() => {
+    if (ingestSummary) void refreshCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ingestSummary]);
+
+  // Refresh folder counts whenever the user returns to the dashboard so
+  // changes made in the Browser (adding/removing input files) are reflected.
+  // Without this, counts stay stale after adding files and the dashboard's
+  // "input pending" hero / Run /wiki-update button would not appear.
+  useEffect(() => {
+    if (view === "dashboard") void refreshCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
+  useEffect(() => {
+    if (messages.length === 1) void refreshSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length]);
+
+  // Refresh the session list whenever a chat turn ends so the
+  // most-recently-active session (updated lastModified) bubbles to the top.
+  useEffect(() => {
+    if (turnEnded === 0) return;
+    void refreshSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turnEnded]);
+
+  const navBtn = (target: "chat" | "dashboard" | "browser", label: string): JSX.Element => (
+    <button
+      className={`btn btn-sm btn-ghost mono${view === target ? " active" : ""}`}
+      onClick={() => setView(target)}
+    >
+      {label}
+    </button>
+  );
+
+  const closeSidebar = (): void => setSidebarOpen(false);
+
+  const handleDeleteSession = async (path: string): Promise<void> => {
+    const isCurrent = currentSession?.path === path;
+    const result = await api.deleteSession(path);
+    if (!result.success) return;
+    if (isCurrent) {
+      const created = await api.newSession();
+      if (created.success) {
+        setCurrentSession(created.data);
+        setMessages([]);
+      }
+    }
+    await refreshSessions();
+  };
+
+  return (
+    <div className="shell">
+      <header className="appbar">
+        {view === "chat" && (
+          <button
+            className="iconbtn sidebar-toggle"
+            onClick={() => setSidebarOpen((v) => !v)}
+            title={t("sidebar.toggle")}
+            aria-label={t("sidebar.toggle")}
+            aria-expanded={sidebarOpen}
+          >
+            {sidebarOpen ? <CloseIcon size={18} /> : <MenuIcon size={18} />}
+          </button>
+        )}
+        <div className="brand"><span className="mark">{t("app.avatar")}</span> {t("app.name")}</div>
+        <span className="crumb">{workspace?.name ?? ""}</span>
+        <div className="spacer" />
+        {navBtn("dashboard", t("nav.workspace"))}
+        {navBtn("chat", t("nav.chat"))}
+        {navBtn("browser", t("nav.files"))}
+        <button className="iconbtn" onClick={() => setView("settings")} title={t("nav.settings")}><SettingsIcon size={16} /></button>
+      </header>
+      <div className="body">
+        {view === "chat" && (
+          <Fragment>
+            <div className={`sidebar-backdrop${sidebarOpen ? " open" : ""}`} onClick={closeSidebar} />
+            <Sidebar
+              open={sidebarOpen}
+              onAfterSelect={closeSidebar}
+              onOpenSession={async (path) => {
+                const opened = await api.openSession(path);
+                if (opened.success) {
+                  setCurrentSession(opened.data);
+                  await loadMessages();
+                  setView("chat");
+                }
+              }}
+              onNewSession={async () => {
+                const created = await api.newSession();
+                if (created.success) {
+                  setCurrentSession(created.data);
+                  setMessages([]);
+                  setView("chat");
+                  await refreshSessions();
+                }
+              }}
+              onDeleteSession={handleDeleteSession}
+            />
+          </Fragment>
+        )}
+        <main className="pane grow">
+          {view === "dashboard" && <Dashboard onAsk={async () => { const created = await api.newSession(); if (created.success) { setCurrentSession(created.data); setMessages([]); setView("chat"); await refreshSessions(); } }} onOpenSession={async (path) => { const opened = await api.openSession(path); if (opened.success) { setCurrentSession(opened.data); await loadMessages(); setView("chat"); } }} onDeleteSession={handleDeleteSession} onSwitchWorkspace={() => setScreen("picker")} onBrowser={(folder) => { setBrowserFolder(folder); setBrowserMode("files"); setView("browser"); }} onIngest={runIngest} />}
+          {view === "chat" && <Chat />}
+          {view === "browser" && <Browser />}
+          {view === "ingest" && <IngestView onRun={runIngest} />}
+          {view === "settings" && <Settings />}
+        </main>
+      </div>
+      {(ingestState !== "idle" || view === "dashboard") && (
+        <IngestBar onRun={runIngest} onView={() => setView("ingest")} />
+      )}
+    </div>
+  );
+}

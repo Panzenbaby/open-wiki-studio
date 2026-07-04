@@ -1,0 +1,17 @@
+{
+  "0": "Agent Runtime & Repository",
+  "1": "Dependencies & Manifest",
+  "2": "Config & Recent Workspaces",
+  "3": "TypeScript Config",
+  "4": "LLM Config Form & IPC",
+  "5": "Chat Message & Concept Links",
+  "6": "Electron Builder Packaging",
+  "7": "Architecture & README Concepts",
+  "8": "Renderer State Atoms",
+  "9": "App Shell & Sidebar",
+  "10": "Community 10",
+  "12": "Wiki Scan & Snapshot Diff",
+  "16": "Auth & Wiki Query",
+  "17": "Wiki Update & Ingest Summary",
+  "18": "Vite Build Config"
+}

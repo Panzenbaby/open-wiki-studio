@@ -1,0 +1,49 @@
+// Preload: exposes a strictly-typed AgentApi to the renderer via contextBridge.
+// Event methods subscribe to the streaming channels from the main process.
+import { contextBridge, ipcRenderer } from "electron";
+import type { AgentApi, AgentEvent, IngestSummary } from "../shared/ipc-types.ts";
+
+const api: AgentApi = {
+  getAppSelf: () => ipcRenderer.invoke("okf:getAppSelf"),
+  getLlmConfig: () => ipcRenderer.invoke("okf:getLlmConfig"),
+  listRecentWorkspaces: () => ipcRenderer.invoke("okf:listRecentWorkspaces"),
+  openWorkspace: (path) => ipcRenderer.invoke("okf:openWorkspace", path),
+  pickWorkspace: () => ipcRenderer.invoke("okf:pickWorkspace"),
+
+  configureLlm: (config) => ipcRenderer.invoke("okf:configureLlm", config),
+
+  listFolder: (folder) => ipcRenderer.invoke("okf:listFolder", folder),
+  getPreview: (relativePath) => ipcRenderer.invoke("okf:getPreview", relativePath),
+  addInputFiles: (filePaths) => ipcRenderer.invoke("okf:addInputFiles", filePaths),
+  addInputFilesDialog: () => ipcRenderer.invoke("okf:addInputFilesDialog"),
+  revealInFileManager: (folder, relativePath, isDirectory) => ipcRenderer.invoke("okf:revealInFileManager", folder, relativePath, isDirectory),
+
+  listSessions: () => ipcRenderer.invoke("okf:listSessions"),
+  newSession: () => ipcRenderer.invoke("okf:newSession"),
+  openSession: (path) => ipcRenderer.invoke("okf:openSession", path),
+  deleteSession: (path) => ipcRenderer.invoke("okf:deleteSession", path),
+  getMessages: () => ipcRenderer.invoke("okf:getMessages"),
+  getWikiGraph: () => ipcRenderer.invoke("okf:getWikiGraph"),
+
+  ask: (question) => ipcRenderer.invoke("okf:ask", question),
+  ingest: () => ipcRenderer.invoke("okf:ingest"),
+  abort: () => ipcRenderer.invoke("okf:abort"),
+
+  onAgentEvent: (listener) => {
+    const handler = (_event: unknown, payload: AgentEvent) => listener(payload);
+    ipcRenderer.on("okf:chat-event", handler);
+    return () => ipcRenderer.removeListener("okf:chat-event", handler);
+  },
+  onIngestEvent: (listener) => {
+    const handler = (_event: unknown, payload: AgentEvent) => listener(payload);
+    ipcRenderer.on("okf:ingest-event", handler);
+    return () => ipcRenderer.removeListener("okf:ingest-event", handler);
+  },
+  onIngestSummary: (listener) => {
+    const handler = (_event: unknown, payload: IngestSummary) => listener(payload);
+    ipcRenderer.on("okf:ingest-summary", handler);
+    return () => ipcRenderer.removeListener("okf:ingest-summary", handler);
+  },
+};
+
+contextBridge.exposeInMainWorld("api", api);
