@@ -247,6 +247,7 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 }
 .session-item:hover { background: var(--glass-bg); }
 .session-item.active { background: color-mix(in oklab, var(--accent), transparent 82%); border-color: color-mix(in oklab, var(--accent), transparent 55%); }
+.session-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .session-item .s-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .session-item .s-title { font-size: var(--text-sm); color: var(--fg); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-item .s-meta { font-size: var(--text-xs); color: var(--muted); font-family: var(--font-mono); }
@@ -476,6 +477,8 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .folder-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
 .folder-card { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-6); background: var(--glass-bg); cursor: pointer; transition: border-color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard); }
 .folder-card:hover { border-color: var(--accent); background: var(--glass-bg-hover); }
+button.folder-card { font: inherit; color: inherit; text-align: left; width: 100%; }
+button.folder-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .folder-card .fc-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
 .folder-card .fc-icon { width: 36px; height: 36px; border-radius: var(--radius-md); display: grid; place-items: center; font-family: var(--font-mono); font-weight: 700; }
 .folder-card .fc-icon.input { background: color-mix(in oklab, var(--input-fg), transparent 80%); color: var(--input-fg); }

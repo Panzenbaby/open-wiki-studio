@@ -1,6 +1,6 @@
 // Filesystem operations on the workspace folders, returned as Result<T>.
 import { copyFile, mkdir, readFile, stat } from "node:fs/promises";
-import { basename, dirname, join, relative, sep } from "node:path";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { shell } from "electron";
 import { parseDocument } from "./frontmatter.ts";
 import { ok, err, errorMessage } from "../shared/result.ts";
@@ -19,6 +19,20 @@ function workspaceDir(workspace: string, folder: Folder): string {
   return join(workspace, folder);
 }
 
+/**
+ * Resolve `relativePath` under `baseDir` and guard against traversal. Returns
+ * null when the resolved path escapes `baseDir` (e.g. `../../etc/passwd`) or
+ * when `relativePath` is absolute. The renderer is local/trusted, but IPC
+ * handlers are reachable from any renderer frame, so we validate defensively.
+ */
+function safeResolve(baseDir: string, relativePath: string): string | null {
+  if (relativePath === "" || isAbsolute(relativePath)) return null;
+  const resolved = resolve(baseDir, relativePath);
+  const rel = relative(baseDir, resolved);
+  if (rel.startsWith(`..${sep}`) || rel === `..`) return null;
+  return resolved;
+}
+
 async function walk(dir: string, root: string): Promise<FileNode[]> {
   const out: FileNode[] = [];
   let entries: import("node:fs").Dirent[];
@@ -28,6 +42,7 @@ async function walk(dir: string, root: string): Promise<FileNode[]> {
     return out;
   }
   for (const entry of entries) {
+    if (entry.name.startsWith(".")) continue;
     const abs = join(dir, entry.name);
     if (entry.isDirectory()) {
       out.push(...(await walk(abs, root)));
@@ -62,7 +77,10 @@ export async function getPreview(
   relativePath: string,
 ): Promise<Result<FilePreview>> {
   // relativePath may be "wiki/foo.md" or just "foo.md"; resolve under workspace.
-  const absolute = join(workspace, relativePath);
+  const absolute = safeResolve(workspace, relativePath);
+  if (!absolute) {
+    return err<FilePreview>(`Invalid path: ${relativePath}`, { path: relativePath });
+  }
   try {
     const content = await readFile(absolute, "utf8");
     const isMarkdown = relativePath.endsWith(".md");
@@ -106,10 +124,16 @@ export async function addInputFiles(
     await mkdir(inputDir, { recursive: true });
     const added: string[] = [];
     for (const source of filePaths) {
-      const dest = join(inputDir, basename(source));
-      await mkdir(dirname(dest), { recursive: true });
+      const name = basename(source);
+      const dest = join(inputDir, name);
+      // Refuse to overwrite an existing input file with the same name —
+      // a silent overwrite loses the user's previously added document.
+      const exists = await stat(dest).then(() => true).catch(() => false);
+      if (exists) {
+        return err<readonly string[]>(mainT("dialog.fileExists", { name }), { path: name });
+      }
       await copyFile(source, dest);
-      added.push(basename(source));
+      added.push(name);
     }
     return ok(added);
   } catch (error) {
@@ -127,7 +151,11 @@ export async function revealInFileManager(
   relativePath: string,
   isDirectory: boolean,
 ): Promise<Result<void>> {
-  const absolute = join(workspaceDir(workspace, folder), relativePath);
+  const base = workspaceDir(workspace, folder);
+  const absolute = safeResolve(base, relativePath);
+  if (!absolute) {
+    return err<void>(`Invalid path: ${relativePath}`, { path: relativePath });
+  }
   try {
     if (isDirectory) {
       const error = await shell.openPath(absolute);

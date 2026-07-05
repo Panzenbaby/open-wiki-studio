@@ -52,7 +52,15 @@ export function Sidebar(props: SidebarProps): JSX.Element {
           <li
             key={session.path}
             className={`session-item${current?.path === session.path ? " active" : ""}`}
+            role="button"
+            tabIndex={0}
             onClick={() => openSession(session.path)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openSession(session.path);
+              }
+            }}
           >
             <div className="s-content">
               <div className="s-title">{session.name}</div>

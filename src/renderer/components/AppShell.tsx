@@ -20,6 +20,7 @@ import {
   viewAtom,
   workspaceAtom,
 } from "../store.ts";
+import type { SessionInfo } from "../../shared/ipc-types.ts";
 import { Sidebar } from "./Sidebar.tsx";
 import { Dashboard } from "../screens/Dashboard.tsx";
 import { Chat } from "../screens/Chat.tsx";
@@ -62,9 +63,11 @@ export function AppShell(): JSX.Element {
     });
   }
 
-  async function refreshSessions(): Promise<void> {
+  async function refreshSessions(): Promise<readonly SessionInfo[]> {
     const list = await api.listSessions();
-    if (list.success) setSessions(list.data);
+    const sessions = list.success ? list.data : [];
+    setSessions(sessions);
+    return sessions;
   }
 
   async function loadMessages(): Promise<void> {
@@ -93,10 +96,9 @@ export function AppShell(): JSX.Element {
   useEffect(() => {
     void (async () => {
       await refreshCounts();
-      await refreshSessions();
-      const list = await api.listSessions();
-      if (list.success && list.data.length > 0) {
-        const opened = await api.openSession(list.data[0].path);
+      const sessions = await refreshSessions();
+      if (sessions.length > 0) {
+        const opened = await api.openSession(sessions[0].path);
         if (opened.success) {
           setCurrentSession(opened.data);
           await loadMessages();
@@ -153,14 +155,28 @@ useEffect(() => {
 
   const handleDeleteSession = async (path: string): Promise<void> => {
     const isCurrent = currentSession?.path === path;
-    const result = await api.deleteSession(path);
-    if (!result.success) return;
+    // If we're deleting the active session, switch the runtime to a fresh
+    // session FIRST — the repository refuses to delete the session it is
+    // currently bound to (unlinking it would leave the runtime in a bad
+    // state). Switching before deleting keeps the file valid until the
+    // runtime has moved on.
     if (isCurrent) {
       const created = await api.newSession();
       if (created.success) {
         setCurrentSession(created.data);
         setMessages([]);
+      } else {
+        // Could not switch away — abort the delete rather than leave the
+        // runtime pointing at a deleted file.
+        return;
       }
+    }
+    const result = await api.deleteSession(path);
+    if (!result.success) {
+      // Delete failed; if we switched away for this, the user is now on a
+      // fresh empty session, which is an acceptable state. Refresh anyway.
+      await refreshSessions();
+      return;
     }
     await refreshSessions();
   };

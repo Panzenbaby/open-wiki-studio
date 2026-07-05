@@ -25,6 +25,8 @@ export const messages: Record<Locale, Dict> = {
       "The workspace is the folder containing input/, wiki/ and archive/ (they will be created if missing).",
     "picker.chooseFolder": "Choose folder…",
     "picker.recent": "Recently opened",
+    "picker.openFailed": "Could not open workspace",
+    "picker.pickFailed": "Could not choose folder",
 
     // ── first run ─────────────────────────────────────────────────
     "firstrun.title": "Connect an LLM",
@@ -38,6 +40,8 @@ export const messages: Record<Locale, Dict> = {
     "llf.baseUrl": "Base URL",
     "llf.apiKey": "API key",
     "llf.apiKeyOptional": "optional",
+    "llf.apiKeyRequired": "An API key is required for this provider.",
+    "llf.saveFailed": "Could not save configuration",
 
     // Provider sub-descriptions shown in the provider selector grid.
     "llf.anthropic.sub": "Claude · anthropic-messages",
@@ -139,7 +143,9 @@ export const messages: Record<Locale, Dict> = {
     "session.newDefault": "New question",
     "concept.untyped": "(untyped)",
     "error.allRetriesFailed": "All retry attempts failed",
+    "error.ingestTimeout": "Ingest did not finish in time",
     "dialog.addFiles": "Add files to input/",
+    "dialog.fileExists": "A file named \"{name}\" already exists in input/",
     "dialog.chooseWorkspace": "Choose a workspace folder",
     "dialog.startupError": "Open Wiki Studio — startup error",
     "error.windowLoad": "Failed to load renderer window",
@@ -185,6 +191,8 @@ export const messages: Record<Locale, Dict> = {
       "Der Workspace ist der Ordner, der input/, wiki/ und archive/ enthält (oder sie werden angelegt).",
     "picker.chooseFolder": "Ordner wählen…",
     "picker.recent": "Zuletzt geöffnet",
+    "picker.openFailed": "Workspace konnte nicht geöffnet werden",
+    "picker.pickFailed": "Ordner konnte nicht gewählt werden",
 
     // ── first run ─────────────────────────────────────────────────
     "firstrun.title": "LLM verbinden",
@@ -199,6 +207,8 @@ export const messages: Record<Locale, Dict> = {
     "llf.baseUrl": "Base URL",
     "llf.apiKey": "API-Key",
     "llf.apiKeyOptional": "optional",
+    "llf.apiKeyRequired": "Für diesen Anbieter ist ein API-Schlüssel erforderlich.",
+    "llf.saveFailed": "Konfiguration konnte nicht gespeichert werden",
 
     "llf.anthropic.sub": "Claude · anthropic-messages",
     "llf.openai.sub": "GPT · openai-responses",
@@ -304,7 +314,9 @@ export const messages: Record<Locale, Dict> = {
     "concept.untyped": "(untypisiert)",
     "error.allRetriesFailed":
       "Alle Wiederholungsversuche fehlgeschlagen",
+    "error.ingestTimeout": "Ingest wurde nicht rechtzeitig abgeschlossen",
     "dialog.addFiles": "Dateien zu input/ hinzufügen",
+    "dialog.fileExists": "Eine Datei namens \"{name}\" existiert bereits in input/",
     "dialog.chooseWorkspace": "Workspace-Ordner wählen",
     "dialog.startupError": "Open Wiki Studio — Startfehler",
     "error.windowLoad": "Renderer-Fenster konnte nicht geladen werden",

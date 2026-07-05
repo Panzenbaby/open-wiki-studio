@@ -45,12 +45,19 @@ function parseYaml(lines: string[]): ParsedDocument["frontmatter"] {
     raw[key] = parseValue(line.slice(idx + 1).trim());
   }
   const type = asString(raw["type"]);
-  if (!type) return null;
+  const title = asString(raw["title"]);
+  const description = asString(raw["description"]);
+  const tags = asStringArray(raw["tags"]);
+  // Return the partial frontmatter even when `type` is missing — callers
+  // fall back to `mainT("concept.untyped")` for the type, and dropping a
+  // present `title`/`description`/`tags` just because `type` is absent would
+  // hide valid metadata from previews and the graph.
+  if (!type && !title && !description && tags.length === 0) return null;
   return {
     type,
-    title: asString(raw["title"]),
-    description: asString(raw["description"]),
-    tags: asStringArray(raw["tags"]),
+    title,
+    description,
+    tags,
   };
 }
 

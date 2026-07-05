@@ -45,6 +45,7 @@ async function walk(dir: string, root: string): Promise<readonly { relativePath:
     return out;
   }
   for (const entry of entries) {
+    if (entry.name.startsWith(".")) continue;
     const abs = join(dir, entry.name);
     if (entry.isDirectory()) {
       out.push(...(await walk(abs, root)));
@@ -84,8 +85,7 @@ function extractLinks(body: string): readonly string[] {
     if (id) refs.add(id);
   }
   // bare concept paths (also catches links already wrapped in markdown
-  // — deduped via the Set)
-  CONCEPT_RE.lastIndex = 0;
+  // — deduped via the Set). matchAll ignores lastIndex, so no reset needed.
   for (const match of body.matchAll(CONCEPT_RE)) {
     const id = toConceptId(match[0]);
     if (id) refs.add(id);

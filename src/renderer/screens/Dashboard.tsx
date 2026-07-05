@@ -109,7 +109,7 @@ function FolderCard(props: { dot: "input" | "wiki" | "archive"; onClick: () => v
   const countKey = props.dot === "input" ? "folder.input.count" : props.dot === "wiki" ? "folder.wiki.count" : "folder.archive.count";
   const descKey = props.dot === "input" ? "folder.input.desc" : props.dot === "wiki" ? "folder.wiki.desc" : "folder.archive.desc";
   return (
-    <div className="folder-card" onClick={props.onClick}>
+    <button type="button" className="folder-card" onClick={props.onClick}>
       <div className="fc-head">
         <div className={`fc-icon ${props.dot}`}>{props.dot === "input" ? <Download size={18} /> : props.dot === "wiki" ? <FileText size={18} /> : <Archive size={18} />}</div>
         <div>
@@ -118,6 +118,6 @@ function FolderCard(props: { dot: "input" | "wiki" | "archive"; onClick: () => v
         </div>
       </div>
       <div className="fc-desc">{t(descKey)}</div>
-    </div>
+    </button>
   );
 }

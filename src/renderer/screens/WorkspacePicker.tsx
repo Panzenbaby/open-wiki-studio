@@ -6,6 +6,7 @@ import {
   screenAtom,
   workspaceAtom,
   llmConfiguredAtom,
+  toastAtom,
 } from "../store.ts";
 
 export function WorkspacePicker(): JSX.Element {
@@ -14,10 +15,14 @@ export function WorkspacePicker(): JSX.Element {
   const setWorkspace = useSetAtom(workspaceAtom);
   const setLlmConfigured = useSetAtom(llmConfiguredAtom);
   const [, setScreen] = useAtom(screenAtom);
+  const setToast = useSetAtom(toastAtom);
 
   async function activate(path: string): Promise<void> {
     const result = await api.openWorkspace(path);
-    if (!result.success) return;
+    if (!result.success) {
+      setToast({ message: `${t("picker.openFailed")}: ${result.error.message}`, kind: "error" });
+      return;
+    }
     setWorkspace(result.data);
     const self = await api.getAppSelf();
     if (self.success) setLlmConfigured(self.data.hasLlmConfig);
@@ -26,7 +31,11 @@ export function WorkspacePicker(): JSX.Element {
 
   async function pick(): Promise<void> {
     const result = await api.pickWorkspace();
-    if (!result.success || !result.data) return;
+    if (!result.success) {
+      setToast({ message: `${t("picker.pickFailed")}: ${result.error.message}`, kind: "error" });
+      return;
+    }
+    if (!result.data) return;
     setWorkspace(result.data);
     const self = await api.getAppSelf();
     if (self.success) setLlmConfigured(self.data.hasLlmConfig);

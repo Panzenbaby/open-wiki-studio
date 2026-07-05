@@ -144,7 +144,7 @@ export class AgentRepository {
     this.summaryListener = listener;
   }
 
-  private forward(session: AgentSession, listener: () => void, emit: (e: AgentEvent) => void): () => void {
+  private forward(session: AgentSession, emit: (e: AgentEvent) => void): () => void {
     return session.subscribe((event) => {
       if (event.type === "agent_start") {
         emit({ type: "agent_start", sessionId: session.sessionId });
@@ -158,7 +158,6 @@ export class AgentRepository {
       } else if (event.type === "auto_retry_end" && !event.success) {
         emit({ type: "error", message: event.finalError ?? mainT("error.allRetriesFailed") });
       }
-      listener();
     });
   }
 
@@ -166,13 +165,13 @@ export class AgentRepository {
     this.chatUnsub?.();
     const session = this.runtime.session;
     await session.bindExtensions({});
-    this.chatUnsub = this.forward(session, () => {}, (e) => this.chatListener?.(e));
+    this.chatUnsub = this.forward(session, (e) => this.chatListener?.(e));
   }
 
   private async bindIngest(): Promise<void> {
     this.ingestUnsub?.();
     await this.ingestSession.bindExtensions({});
-    this.ingestUnsub = this.forward(this.ingestSession, () => {}, (e) => this.ingestListener?.(e));
+    this.ingestUnsub = this.forward(this.ingestSession, (e) => this.ingestListener?.(e));
   }
 
   // ─── LLM ────────────────────────────────────────────────────────
@@ -196,7 +195,10 @@ export class AgentRepository {
           // registerProvider requires an apiKey when defining models (validator rejects
           // empty string); for providers that don't need one, pass a placeholder.
           apiKey: config.apiKey || (config.provider === "ollama" ? "ollama" : "not-needed"),
-          api: "openai-completions" as never,
+          // "openai-completions" is a KnownApi in pi-ai (the OpenAI chat
+          // completions wire protocol) and is the protocol Ollama +
+          // OpenAI-compatible endpoints speak.
+          api: "openai-completions",
           models: [
             {
               id: config.modelId,
@@ -263,6 +265,14 @@ export class AgentRepository {
   }
 
   async deleteSession(path: string): Promise<Result<void>> {
+    // Refuse to delete the session the runtime is currently bound to —
+    // unlinking it would leave the runtime pointing at a file that no longer
+    // exists, and the next prompt would fail opaquely. Callers must switch to
+    // a different session first (the UI does this by creating a new session
+    // after a successful delete when the deleted one was current).
+    if (path === this.runtime.session.sessionFile) {
+      return err<void>(`Cannot delete the active session`, { path });
+    }
     try {
       await unlink(path);
       return ok(undefined);
@@ -311,6 +321,12 @@ export class AgentRepository {
 
   // ─── agent actions ──────────────────────────────────────────────
   async ask(question: string): Promise<Result<void>> {
+    // Note on Result<void> semantics: `ask`/`ingest` only capture
+    // *synchronous* failures of `prompt()` (e.g. the command is unknown, the
+    // session is disposed). The agent runs asynchronously after `prompt`
+    // resolves; turn-level errors surface as `error` events on the event
+    // stream (handled in `forward()`), NOT through this return value. Callers
+    // must not assume `ok` means the agent finished successfully.
     try {
       await this.runtime.session.prompt(`/wiki-query ${question}`);
       return ok(undefined);
@@ -339,27 +355,65 @@ export class AgentRepository {
       // not wait forever: if no `agent_start` arrives within a grace window
       // after the command returns, the run needed no turn and the state is
       // already final.
+      //
+      // The wait is structured as a race so a mid-turn failure (`error`
+      // event) or a stuck turn (hard timeout) rejects instead of hanging
+      // the IngestView on "running" forever.
+      const TURN_GRACE_MS = 3000; // wait this long for agent_start after prompt
+      const TURN_TIMEOUT_MS = 5 * 60 * 1000; // hard cap for a single turn
+
       let sawStart = false;
-      let endResolver: (() => void) | null = null;
-      const turnEnded = new Promise<void>((resolve) => {
-        endResolver = resolve;
+      let resolveStart: () => void = () => {};
+      let rejectStart: (error: Error) => void = () => {};
+      let resolveEnd: () => void = () => {};
+      let rejectEnd: (error: Error) => void = () => {};
+      const startedPromise = new Promise<void>((res, rej) => {
+        resolveStart = res;
+        rejectStart = rej;
       });
+      const endedPromise = new Promise<void>((res, rej) => {
+        resolveEnd = res;
+        rejectEnd = rej;
+      });
+
       const off = this.ingestSession.subscribe((event) => {
         if (event.type === "agent_start") {
-          sawStart = true;
-        } else if (event.type === "agent_end" && sawStart && endResolver) {
-          endResolver();
-          endResolver = null;
+          if (!sawStart) {
+            sawStart = true;
+            resolveStart();
+          }
+        } else if (event.type === "agent_end" && sawStart) {
+          resolveEnd();
+        } else if (event.type === "auto_retry_end" && !event.success) {
+          const e = new Error(event.finalError ?? mainT("error.allRetriesFailed"));
+          rejectStart(e);
+          rejectEnd(e);
         }
       });
       try {
         await this.ingestSession.prompt("/wiki-update");
-        if (!sawStart) {
-          // sendUserMessage is async; agent_start may fire a few ticks after
-          // the command handler returns. Give it a brief grace window.
-          await new Promise<void>((resolve) => setTimeout(resolve, 2000));
+        // Race agent_start against a grace window. sendUserMessage is async,
+        // so agent_start may fire a few ticks after the command handler
+        // returns; if it doesn't fire at all, no turn was needed.
+        const noTurn = new Promise<false>((resolve) =>
+          setTimeout(() => resolve(false), TURN_GRACE_MS),
+        );
+        const started = await Promise.race([
+          startedPromise.then(() => true as const),
+          noTurn,
+        ]);
+        if (started) {
+          // Turn started — wait for agent_end, error, or hard timeout.
+          await Promise.race([
+            endedPromise,
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error(mainT("error.ingestTimeout"))),
+                TURN_TIMEOUT_MS,
+              ),
+            ),
+          ]);
         }
-        if (sawStart) await turnEnded;
       } finally {
         off();
       }
@@ -368,9 +422,6 @@ export class AgentRepository {
       const diff = diffSnapshots(before, after);
       const leftover = await listInputFiles(this.workspace);
       const summary: IngestSummary = {
-        conformantImported: [],
-        nonConformantHandedToAgent: [],
-        ignored: [],
         leftover,
         createdConcepts: diff.created,
         updatedConcepts: diff.updated,

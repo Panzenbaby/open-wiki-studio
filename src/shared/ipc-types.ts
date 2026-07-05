@@ -87,9 +87,6 @@ export type AgentEvent =
   | { type: "error"; message: string };
 
 export interface IngestSummary {
-  readonly conformantImported: readonly string[];
-  readonly nonConformantHandedToAgent: readonly string[];
-  readonly ignored: ReadonlyArray<{ path: string; reason: string }>;
   readonly leftover: readonly string[];
   readonly createdConcepts: readonly string[];
   readonly updatedConcepts: readonly string[];

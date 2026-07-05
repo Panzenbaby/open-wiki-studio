@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useSetAtom } from "jotai";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
+import { toastAtom } from "../store.ts";
 import type { LlmConfig, ProviderId } from "../../shared/ipc-types.ts";
 
 type ProviderDef = {
@@ -34,6 +36,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   const [apiKey, setApiKey] = useState(props.initial?.apiKey ?? "");
   const [baseUrl, setBaseUrl] = useState(props.initial?.baseUrl ?? "");
   const [busy, setBusy] = useState(false);
+  const setToast = useSetAtom(toastAtom);
 
   useEffect(() => {
     if (!props.initial) return;
@@ -46,7 +49,17 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   const selected = PROVIDERS.find((p) => p.id === provider)!;
   const showKeyField = selected.keyMode !== "none";
 
+  // A required-key provider needs a non-empty apiKey before we can save.
+  // Ollama / openai-compatible have their own key handling in the main
+  // process (placeholder key) so they are exempt.
+  const missingRequiredKey = selected.keyMode === "required" && !apiKey.trim();
+  const canSave = !busy && !missingRequiredKey;
+
   async function save(): Promise<void> {
+    if (missingRequiredKey) {
+      setToast({ message: t("llf.apiKeyRequired"), kind: "error" });
+      return;
+    }
     setBusy(true);
     const config: LlmConfig = {
       provider,
@@ -56,7 +69,10 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
     };
     const result = await api.configureLlm(config);
     setBusy(false);
-    if (!result.success) return;
+    if (!result.success) {
+      setToast({ message: `${t("llf.saveFailed")}: ${result.error.message}`, kind: "error" });
+      return;
+    }
     props.onSaved();
   }
 
@@ -108,9 +124,19 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
         </div>
       )}
 
-      <button className="btn btn-primary" disabled={busy} onClick={() => void save()} style={{ width: "100%", justifyContent: "center" }}>
+      <button
+        className="btn btn-primary"
+        disabled={!canSave}
+        onClick={() => void save()}
+        style={{ width: "100%", justifyContent: "center" }}
+      >
         {busy ? `${t("settings.save")}…` : props.submitLabel}
       </button>
+      {missingRequiredKey && (
+        <div className="hint" style={{ marginTop: "var(--space-3)", color: "var(--danger, #e06c75)" }}>
+          {t("llf.apiKeyRequired")}
+        </div>
+      )}
     </>
   );
 }

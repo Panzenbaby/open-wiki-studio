@@ -2,6 +2,7 @@
 // activation of the AgentRepository + IpcBridge for the chosen workspace.
 import "./polyfill.ts"; // must run before pi-coding-agent loads (undici worker_threads polyfill)
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AgentRepository } from "./agent.ts";
@@ -100,9 +101,23 @@ function registerGlobalHandlers(): void {
     return activateWorkspace(result.filePaths[0]);
   });
 
-  ipcMain.handle("okf:openWorkspace", async (_event, path: string) =>
-    activateWorkspace(path),
-  );
+  ipcMain.handle("okf:openWorkspace", async (_event, path: string) => {
+    // The renderer can pass any string here; validate that it resolves to
+    // an existing directory before activating. Refusing early gives a clear
+    // error instead of a cryptic failure deep inside AgentRepository.create.
+    if (typeof path !== "string" || path === "") {
+      return err<WorkspaceInfo>("Invalid workspace path");
+    }
+    try {
+      const info = await stat(path);
+      if (!info.isDirectory()) {
+        return err<WorkspaceInfo>(`Not a directory: ${path}`, { path });
+      }
+    } catch {
+      return err<WorkspaceInfo>(`Workspace not found: ${path}`, { path });
+    }
+    return activateWorkspace(path);
+  });
 }
 
 async function createWindow(): Promise<BrowserWindow> {
@@ -169,6 +184,15 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", async () => {
-  if (state.repo) await state.repo.dispose();
+app.on("before-quit", (event) => {
+  if (!state.repo) return;
+  // `before-quit` is not awaitable by default: prevent the quit, dispose
+  // the agent cleanly, then quit again. Without this, Electron may exit
+  // before `dispose()` finishes flushing session state.
+  event.preventDefault();
+  const repo = state.repo;
+  state.repo = null;
+  void repo.dispose().finally(() => {
+    app.exit(0);
+  });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
 import { api } from "./ipc.ts";
 import {
   chatErrorAtom,
@@ -19,6 +19,7 @@ import { useT, localeAtom } from "./i18n.ts";
 import { WorkspacePicker } from "./screens/WorkspacePicker.tsx";
 import { FirstRun } from "./screens/FirstRun.tsx";
 import { AppShell } from "./components/AppShell.tsx";
+import { Toast } from "./components/Toast.tsx";
 
 export function App(): JSX.Element {
   const t = useT();
@@ -37,6 +38,7 @@ export function App(): JSX.Element {
   const setIngestSummary = useSetAtom(ingestSummaryAtom);
   const setIngestError = useSetAtom(ingestErrorAtom);
   const bumpTurnEnded = useSetAtom(chatTurnEndedAtom);
+  const store = useStore();
 
   // Set the document title to the localized app name.
   useEffect(() => {
@@ -68,19 +70,20 @@ export function App(): JSX.Element {
       } else if (event.type === "agent_end") {
         setChatStreaming(false);
         bumpTurnEnded((n) => n + 1);
-        setMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (!last || last.role !== "assistant" || last.text.trim() === "") {
-            setChatError(tRef.current("chat.errorNoResponse"));
-          }
-          return prev;
-        });
+        // Read the latest messages from the store directly instead of
+        // calling setChatError inside a setMessages updater (a side effect
+        // during render). The store always reflects the current value.
+        const messages = store.get(messagesAtom);
+        const last = messages[messages.length - 1];
+        if (!last || last.role !== "assistant" || last.text.trim() === "") {
+          setChatError(tRef.current("chat.errorNoResponse"));
+        }
       } else if (event.type === "error") {
         setChatStreaming(false);
         setChatError(event.message);
       }
     });
-  }, [setChatStreaming, setChatError, setMessages, bumpTurnEnded]);
+  }, [setChatStreaming, setChatError, setMessages, bumpTurnEnded, store]);
 
   // Ingest event stream + summary.
   useEffect(() => {
@@ -120,9 +123,19 @@ export function App(): JSX.Element {
     );
   }
   if (screen === "picker" || screen === "first-run") {
-    return <div className="shell">{screen === "picker" ? <WorkspacePicker /> : <FirstRun />}</div>;
+    return (
+      <>
+        <div className="shell">{screen === "picker" ? <WorkspacePicker /> : <FirstRun />}</div>
+        <Toast />
+      </>
+    );
   }
-  return <AppShell />;
+  return (
+    <>
+      <AppShell />
+      <Toast />
+    </>
+  );
 }
 
 function updateLastAssistant(messages: readonly ChatMessage[], delta: string): ChatMessage[] {

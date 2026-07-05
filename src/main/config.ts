@@ -17,6 +17,22 @@ function configPath(): string {
   return join(app.getPath("userData"), "config.json");
 }
 
+// Serialize config reads+writes. Without this, two concurrent
+// `setLlmConfig` / `rememberWorkspace` calls interleave their
+// read-modify-write cycles and the last writer wins, silently dropping one
+// update. A simple promise chain is enough — config access is low-frequency.
+let configChain: Promise<unknown> = Promise.resolve();
+function withConfigLock<T>(work: () => Promise<T>): Promise<T> {
+  const run = configChain.then(work, work);
+  // Swallow rejections on the chain itself so a failed write doesn't poison
+  // every subsequent call; the caller still sees its own rejection.
+  configChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 async function readConfig(): Promise<ConfigShape> {
   try {
     const raw = await readFile(configPath(), "utf8");
@@ -59,20 +75,22 @@ export async function getLastWorkspace(): Promise<string | undefined> {
 export async function rememberWorkspace(
   folderPath: string,
 ): Promise<Result<WorkspaceInfo>> {
-  try {
-    const config = await readConfig();
-    const info = toInfo(folderPath);
-    const deduped = config.recentWorkspaces.filter((w) => w.path !== folderPath);
-    const next: ConfigShape = {
-      recentWorkspaces: [info, ...deduped].slice(0, MAX_RECENT),
-      lastWorkspace: folderPath,
-      llm: config.llm,
-    };
-    await writeConfig(next);
-    return ok(info);
-  } catch (error) {
-    return err<WorkspaceInfo>(`Failed to remember workspace: ${errorMessage(error)}`);
-  }
+  return withConfigLock(async () => {
+    try {
+      const config = await readConfig();
+      const info = toInfo(folderPath);
+      const deduped = config.recentWorkspaces.filter((w) => w.path !== folderPath);
+      const next: ConfigShape = {
+        recentWorkspaces: [info, ...deduped].slice(0, MAX_RECENT),
+        lastWorkspace: folderPath,
+        llm: config.llm,
+      };
+      await writeConfig(next);
+      return ok(info);
+    } catch (error) {
+      return err<WorkspaceInfo>(`Failed to remember workspace: ${errorMessage(error)}`);
+    }
+  });
 }
 
 export async function getLlmConfig(): Promise<LlmConfig | undefined> {
@@ -80,11 +98,13 @@ export async function getLlmConfig(): Promise<LlmConfig | undefined> {
 }
 
 export async function setLlmConfig(config: LlmConfig): Promise<Result<void>> {
-  try {
-    const current = await readConfig();
-    await writeConfig({ ...current, llm: config });
-    return ok(undefined);
-  } catch (error) {
-    return err<void>(`Failed to save LLM config: ${errorMessage(error)}`);
-  }
+  return withConfigLock(async () => {
+    try {
+      const current = await readConfig();
+      await writeConfig({ ...current, llm: config });
+      return ok(undefined);
+    } catch (error) {
+      return err<void>(`Failed to save LLM config: ${errorMessage(error)}`);
+    }
+  });
 }

@@ -35,6 +35,7 @@ async function walk(dir: string, root: string): Promise<readonly { relativePath:
     return out;
   }
   for (const entry of entries) {
+    if (entry.name.startsWith(".")) continue;
     const abs = join(dir, entry.name);
     if (entry.isDirectory()) {
       out.push(...(await walk(abs, root)));
