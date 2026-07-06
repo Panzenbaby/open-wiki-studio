@@ -18,10 +18,18 @@ export function Chat(): JSX.Element {
   const firstUser = messages.find((m) => m.role === "user")?.text;
   const title = (firstUser ? stripQueryCommand(firstUser) : "") || current?.name || t("chat.titleFallback");
   const streamRef = useRef<HTMLDivElement | null>(null);
+  const pinnedRef = useRef<boolean>(true);
+
+  function handleScroll(): void {
+    const el = streamRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    pinnedRef.current = distanceFromBottom < 32;
+  }
 
   useEffect(() => {
     const el = streamRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
   }, [messages, streaming]);
 
   async function send(): Promise<void> {
@@ -78,7 +86,7 @@ export function Chat(): JSX.Element {
           <div className="h-sub">{t("chat.command")}</div>
         </div>
       </div>
-      <div className="chat-stream" ref={streamRef}>
+      <div className="chat-stream" ref={streamRef} onScroll={handleScroll}>
         <div className="thread">
           {messages.length === 0 && (
             <div className="empty">
