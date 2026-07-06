@@ -240,7 +240,7 @@ useEffect(() => {
         </main>
       </div>
       {(ingestState !== "idle" || view === "dashboard") && (
-        <IngestBar onRun={runIngest} onView={() => setView("ingest")} />
+        <IngestBar onRun={runIngest} onView={view !== "ingest" ? () => setView("ingest") : undefined} />
       )}
     </div>
   );

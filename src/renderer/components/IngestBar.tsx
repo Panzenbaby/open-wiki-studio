@@ -5,7 +5,7 @@ import { countsAtom, ingestStateAtom } from "../store.ts";
 
 interface IngestBarProps {
   onRun: () => void;
-  onView: () => void;
+  onView?: () => void;
 }
 
 export function IngestBar(props: IngestBarProps): JSX.Element | null {
@@ -21,7 +21,9 @@ export function IngestBar(props: IngestBarProps): JSX.Element | null {
           <div className="ib-title">{t("ingestbar.running")}</div>
           <div className="ib-sub">{t("ingestbar.runningSub")}</div>
         </div>
-        <button className="btn btn-sm" onClick={props.onView}>{t("ingestbar.view")}</button>
+        {props.onView && (
+          <button className="btn btn-sm" onClick={props.onView}>{t("ingestbar.view")}</button>
+        )}
       </div>
     );
   }
