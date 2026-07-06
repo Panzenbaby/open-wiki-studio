@@ -68,6 +68,10 @@ export const messages: Record<Locale, Dict> = {
       "Run /wiki-update to ingest them as concepts into the wiki.",
     "dashboard.viewInput": "View input",
     "dashboard.runUpdate": "Run /wiki-update",
+    "dashboard.ingestRunning": "/wiki-update is running",
+    "dashboard.ingestRunningSub":
+      "The agent is transforming input files. Open the ingest view to watch progress.",
+    "dashboard.viewProgress": "View progress",
 
     // ── folder cards ──────────────────────────────────────────────
     "folder.input.name": "Input",
@@ -236,6 +240,10 @@ export const messages: Record<Locale, Dict> = {
       "Führe /wiki-update aus, um sie als Concepts ins Wiki zu übernehmen.",
     "dashboard.viewInput": "Input ansehen",
     "dashboard.runUpdate": "Run /wiki-update",
+    "dashboard.ingestRunning": "/wiki-update wird ausgeführt",
+    "dashboard.ingestRunningSub":
+      "Der Agent verarbeitet die Input-Dateien. Öffne die Ingest-Ansicht, um den Fortschritt zu sehen.",
+    "dashboard.viewProgress": "Fortschritt ansehen",
 
     // ── folder cards ──────────────────────────────────────────────
     "folder.input.name": "Input",

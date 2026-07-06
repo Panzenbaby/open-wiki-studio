@@ -232,7 +232,7 @@ useEffect(() => {
           </Fragment>
         )}
         <main className="pane grow">
-          {view === "dashboard" && <Dashboard onAsk={async () => { const created = await api.newSession(); if (created.success) { setCurrentSession(created.data); setMessages([]); setView("chat"); await refreshSessions(); } }} onOpenSession={async (path) => { const opened = await api.openSession(path); if (opened.success) { setCurrentSession(opened.data); await loadMessages(); setView("chat"); } }} onDeleteSession={handleDeleteSession} onSwitchWorkspace={() => setScreen("picker")} onBrowser={(folder) => { setBrowserFolder(folder); setBrowserMode("files"); setView("browser"); }} onIngest={runIngest} />}
+          {view === "dashboard" && <Dashboard onAsk={async () => { const created = await api.newSession(); if (created.success) { setCurrentSession(created.data); setMessages([]); setView("chat"); await refreshSessions(); } }} onOpenSession={async (path) => { const opened = await api.openSession(path); if (opened.success) { setCurrentSession(opened.data); await loadMessages(); setView("chat"); } }} onDeleteSession={handleDeleteSession} onSwitchWorkspace={() => setScreen("picker")} onBrowser={(folder) => { setBrowserFolder(folder); setBrowserMode("files"); setView("browser"); }} onIngest={runIngest} onViewIngest={() => setView("ingest")} />}
           {view === "chat" && <Chat />}
           {view === "browser" && <Browser />}
           {view === "ingest" && <IngestView onRun={runIngest} />}

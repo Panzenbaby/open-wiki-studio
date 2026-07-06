@@ -19,6 +19,18 @@ export function Chat(): JSX.Element {
   const title = (firstUser ? stripQueryCommand(firstUser) : "") || current?.name || t("chat.titleFallback");
   const streamRef = useRef<HTMLDivElement | null>(null);
   const pinnedRef = useRef<boolean>(true);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  function autosizeInput(): void {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }
+
+  useEffect(() => {
+    autosizeInput();
+  }, [input]);
 
   function handleScroll(): void {
     const el = streamRef.current;
@@ -126,6 +138,7 @@ export function Chat(): JSX.Element {
         <div className="box">
           <div className="field-wrap">
             <textarea
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {

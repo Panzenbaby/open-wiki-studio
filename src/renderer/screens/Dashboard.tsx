@@ -10,6 +10,7 @@ interface DashboardProps {
   onSwitchWorkspace: () => void;
   onBrowser: (folder: "input" | "wiki" | "archive") => void;
   onIngest: () => void;
+  onViewIngest: () => void;
 }
 
 export function Dashboard(props: DashboardProps): JSX.Element {
@@ -19,6 +20,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
   const ingestState = useAtomValue(ingestStateAtom);
   const sessions = useAtomValue(sessionsAtom);
   const currentSession = useAtomValue(currentSessionAtom);
+  const running = ingestState === "running";
   const inputPending = counts.input > 0;
 
   const confirmDelete = (path: string, e: React.MouseEvent): void => {
@@ -44,17 +46,23 @@ export function Dashboard(props: DashboardProps): JSX.Element {
           </div>
         </div>
 
-        {inputPending && (
+        {(inputPending || running) && (
           <div className="ingest-hero" style={{ border: "1px solid color-mix(in oklab, var(--accent), transparent 40%)", background: "linear-gradient(180deg, color-mix(in oklab, var(--accent), transparent 90%), var(--surface))", borderRadius: "var(--radius-lg)", padding: "var(--space-6)", display: "flex", alignItems: "center", gap: "var(--space-6)" }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: "var(--text-xl)", display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                <span className="pulse" /> {t("dashboard.inputWaiting", { n: counts.input })}
+                <span className="pulse" /> {running ? t("dashboard.ingestRunning") : t("dashboard.inputWaiting", { n: counts.input })}
               </div>
-              <div className="fg2" style={{ marginTop: "var(--space-2)" }}>{t("dashboard.ingestHint")}</div>
+              <div className="fg2" style={{ marginTop: "var(--space-2)" }}>{running ? t("dashboard.ingestRunningSub") : t("dashboard.ingestHint")}</div>
             </div>
             <div className="row">
-              <button className="btn" onClick={() => props.onBrowser("input")}>{t("dashboard.viewInput")}</button>
-              <button className="btn btn-primary" disabled={ingestState === "running"} onClick={props.onIngest}><Play size={14} /> {t("dashboard.runUpdate")}</button>
+              {running ? (
+                <button className="btn btn-primary" onClick={props.onViewIngest}>{t("dashboard.viewProgress")}</button>
+              ) : (
+                <>
+                  <button className="btn" onClick={() => props.onBrowser("input")}>{t("dashboard.viewInput")}</button>
+                  <button className="btn btn-primary" onClick={props.onIngest}><Play size={14} /> {t("dashboard.runUpdate")}</button>
+                </>
+              )}
             </div>
           </div>
         )}
