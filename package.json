@@ -11,9 +11,10 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "check": "tsc --noEmit -p tsconfig.json",
-    "package": "electron-vite build && electron-builder",
-    "package:win": "electron-vite build && electron-builder --win",
-    "package:linux": "electron-vite build && electron-builder --linux"
+    "package": "npm run package:mac && npm run package:win && npm run package:linux",
+    "package:mac": "electron-vite build && electron-builder --mac --arm64 --x64",
+    "package:win": "electron-vite build && electron-builder --win --arm64 --x64",
+    "package:linux": "electron-vite build && electron-builder --linux --arm64 --x64"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.80.3",
