@@ -19,6 +19,13 @@ import type {
 
 type PiModule = typeof import("@earendil-works/pi-coding-agent");
 
+/**
+ * Model resolved from the registry. Stored on the repo so a recreated ingest
+ * session can re-apply the same model without re-resolving (which would drop
+ * dynamically registered providers like ollama/openai-compatible).
+ */
+type ResolvedModel = ReturnType<AgentSessionServices["modelRegistry"]["getAll"]>[number];
+
 import { resolveOkfExtensionPath } from "./resource.ts";
 import { diffSnapshots, listInputFiles, snapshotWiki } from "./wiki-scan.ts";
 import { ok, err, errorMessage } from "../shared/result.ts";
@@ -52,12 +59,13 @@ export class AgentRepository {
   private chatUnsub: (() => void) | null = null;
   private ingestUnsub: (() => void) | null = null;
   private pi: PiModule | null = null;
+  private ingestModel: ResolvedModel | null = null;
 
   private constructor(
     private readonly workspace: string,
     private readonly services: AgentSessionServices,
     private readonly runtime: AgentSessionRuntime,
-    private readonly ingestSession: AgentSession,
+    private ingestSession: AgentSession,
   ) {}
 
   static async create(workspace: string): Promise<Result<AgentRepository>> {
@@ -102,26 +110,9 @@ export class AgentRepository {
         sessionManager,
       });
 
-      // Give the ingest session its OWN, isolated ExtensionRuntime so it is
-      // unaffected by the chat session's lifecycle. Both sessions share the
-      // same `services` (and thus the same cached `extensionsResult.runtime`),
-      // so without this reload the ingest session would reuse the chat
-      // session's runtime. When the chat session is later switched out
-      // (openSession/newSession on the dashboard), `dispose()` invalidates
-      // that shared runtime, and `pi.sendUserMessage` inside /wiki-update would
-      // throw "stale ctx" — silently breaking the ingest (the renderer ignored
-      // the error, leaving the IngestView stuck on "Ready…").
-      //
-      // Reloading here builds a fresh `extensionsResult` with a new runtime;
-      // the chat session keeps its already-captured runtime reference, and
-      // the ingest session captures the fresh one — fully isolated.
-      await services.resourceLoader.reload();
-      const ingestSession = (
-        await pi.createAgentSessionFromServices({
-          services,
-          sessionManager: pi.SessionManager.inMemory(),
-        })
-      ).session;
+      // Ingest runs in its own isolated ExtensionRuntime — see
+      // `createIngestSession` for the rationale.
+      const ingestSession = await createIngestSession(pi, services);
 
       const repo = new AgentRepository(workspace, services, runtime, ingestSession);
       repo.pi = pi;
@@ -174,6 +165,32 @@ export class AgentRepository {
     this.ingestUnsub = this.forward(this.ingestSession, (e) => this.ingestListener?.(e));
   }
 
+  /**
+   * Tear down the current ingest session and create a fresh one.
+   *
+   * The ingest session is otherwise long-lived (in-memory, reused across
+   * ingests), so the agent accumulates prior turns. After the wiki is deleted
+   * externally, the agent still "remembers" the concepts it created and will
+   * NOT rebuild them — even though /wiki-update reports the (now empty) disk
+   * state in its prompt. Starting each ingest in a clean session forces the
+   * agent to reason purely from the current disk state.
+   */
+  private async resetIngestSession(): Promise<void> {
+    this.ingestUnsub?.();
+    this.ingestUnsub = null;
+    try {
+      this.ingestSession.dispose();
+    } catch {
+      /* ignore — best-effort teardown */
+    }
+    this.ingestSession = await createIngestSession(
+      this.pi!,
+      this.services,
+      this.ingestModel ?? undefined,
+    );
+    await this.bindIngest();
+  }
+
   // ─── LLM ────────────────────────────────────────────────────────
   hasLlmConfig(): boolean {
     return this.services.modelRegistry.getAvailable().length > 0;
@@ -221,6 +238,9 @@ export class AgentRepository {
         mr.getAll().find((m) => m.provider === providerName && m.id === config.modelId) ??
         mr.getAll().find((m) => m.id === config.modelId);
       if (model) {
+        // Remember the resolved model so a recreated ingest session
+        // (see resetIngestSession) can re-apply it without re-resolving.
+        this.ingestModel = model;
         await this.runtime.session.setModel(model);
         await this.ingestSession.setModel(model);
       } else {
@@ -337,6 +357,11 @@ export class AgentRepository {
 
   async ingest(): Promise<Result<void>> {
     try {
+      // Start every ingest in a fresh session so the agent has no stale
+      // memory of a wiki that may have been deleted externally. See
+      // resetIngestSession for the rationale.
+      await this.resetIngestSession();
+
       const before = await snapshotWiki(this.workspace);
 
       // /wiki-update hands non-conformant input files to the agent via
@@ -459,6 +484,37 @@ export class AgentRepository {
       /* ignore */
     }
   }
+}
+
+/**
+ * Create a fresh, isolated ingest session.
+ *
+ * The ingest session gets its OWN ExtensionRuntime, unaffected by the chat
+ * session's lifecycle. Both sessions share the same `services` (and thus the
+ * same cached `extensionsResult.runtime`), so without the reload here the
+ * ingest session would reuse the chat session's runtime. When the chat
+ * session is later switched out (openSession/newSession on the dashboard),
+ * `dispose()` invalidates that shared runtime, and `pi.sendUserMessage`
+ * inside /wiki-update would throw "stale ctx" — silently breaking the ingest.
+ *
+ * Reloading builds a fresh `extensionsResult` with a new runtime; the chat
+ * session keeps its already-captured runtime reference, and the ingest
+ * session captures the fresh one — fully isolated. The optional `model` is
+ * applied at creation so a recreated ingest session keeps the configured LLM.
+ */
+async function createIngestSession(
+  pi: PiModule,
+  services: AgentSessionServices,
+  model?: ResolvedModel,
+): Promise<AgentSession> {
+  await services.resourceLoader.reload();
+  return (
+    await pi.createAgentSessionFromServices({
+      services,
+      sessionManager: pi.SessionManager.inMemory(),
+      model,
+    })
+  ).session;
 }
 
 function extractText(content: ReadonlyArray<{ type: string; text?: string }> | undefined): string {
