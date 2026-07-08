@@ -1,4 +1,4 @@
-import { Fragment, useEffect } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Menu as MenuIcon, Settings as SettingsIcon, X as CloseIcon } from "lucide-react";
 import { api } from "../ipc.ts";
@@ -20,6 +20,7 @@ import {
   sessionsAtom,
   sidebarOpenAtom,
   streamingSessionsAtom,
+  toastAtom,
   viewAtom,
   workspaceAtom,
 } from "../store.ts";
@@ -55,6 +56,30 @@ export function AppShell(): JSX.Element {
   const setStreamingSessions = useSetAtom(streamingSessionsAtom);
   const turnEnded = useAtomValue(chatTurnEndedAtom);
   const [sidebarOpen, setSidebarOpen] = useAtom(sidebarOpenAtom);
+  const setToast = useSetAtom(toastAtom);
+  const [dragOver, setDragOver] = useState<boolean>(false);
+
+  /**
+   * Drop external files anywhere in the app → copy them into `input/`.
+   * Reuses the existing `addInputFiles` IPC handler. Always targets `input/`,
+   * regardless of which view is currently active.
+   */
+  async function handleDropFiles(fileList: FileList | null): Promise<void> {
+    if (!fileList || fileList.length === 0) return;
+    const paths: string[] = [];
+    for (let index = 0; index < fileList.length; index++) {
+      const file = fileList.item(index);
+      if (file && file.path) paths.push(file.path);
+    }
+    if (paths.length === 0) return;
+    const result = await api.addInputFiles(paths);
+    if (result.success) {
+      setToast({ message: t("browser.dropAdded", { n: result.data.length }), kind: "info" });
+      await refreshCounts();
+    } else {
+      setToast({ message: result.error.message, kind: "error" });
+    }
+  }
 
   async function refreshCounts(): Promise<void> {
     const [input, wiki, archive] = await Promise.all([
@@ -229,7 +254,47 @@ useEffect(() => {
   };
 
   return (
-    <div className="shell">
+    <div
+      className="shell"
+      onDragOver={(event) => {
+        // Only real external file drags carry a "Files" type; accept those so
+        // the subsequent drop event fires. Internal text drags are ignored.
+        if (event.dataTransfer.types.includes("Files")) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+          setDragOver(true);
+        }
+      }}
+      onDragLeave={(event) => {
+        // Only clear when leaving the shell entirely, not when crossing into
+        // a child element (relatedTarget becomes null at the boundary).
+        if (event.relatedTarget === null) setDragOver(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragOver(false);
+        void handleDropFiles(event.dataTransfer.files);
+      }}
+    >
+      {dragOver && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            pointerEvents: "none",
+            background: "color-mix(in oklab, var(--accent), transparent 85%)",
+            border: "2px dashed var(--accent)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div className="mono" style={{ color: "var(--accent)", background: "color-mix(in oklab, var(--bg), transparent 30%)", padding: "var(--space-4) var(--space-6)", borderRadius: "var(--radius-md)", border: "1px solid var(--accent)", fontSize: "var(--text-sm)" }}>
+            {t("browser.dropHint")}
+          </div>
+        </div>
+      )}
       <header className="appbar">
         {view === "chat" && (
           <button
