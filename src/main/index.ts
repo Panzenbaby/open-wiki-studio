@@ -3,7 +3,7 @@
 import "./polyfill.ts"; // must run before pi-coding-agent loads (undici worker_threads polyfill)
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { stat } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AgentRepository } from "./agent.ts";
 import { IpcBridge } from "./ipc.ts";
@@ -17,6 +17,15 @@ import { mainT } from "./i18n.ts";
 import type { ProviderId, Result, WorkspaceInfo } from "../shared/ipc-types.ts";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
+
+function getAppIconPath(): string {
+  if (app.isPackaged) {
+    return join(process.resourcesPath, "icons", "icon.png");
+  }
+  const iconPath = join(dirname(__dirname), "..", "build", "icon.png");
+  log("icon path:", iconPath);
+  return iconPath;
+}
 
 function log(...parts: unknown[]): void {
   console.log("[open-wiki-studio]", ...parts);
@@ -129,6 +138,7 @@ async function createWindow(): Promise<BrowserWindow> {
     backgroundColor: "#0e1214",
     title: mainT("app.name"),
     autoHideMenuBar: true,
+    icon: getAppIconPath(),
     webPreferences: {
       preload: join(__dirname, "../preload/index.mjs"),
       contextIsolation: true,
@@ -165,6 +175,9 @@ app.whenReady().then(async () => {
   try {
     state.window = await createWindow();
     log("window created");
+    if (process.platform === "darwin" && app.dock) {
+      app.dock.setIcon(getAppIconPath());
+    }
   } catch (error) {
     fatal(mainT("error.windowCreate"), error);
     return;

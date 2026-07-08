@@ -1,7 +1,7 @@
 import { useAtom, useAtomValue } from "jotai";
 import { Plus, Trash2 } from "lucide-react";
 import { useT } from "../i18n.ts";
-import { currentSessionAtom, sessionsAtom } from "../store.ts";
+import { currentSessionAtom, sessionsAtom, streamingSessionsAtom } from "../store.ts";
 
 interface SidebarProps {
   onOpenSession: (path: string) => void;
@@ -16,6 +16,7 @@ interface SidebarProps {
 export function Sidebar(props: SidebarProps): JSX.Element {
   const t = useT();
   const sessions = useAtomValue(sessionsAtom);
+  const streamingSessions = useAtomValue(streamingSessionsAtom);
   const [current] = useAtom(currentSessionAtom);
 
   const openSession = (path: string): void => {
@@ -66,6 +67,16 @@ export function Sidebar(props: SidebarProps): JSX.Element {
               <div className="s-title">{session.name}</div>
               <div className="s-meta">{new Date(session.lastModified).toLocaleString()}</div>
             </div>
+            {streamingSessions.has(session.path) && (
+              <span
+                className="session-streaming"
+                role="status"
+                aria-label={t("session.streaming")}
+                title={t("session.streaming")}
+              >
+                <span className="stream-dot" />
+              </span>
+            )}
             <span
               className="session-delete-dash"
               role="button"

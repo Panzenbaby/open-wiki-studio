@@ -22,11 +22,12 @@ const api: AgentApi = {
   newSession: () => ipcRenderer.invoke("okf:newSession"),
   openSession: (path) => ipcRenderer.invoke("okf:openSession", path),
   deleteSession: (path) => ipcRenderer.invoke("okf:deleteSession", path),
-  getMessages: () => ipcRenderer.invoke("okf:getMessages"),
+  getMessages: (path: string) => ipcRenderer.invoke("okf:getMessages", path),
   getWikiGraph: () => ipcRenderer.invoke("okf:getWikiGraph"),
 
   ask: (question) => ipcRenderer.invoke("okf:ask", question),
   ingest: () => ipcRenderer.invoke("okf:ingest"),
+  abortChat: () => ipcRenderer.invoke("okf:abortChat"),
   abort: () => ipcRenderer.invoke("okf:abort"),
 
   onAgentEvent: (listener) => {

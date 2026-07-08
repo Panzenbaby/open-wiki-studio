@@ -5,6 +5,7 @@ import {
   chatErrorAtom,
   chatStreamingAtom,
   chatTurnEndedAtom,
+  currentSessionAtom,
   ingestStateAtom,
   ingestStreamAtom,
   ingestSummaryAtom,
@@ -13,6 +14,7 @@ import {
   platformAtom,
   recentWorkspacesAtom,
   screenAtom,
+  streamingSessionsAtom,
   type ChatMessage,
 } from "./store.ts";
 import { useT, localeAtom } from "./i18n.ts";
@@ -38,6 +40,7 @@ export function App(): JSX.Element {
   const setIngestSummary = useSetAtom(ingestSummaryAtom);
   const setIngestError = useSetAtom(ingestErrorAtom);
   const bumpTurnEnded = useSetAtom(chatTurnEndedAtom);
+  const setStreamingSessions = useSetAtom(streamingSessionsAtom);
   const store = useStore();
 
   // Set the document title to the localized app name.
@@ -58,32 +61,67 @@ export function App(): JSX.Element {
     })();
   }, [setRecent, setScreen, setPlatform]);
 
-  // Chat event stream -> messages.
+  // Route chat events by sessionPath: only the current session updates
+  // messagesAtom/chatStreamingAtom; background sessions update streamingSessionsAtom.
   useEffect(() => {
     return api.onAgentEvent((event) => {
+      const currentPath = store.get(currentSessionAtom)?.path;
       if (event.type === "agent_start") {
-        setChatError(null);
-        setChatStreaming(true);
+        const isCurrent = event.sessionPath === currentPath;
+        setStreamingSessions((prev) =>
+          prev.has(event.sessionPath) ? prev : new Set(prev).add(event.sessionPath),
+        );
+        if (isCurrent) {
+          setChatError(null);
+          setChatStreaming(true);
+        }
       } else if (event.type === "text_delta") {
-        setChatError(null);
-        setMessages((prev) => updateLastAssistant(prev, event.delta));
+        if (event.sessionPath === currentPath) {
+          setChatError(null);
+          setMessages((prev) => updateLastAssistant(prev, event.delta));
+        }
       } else if (event.type === "agent_end") {
-        setChatStreaming(false);
+        const isCurrent = event.sessionPath === currentPath;
+        setStreamingSessions((prev) => {
+          if (!prev.has(event.sessionPath)) return prev;
+          const next = new Set(prev);
+          next.delete(event.sessionPath);
+          return next;
+        });
+        // Keep session list fresh so sidebar names + streaming dots stay current.
         bumpTurnEnded((n) => n + 1);
-        // Read the latest messages from the store directly instead of
-        // calling setChatError inside a setMessages updater (a side effect
-        // during render). The store always reflects the current value.
-        const messages = store.get(messagesAtom);
-        const last = messages[messages.length - 1];
-        if (!last || last.role !== "assistant" || last.text.trim() === "") {
-          setChatError(tRef.current("chat.errorNoResponse"));
+        if (isCurrent) {
+          setChatStreaming(false);
+          if (event.lastError) {
+            // The turn failed (stopReason "error") — show the real error
+            // immediately instead of the generic "no response" banner.
+            setChatError(event.lastError);
+          } else if (!event.aborted) {
+            // A deliberately aborted turn (Stop button) must not surface a red
+            // "no response" error banner — the user chose to stop. Only flag a
+            // missing response for non-aborted turns that produced nothing.
+            const messages = store.get(messagesAtom);
+            const last = messages[messages.length - 1];
+            if (!last || last.role !== "assistant" || last.text.trim() === "") {
+              setChatError(tRef.current("chat.errorNoResponse"));
+            }
+          }
         }
       } else if (event.type === "error") {
-        setChatStreaming(false);
-        setChatError(event.message);
+        const isCurrent = event.sessionPath === currentPath;
+        setStreamingSessions((prev) => {
+          if (!prev.has(event.sessionPath)) return prev;
+          const next = new Set(prev);
+          next.delete(event.sessionPath);
+          return next;
+        });
+        if (isCurrent) {
+          setChatStreaming(false);
+          setChatError(event.message);
+        }
       }
     });
-  }, [setChatStreaming, setChatError, setMessages, bumpTurnEnded, store]);
+  }, [setChatStreaming, setChatError, setMessages, bumpTurnEnded, setStreamingSessions, store]);
 
   // Ingest event stream + summary.
   useEffect(() => {

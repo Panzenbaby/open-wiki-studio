@@ -42,12 +42,17 @@
   "build": {
     "appId": "dev.panzenbaby.openwikistudio",
     "productName": "Open Wiki Studio",
+    "icon": "build/icon",
     "files": [
       "out/**/*",
       "node_modules/**/*",
       "!node_modules/pi-okf-wiki"
     ],
     "extraResources": [
+      {
+        "from": "build/icon.png",
+        "to": "icons/icon.png"
+      },
       {
         "from": "node_modules/pi-okf-wiki",
         "to": "pi-okf-wiki",
@@ -67,14 +72,17 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "target": "dmg"
+      "target": "dmg",
+      "icon": "build/icon.icns"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     },
     "linux": {
       "target": "AppImage",
-      "category": "Office"
+      "category": "Office",
+      "icon": "build/icon.png"
     }
   }
 }

@@ -273,6 +273,11 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .session-item:hover .session-delete-dash { opacity: 1; }
 .session-item .session-delete-dash:hover { color: var(--danger); background: color-mix(in oklab, var(--danger), transparent 88%); }
 
+/* Live "answer in progress" indicator on a session row. */
+.session-item .session-streaming { display: inline-flex; align-items: center; flex-shrink: 0; padding-left: var(--space-1); }
+.session-item .session-streaming .stream-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: stream-pulse 1.4s ease-in-out infinite; }
+@keyframes stream-pulse { 0%, 100% { transform: scale(0.7); opacity: 0.35; } 50% { transform: scale(1); opacity: 1; } }
+
 /* ---------- folder tree ---------- */
 .tree { list-style: none; margin: 0; padding: 0; }
 .tree-node { display: flex; align-items: center; gap: var(--space-2); padding: 6px var(--space-3); border-radius: var(--radius-sm); cursor: pointer; font-size: var(--text-sm); color: var(--fg-2); transition: background var(--motion-fast) var(--ease-standard); }

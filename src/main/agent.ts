@@ -1,10 +1,16 @@
 // AgentRepository: hosts the embedded Pi agent for one workspace.
 //
-// - chat runtime (AgentSessionRuntime) with persistent SessionManager per
-//   workspace; new/resume sessions via the runtime.
+// - chat sessions live in a POOL of concurrent AgentSessions (one per opened
+//   session file), so multiple sessions can stream answers in parallel. The
+//   pool keys live sessions by their session-file path; switching the "current"
+//   session does NOT tear down the others — their in-flight turns keep running.
+//   This works because `services.resourceLoader.reload()` builds a FRESH
+//   extension runtime per session without invalidating runtimes already
+//   captured by other live sessions (the ingest session uses the same trick).
 // - a separate ephemeral in-memory AgentSession for /wiki-update so chat
 //   sessions stay clean.
-// - events forwarded to the renderer via listeners set from ipc.ts.
+// - events forwarded to the renderer via listeners set from ipc.ts, tagged
+//   with the originating session path so the renderer can route them.
 // - ingest summary computed from a before/after wiki snapshot (wiki-scan.ts).
 import { app } from "electron";
 import { mkdirSync } from "node:fs";
@@ -12,9 +18,9 @@ import { unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   AgentSession,
-  AgentSessionRuntime,
   AgentSessionServices,
-  CreateAgentSessionRuntimeFactory,
+  SessionManager,
+  SessionStartEvent,
 } from "@earendil-works/pi-coding-agent";
 
 type PiModule = typeof import("@earendil-works/pi-coding-agent");
@@ -52,19 +58,46 @@ function appAgentDir(): string {
   return dir;
 }
 
+/**
+ * One live chat session in the pool. Held alive (not disposed) while the user
+ * may switch away and back, so an in-flight agent turn keeps streaming in the
+ * background. Its own `chatUnsub` detaches the event forwarder on teardown.
+ */
+interface LiveChatSession {
+  readonly session: AgentSession;
+  readonly sessionManager: SessionManager;
+  chatUnsub: () => void;
+  readonly path: string;
+  /** Accumulated text of the in-progress assistant message while streaming.
+   *  The agent only stores the finalized assistant message in `state.messages`
+   *  at `message_end`, so during streaming this is the only place the partial
+   *  answer lives — `getMessages` merges it back in so switching away and back
+   *  does not lose the already-streamed text. */
+  streamingAssistantText: string;
+}
+
 export class AgentRepository {
   private chatListener: ((event: AgentEvent) => void) | null = null;
   private ingestListener: ((event: AgentEvent) => void) | null = null;
   private summaryListener: ((summary: IngestSummary) => void) | null = null;
-  private chatUnsub: (() => void) | null = null;
   private ingestUnsub: (() => void) | null = null;
   private pi: PiModule | null = null;
   private ingestModel: ResolvedModel | null = null;
 
+  /** Live chat sessions keyed by session-file path. Insertion order is the
+   *  LRU eviction order: re-inserting a key (see `touchLiveSession`) moves it
+   *  to the back as most-recently-used. */
+  private readonly liveSessions = new Map<string, LiveChatSession>();
+  /** Path of the session currently displayed in the chat view. */
+  private currentPath: string | null = null;
+  /** Upper bound on concurrently resident live chat sessions. Background
+   *  turns are valuable but not infinitely so — evict the least-recently-used
+   *  idle session (never the current one) beyond this cap. */
+  private static readonly MAX_LIVE_SESSIONS = 8;
+
   private constructor(
     private readonly workspace: string,
     private readonly services: AgentSessionServices,
-    private readonly runtime: AgentSessionRuntime,
     private ingestSession: AgentSession,
   ) {}
 
@@ -84,40 +117,25 @@ export class AgentRepository {
           noExtensions: true,
         },
       });
-      const sessionManager = pi.SessionManager.create(workspace);
 
-      const createRuntime: CreateAgentSessionRuntimeFactory = async ({
-        sessionManager: sm,
-        sessionStartEvent,
-      }) => {
-        // Reload the resource loader so this session gets a FRESH extension
-        // runtime. Without this, the shared ExtensionRuntime is invalidated
-        // when a previous session is torn down (switchSession/newSession calls
-        // dispose() -> runtime.invalidate()), and pi.sendUserMessage would
-        // throw "stale ctx" — breaking /wiki-query which uses sendUserMessage.
-        await services.resourceLoader.reload();
-        const session = await pi.createAgentSessionFromServices({
-          services,
-          sessionManager: sm,
-          sessionStartEvent,
-        });
-        return { ...session, services, diagnostics: services.diagnostics };
-      };
-
-      const runtime = await pi.createAgentSessionRuntime(createRuntime, {
-        cwd: workspace,
-        agentDir,
-        sessionManager,
-      });
+      // Disable auto-retry — surfaces failures immediately so the user can
+      // retry manually via the chat retry button.
+      services.settingsManager.setRetryEnabled(false);
 
       // Ingest runs in its own isolated ExtensionRuntime — see
       // `createIngestSession` for the rationale.
       const ingestSession = await createIngestSession(pi, services);
 
-      const repo = new AgentRepository(workspace, services, runtime, ingestSession);
+      const repo = new AgentRepository(workspace, services, ingestSession);
       repo.pi = pi;
-      await repo.bindChat();
       await repo.bindIngest();
+
+      const sessions = await pi.SessionManager.list(workspace);
+      if (sessions.length > 0) {
+        await repo.openSession(sessions[0].path);
+      } else {
+        await repo.newSession();
+      }
       return ok(repo);
     } catch (error) {
       return err<AgentRepository>(`Failed to create agent: ${errorMessage(error)}`);
@@ -135,34 +153,131 @@ export class AgentRepository {
     this.summaryListener = listener;
   }
 
-  private forward(session: AgentSession, emit: (e: AgentEvent) => void): () => void {
+  /**
+   * Subscribe to a session's events and forward the chat-relevant ones to
+   * `emit`, tagged with `path` so the renderer can route them to the correct
+   * session's UI state. Ingest uses `path: ""` (the renderer ignores it).
+   */
+  private forward(
+    session: AgentSession,
+    path: string,
+    emit: (event: AgentEvent) => void,
+  ): () => void {
     return session.subscribe((event) => {
       if (event.type === "agent_start") {
-        emit({ type: "agent_start", sessionId: session.sessionId });
+        emit({ type: "agent_start", sessionId: session.sessionId, sessionPath: path });
       } else if (
         event.type === "message_update" &&
         event.assistantMessageEvent.type === "text_delta"
       ) {
-        emit({ type: "text_delta", sessionId: session.sessionId, delta: event.assistantMessageEvent.delta });
+        emit({
+          type: "text_delta",
+          sessionId: session.sessionId,
+          sessionPath: path,
+          delta: event.assistantMessageEvent.delta,
+        });
       } else if (event.type === "agent_end") {
-        emit({ type: "agent_end", sessionId: session.sessionId });
+        // With auto-retry disabled, a failed turn ends here (stopReason
+        // "error") instead of via `auto_retry_end`. Pack the real error into
+        // the `agent_end` event so the renderer shows it immediately instead
+        // of flashing a generic "no response" banner first.
+        const lastError = lastAssistantErrorMessage(event.messages);
+        emit({
+          type: "agent_end",
+          sessionId: session.sessionId,
+          sessionPath: path,
+          aborted: lastAssistantAborted(event.messages),
+          lastError: lastError || undefined,
+        });
       } else if (event.type === "auto_retry_end" && !event.success) {
-        emit({ type: "error", message: event.finalError ?? mainT("error.allRetriesFailed") });
+        // Auto-retry is disabled (setRetryEnabled(false)); this is a defensive
+        // fallback in case retry is re-enabled in the future.
+        emit({
+          type: "error",
+          sessionPath: path,
+          message: event.finalError ?? mainT("error.allRetriesFailed"),
+        });
       }
     });
-  }
-
-  private async bindChat(): Promise<void> {
-    this.chatUnsub?.();
-    const session = this.runtime.session;
-    await session.bindExtensions({});
-    this.chatUnsub = this.forward(session, (e) => this.chatListener?.(e));
   }
 
   private async bindIngest(): Promise<void> {
     this.ingestUnsub?.();
     await this.ingestSession.bindExtensions({});
-    this.ingestUnsub = this.forward(this.ingestSession, (e) => this.ingestListener?.(e));
+    this.ingestUnsub = this.forward(this.ingestSession, "", (e) => this.ingestListener?.(e));
+  }
+
+  /**
+   * Create a live chat session for a SessionManager and add it to the pool.
+   *
+   * Reloading the resource loader builds a fresh `extensionsResult` with a
+   * new extension runtime; the new session captures it. Reload does NOT
+   * invalidate runtimes already captured by other live sessions, so they keep
+   * streaming undisturbed (proven by the coexisting ingest session). The
+   * `sessionStartEvent` is forwarded to extensions so they see normal
+   * session_start lifecycle events, matching the previous runtime behaviour.
+   */
+  private async createLiveChatSession(
+    sessionManager: SessionManager,
+    reason: "new" | "resume",
+    previousSessionFile?: string,
+  ): Promise<LiveChatSession> {
+    await this.services.resourceLoader.reload();
+    const sessionStartEvent: SessionStartEvent = {
+      type: "session_start",
+      reason,
+      previousSessionFile,
+    };
+    const { session } = await this.pi!.createAgentSessionFromServices({
+      services: this.services,
+      sessionManager,
+      sessionStartEvent,
+    });
+    await session.bindExtensions({});
+    const path = sessionManager.getSessionFile() ?? "";
+    if (this.ingestModel) {
+      try {
+        await session.setModel(this.ingestModel);
+      } catch (error) {
+        console.log(
+          `[open-wiki-studio] setModel failed for session ${path}: ${errorMessage(error)}`,
+        );
+      }
+    }
+    const live: LiveChatSession = {
+      session,
+      sessionManager,
+      chatUnsub: () => {},
+      path,
+      streamingAssistantText: "",
+    };
+    const eventUnsub = this.forward(session, path, (e) => this.chatListener?.(e));
+    // Track in-progress assistant text so getMessages can restore it when the
+    // user switches back to a still-streaming session.
+    const textUnsub = session.subscribe((event) => {
+      if (event.type === "message_update") {
+        const partial = (
+          event.assistantMessageEvent as {
+            partial?: {
+              content?: string | ReadonlyArray<{ type: string; text?: string }>;
+            };
+          }
+        ).partial;
+        live.streamingAssistantText = extractText(partial?.content);
+      } else if (
+        event.type === "message_end" &&
+        (event as { message?: { role?: string } }).message?.role === "assistant"
+      ) {
+        live.streamingAssistantText = "";
+      } else if (event.type === "agent_end") {
+        live.streamingAssistantText = "";
+      }
+    });
+    live.chatUnsub = () => {
+      eventUnsub();
+      textUnsub();
+    };
+    return live;
   }
 
   /**
@@ -189,6 +304,53 @@ export class AgentRepository {
       this.ingestModel ?? undefined,
     );
     await this.bindIngest();
+  }
+
+  /** Abort and dispose a pooled live chat session, removing it from the pool. */
+  private dropLiveChatSession(path: string): void {
+    const live = this.liveSessions.get(path);
+    if (!live) return;
+    live.chatUnsub();
+    try {
+      live.session.dispose();
+    } catch {
+      /* ignore */
+    }
+    this.liveSessions.delete(path);
+    if (this.currentPath === path) this.currentPath = null;
+  }
+
+  /**
+   * Mark a pooled session as most-recently-used by re-inserting it at the
+   * back of the LRU-ordered map. Insertion order is the eviction order.
+   */
+  private touchLiveSession(path: string): void {
+    const live = this.liveSessions.get(path);
+    if (!live) return;
+    this.liveSessions.delete(path);
+    this.liveSessions.set(path, live);
+  }
+
+  /**
+   * Evict idle pooled sessions beyond `MAX_LIVE_SESSIONS`. Walks the map in
+   * insertion (least-recently-used) order and disposes the first idle,
+   * non-current session it finds, repeating until under the cap. Streaming
+   * sessions and the current session are never evicted — a streaming turn's
+   * event forwarder must stay attached to finish, and the current session
+   * is what the user is looking at.
+   */
+  private evictIdleSessions(): void {
+    while (this.liveSessions.size > AgentRepository.MAX_LIVE_SESSIONS) {
+      let evicted = false;
+      for (const [path, live] of this.liveSessions) {
+        if (path === this.currentPath) continue;
+        if (live.session.isStreaming) continue;
+        this.dropLiveChatSession(path);
+        evicted = true;
+        break;
+      }
+      if (!evicted) break;
+    }
   }
 
   // ─── LLM ────────────────────────────────────────────────────────
@@ -238,11 +400,15 @@ export class AgentRepository {
         mr.getAll().find((m) => m.provider === providerName && m.id === config.modelId) ??
         mr.getAll().find((m) => m.id === config.modelId);
       if (model) {
-        // Remember the resolved model so a recreated ingest session
-        // (see resetIngestSession) can re-apply it without re-resolving.
         this.ingestModel = model;
-        await this.runtime.session.setModel(model);
         await this.ingestSession.setModel(model);
+        for (const live of this.liveSessions.values()) {
+          try {
+            await live.session.setModel(model);
+          } catch {
+            /* best-effort — a streaming session may reject reconfiguration */
+          }
+        }
       } else {
         console.log(
           `[open-wiki-studio] LLM model not found in registry: ${config.provider}/${config.modelId}`,
@@ -263,6 +429,7 @@ export class AgentRepository {
           path: s.path,
           name: stripQueryCommand(s.name ?? s.firstMessage ?? mainT("session.newDefault")),
           lastModified: s.modified.toISOString(),
+          streaming: this.liveSessions.get(s.path)?.session.isStreaming ?? false,
         })),
       );
     } catch (error) {
@@ -272,12 +439,21 @@ export class AgentRepository {
 
   async newSession(): Promise<Result<SessionInfo>> {
     try {
-      await this.runtime.newSession();
-      await this.bindChat();
+      const previousSessionFile = this.currentPath ?? undefined;
+      const sessionManager = this.pi!.SessionManager.create(this.workspace);
+      const live = await this.createLiveChatSession(
+        sessionManager,
+        "new",
+        previousSessionFile,
+      );
+      this.liveSessions.set(live.path, live);
+      this.currentPath = live.path;
+      this.evictIdleSessions();
       return ok({
-        path: this.runtime.session.sessionFile ?? "",
+        path: live.path,
         name: mainT("session.newDefault"),
         lastModified: new Date().toISOString(),
+        streaming: false,
       });
     } catch (error) {
       return err<SessionInfo>(`Failed to create session: ${errorMessage(error)}`);
@@ -285,14 +461,10 @@ export class AgentRepository {
   }
 
   async deleteSession(path: string): Promise<Result<void>> {
-    // Refuse to delete the session the runtime is currently bound to —
-    // unlinking it would leave the runtime pointing at a file that no longer
-    // exists, and the next prompt would fail opaquely. Callers must switch to
-    // a different session first (the UI does this by creating a new session
-    // after a successful delete when the deleted one was current).
-    if (path === this.runtime.session.sessionFile) {
+    if (path === this.currentPath) {
       return err<void>(`Cannot delete the active session`, { path });
     }
+    this.dropLiveChatSession(path);
     try {
       await unlink(path);
       return ok(undefined);
@@ -306,32 +478,53 @@ export class AgentRepository {
 
   async openSession(path: string): Promise<Result<SessionInfo>> {
     try {
-      await this.runtime.switchSession(path);
-      await this.bindChat();
+      const existing = this.liveSessions.get(path);
+      if (existing) {
+        this.currentPath = path;
+        this.touchLiveSession(path);
+        const sessions = await this.pi!.SessionManager.list(this.workspace);
+        const info = sessions.find((s) => s.path === path);
+        return ok({
+          path,
+          name: stripQueryCommand(info?.name ?? info?.firstMessage ?? mainT("session.newDefault")),
+          lastModified: (info?.modified ?? new Date()).toISOString(),
+          streaming: existing.session.isStreaming,
+        });
+      }
+      const previousSessionFile = this.currentPath ?? undefined;
+      const sessionManager = this.pi!.SessionManager.open(path);
+      const live = await this.createLiveChatSession(
+        sessionManager,
+        "resume",
+        previousSessionFile,
+      );
+      this.liveSessions.set(live.path, live);
+      this.currentPath = live.path;
+      this.evictIdleSessions();
       const sessions = await this.pi!.SessionManager.list(this.workspace);
       const info = sessions.find((s) => s.path === path);
       return ok({
         path,
         name: stripQueryCommand(info?.name ?? info?.firstMessage ?? mainT("session.newDefault")),
         lastModified: (info?.modified ?? new Date()).toISOString(),
+        streaming: false,
       });
     } catch (error) {
       return err<SessionInfo>(`Failed to open session: ${errorMessage(error)}`);
     }
   }
 
-  async getMessages(): Promise<Result<readonly ChatMessage[]>> {
+  async getMessages(path: string): Promise<Result<readonly ChatMessage[]>> {
     try {
-      const messages = this.runtime.session.messages;
-      const out: ChatMessage[] = [];
-      for (const message of messages) {
-        const role = (message as { role?: string }).role;
-        if (role !== "user" && role !== "assistant") continue;
-        const text = extractText(
-          (message as { content?: ReadonlyArray<{ type: string; text?: string }> }).content,
-        );
-        const clean = role === "user" ? stripQueryCommand(text) : text;
-        if (clean.trim() !== "" || role === "assistant") out.push({ role, text: clean });
+      const live = this.liveSessions.get(path);
+      const messages: ReadonlyArray<AgentMessageLike> = live
+        ? live.session.messages
+        : this.pi!.SessionManager.open(path).buildSessionContext().messages;
+      const out = extractMessages(messages);
+      // Append in-progress answer for sessions still streaming —
+      // the finalized message only hits session.messages at message_end.
+      if (live && live.session.isStreaming && live.streamingAssistantText.trim() !== "") {
+        out.push({ role: "assistant", text: live.streamingAssistantText });
       }
       return ok(out);
     } catch (error) {
@@ -348,7 +541,11 @@ export class AgentRepository {
     // stream (handled in `forward()`), NOT through this return value. Callers
     // must not assume `ok` means the agent finished successfully.
     try {
-      await this.runtime.session.prompt(`/wiki-query ${question}`);
+      const live = this.currentPath ? this.liveSessions.get(this.currentPath) : undefined;
+      if (!live) {
+        return err<void>("No active session");
+      }
+      await live.session.prompt(`/wiki-query ${question}`);
       return ok(undefined);
     } catch (error) {
       return err<void>(`Ask failed: ${errorMessage(error)}`);
@@ -408,7 +605,9 @@ export class AgentRepository {
             resolveStart();
           }
         } else if (event.type === "agent_end" && sawStart) {
-          resolveEnd();
+          const errorMessage = lastAssistantErrorMessage(event.messages);
+          if (errorMessage) rejectEnd(new Error(errorMessage));
+          else resolveEnd();
         } else if (event.type === "auto_retry_end" && !event.success) {
           const e = new Error(event.finalError ?? mainT("error.allRetriesFailed"));
           rejectStart(e);
@@ -460,9 +659,32 @@ export class AgentRepository {
     }
   }
 
+  /**
+   * Abort only the current chat session's in-flight turn. Background turns
+   * keep streaming (that is the point of parallel sessions) and the ingest
+   * session is left untouched. Idempotent: calling abort() on an already-idle
+   * session is harmless.
+   */
+  async abortChat(): Promise<Result<void>> {
+    try {
+      if (this.currentPath) {
+        const live = this.liveSessions.get(this.currentPath);
+        if (live) await live.session.abort();
+      }
+      return ok(undefined);
+    } catch (error) {
+      return err<void>(`Abort chat failed: ${errorMessage(error)}`);
+    }
+  }
+
   async abort(): Promise<Result<void>> {
     try {
-      await this.runtime.session.abort();
+      // Abort the current chat turn (background turns are left running — that
+      // is the point of parallel sessions) and any in-flight ingest turn.
+      if (this.currentPath) {
+        const live = this.liveSessions.get(this.currentPath);
+        if (live) await live.session.abort();
+      }
       await this.ingestSession.abort();
       return ok(undefined);
     } catch (error) {
@@ -471,12 +693,9 @@ export class AgentRepository {
   }
 
   async dispose(): Promise<void> {
-    this.chatUnsub?.();
     this.ingestUnsub?.();
-    try {
-      await this.runtime.dispose();
-    } catch {
-      /* ignore */
+    for (const path of [...this.liveSessions.keys()]) {
+      this.dropLiveChatSession(path);
     }
     try {
       this.ingestSession.dispose();
@@ -490,15 +709,15 @@ export class AgentRepository {
  * Create a fresh, isolated ingest session.
  *
  * The ingest session gets its OWN ExtensionRuntime, unaffected by the chat
- * session's lifecycle. Both sessions share the same `services` (and thus the
+ * sessions' lifecycles. All sessions share the same `services` (and thus the
  * same cached `extensionsResult.runtime`), so without the reload here the
- * ingest session would reuse the chat session's runtime. When the chat
- * session is later switched out (openSession/newSession on the dashboard),
- * `dispose()` invalidates that shared runtime, and `pi.sendUserMessage`
- * inside /wiki-update would throw "stale ctx" — silently breaking the ingest.
+ * ingest session would reuse a chat session's runtime. When that chat session
+ * is later disposed, `dispose()` invalidates that shared runtime, and
+ * `pi.sendUserMessage` inside /wiki-update would throw "stale ctx" — silently
+ * breaking the ingest.
  *
  * Reloading builds a fresh `extensionsResult` with a new runtime; the chat
- * session keeps its already-captured runtime reference, and the ingest
+ * sessions keep their already-captured runtime references, and the ingest
  * session captures the fresh one — fully isolated. The optional `model` is
  * applied at creation so a recreated ingest session keeps the configured LLM.
  */
@@ -517,7 +736,63 @@ async function createIngestSession(
   ).session;
 }
 
-function extractText(content: ReadonlyArray<{ type: string; text?: string }> | undefined): string {
+/** Minimal structural shape of an agent message used for extraction. */
+type AgentMessageLike = {
+  role?: string;
+  content?: string | ReadonlyArray<{ type: string; text?: string }>;
+};
+
+/**
+ * Whether the last assistant message in an `agent_end` event was aborted.
+ * The Pi agent finalizes an aborted turn with a final AssistantMessage whose
+ * `stopReason === "aborted"`, so the renderer can distinguish a deliberate
+ * stop from a normal/failed completion and skip the "no response" error.
+ */
+function lastAssistantAborted(messages: ReadonlyArray<{ role?: string; stopReason?: string }>): boolean {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (message?.role === "assistant") return message.stopReason === "aborted";
+  }
+  return false;
+}
+
+/**
+ * The error message of the last assistant message in an `agent_end` event,
+ * when the turn failed (`stopReason === "error"`). Returns `undefined` for
+ * normal/aborted turns. Used to surface the real failure (instead of the
+ * generic "no response") now that automatic retry is disabled.
+ */
+function lastAssistantErrorMessage(
+  messages: ReadonlyArray<{ role?: string; stopReason?: string; errorMessage?: string }>,
+): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (message?.role === "assistant") {
+      return message.stopReason === "error" ? message.errorMessage : undefined;
+    }
+  }
+  return undefined;
+}
+
+/** Map raw agent messages to the renderer's ChatMessage list (strips the
+ *  /wiki-query command prefix from user messages, drops empty non-assistant
+ *  text). Shared by live-session and disk-backed reads. */
+function extractMessages(messages: ReadonlyArray<AgentMessageLike>): ChatMessage[] {
+  const out: ChatMessage[] = [];
+  for (const message of messages) {
+    const role = (message as { role?: string }).role;
+    if (role !== "user" && role !== "assistant") continue;
+    const text = extractText(
+      (message as { content?: ReadonlyArray<{ type: string; text?: string }> }).content,
+    );
+    const clean = role === "user" ? stripQueryCommand(text) : text;
+    if (clean.trim() !== "" || role === "assistant") out.push({ role, text: clean });
+  }
+  return out;
+}
+
+function extractText(content: string | ReadonlyArray<{ type: string; text?: string }> | undefined): string {
+  if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content
     .filter((block) => block.type === "text" && typeof block.text === "string")

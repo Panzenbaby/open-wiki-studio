@@ -6,6 +6,8 @@ import { useT } from "../i18n.ts";
 import {
   browserFolderAtom,
   browserModeAtom,
+  chatErrorAtom,
+  chatStreamingAtom,
   chatTurnEndedAtom,
   countsAtom,
   currentSessionAtom,
@@ -17,6 +19,7 @@ import {
   screenAtom,
   sessionsAtom,
   sidebarOpenAtom,
+  streamingSessionsAtom,
   viewAtom,
   workspaceAtom,
 } from "../store.ts";
@@ -47,6 +50,9 @@ export function AppShell(): JSX.Element {
   const setScreen = useSetAtom(screenAtom);
   const setBrowserFolder = useSetAtom(browserFolderAtom);
   const setBrowserMode = useSetAtom(browserModeAtom);
+  const setChatStreaming = useSetAtom(chatStreamingAtom);
+  const setChatError = useSetAtom(chatErrorAtom);
+  const setStreamingSessions = useSetAtom(streamingSessionsAtom);
   const turnEnded = useAtomValue(chatTurnEndedAtom);
   const [sidebarOpen, setSidebarOpen] = useAtom(sidebarOpenAtom);
 
@@ -67,12 +73,49 @@ export function AppShell(): JSX.Element {
     const list = await api.listSessions();
     const sessions = list.success ? list.data : [];
     setSessions(sessions);
+    // Sync streamingSessionsAtom from main process state.
+    setStreamingSessions(
+      new Set(sessions.filter((session) => session.streaming).map((session) => session.path)),
+    );
     return sessions;
   }
 
-  async function loadMessages(): Promise<void> {
-    const result = await api.getMessages();
+  async function loadMessages(path: string): Promise<void> {
+    const result = await api.getMessages(path);
     setMessages(result.success ? [...result.data] : []);
+  }
+
+  // Reset streaming flag + error banner when switching to an idle session.
+  function resetChatTurnUi(): void {
+    setChatStreaming(false);
+    setChatError(null);
+  }
+
+  // Switch session (centralized for sidebar + dashboard). Preserves streaming
+  // state on the composer for sessions with an in-flight background turn.
+  async function openSession(path: string): Promise<void> {
+    const opened = await api.openSession(path);
+    if (!opened.success) return;
+    // Load messages before setting current session — prevents text_delta
+    // events from appending to wrong messages during the switch.
+    const result = await api.getMessages(opened.data.path);
+    const messages = result.success ? [...result.data] : [];
+    setCurrentSession(opened.data);
+    setMessages(messages);
+    setView("chat");
+    setChatStreaming(opened.data.streaming);
+    setChatError(null);
+  }
+
+  // Start a fresh session. A new session never has an in-flight turn.
+  async function startNewSession(): Promise<void> {
+    const created = await api.newSession();
+    if (!created.success) return;
+    setCurrentSession(created.data);
+    setMessages([]);
+    setView("chat");
+    resetChatTurnUi();
+    await refreshSessions();
   }
 
   // Kick off /wiki-update from any entry point (dashboard button, ingest bar,
@@ -101,7 +144,10 @@ export function AppShell(): JSX.Element {
         const opened = await api.openSession(sessions[0].path);
         if (opened.success) {
           setCurrentSession(opened.data);
-          await loadMessages();
+          await loadMessages(opened.data.path);
+          // No turn is running at startup, but keep the flag honest.
+          setChatStreaming(false);
+          setChatError(null);
         }
       } else {
         const created = await api.newSession();
@@ -165,6 +211,7 @@ useEffect(() => {
       if (created.success) {
         setCurrentSession(created.data);
         setMessages([]);
+        resetChatTurnUi();
       } else {
         // Could not switch away — abort the delete rather than leave the
         // runtime pointing at a deleted file.
@@ -210,29 +257,14 @@ useEffect(() => {
             <Sidebar
               open={sidebarOpen}
               onAfterSelect={closeSidebar}
-              onOpenSession={async (path) => {
-                const opened = await api.openSession(path);
-                if (opened.success) {
-                  setCurrentSession(opened.data);
-                  await loadMessages();
-                  setView("chat");
-                }
-              }}
-              onNewSession={async () => {
-                const created = await api.newSession();
-                if (created.success) {
-                  setCurrentSession(created.data);
-                  setMessages([]);
-                  setView("chat");
-                  await refreshSessions();
-                }
-              }}
+              onOpenSession={(path) => void openSession(path)}
+              onNewSession={() => void startNewSession()}
               onDeleteSession={handleDeleteSession}
             />
           </Fragment>
         )}
         <main className="pane grow">
-          {view === "dashboard" && <Dashboard onAsk={async () => { const created = await api.newSession(); if (created.success) { setCurrentSession(created.data); setMessages([]); setView("chat"); await refreshSessions(); } }} onOpenSession={async (path) => { const opened = await api.openSession(path); if (opened.success) { setCurrentSession(opened.data); await loadMessages(); setView("chat"); } }} onDeleteSession={handleDeleteSession} onSwitchWorkspace={() => setScreen("picker")} onBrowser={(folder) => { setBrowserFolder(folder); setBrowserMode("files"); setView("browser"); }} onIngest={runIngest} onViewIngest={() => setView("ingest")} />}
+          {view === "dashboard" && <Dashboard onAsk={() => void startNewSession()} onOpenSession={(path) => void openSession(path)} onDeleteSession={handleDeleteSession} onSwitchWorkspace={() => setScreen("picker")} onBrowser={(folder) => { setBrowserFolder(folder); setBrowserMode("files"); setView("browser"); }} onIngest={runIngest} onViewIngest={() => setView("ingest")} />}
           {view === "chat" && <Chat />}
           {view === "browser" && <Browser />}
           {view === "ingest" && <IngestView onRun={runIngest} />}

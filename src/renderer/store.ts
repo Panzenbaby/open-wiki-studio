@@ -34,6 +34,10 @@ export const countsAtom = atom<{ input: number; wiki: number; archive: number }>
 // sessions
 export const sessionsAtom = atom<readonly SessionInfo[]>([]);
 export const currentSessionAtom = atom<SessionInfo | null>(null);
+/** Paths of sessions with an in-flight agent turn (live sidebar indicator).
+ *  Authoritative source: updated from chat events and synced from
+ *  `SessionInfo.streaming` on refresh. */
+export const streamingSessionsAtom = atom<ReadonlySet<string>>(new Set<string>());
 
 export const viewAtom = atom<View>("dashboard");
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { AlertTriangle, HelpCircle, RefreshCw, Send } from "lucide-react";
+import { AlertTriangle, HelpCircle, RefreshCw, Send, Square } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import { chatErrorAtom, chatStreamingAtom, currentSessionAtom, messagesAtom } from "../store.ts";
@@ -59,6 +59,18 @@ export function Chat(): JSX.Element {
       }
     } catch (error) {
       setStreaming(false);
+      setChatError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  // Streaming flag is cleared by the agent_end event, not here —
+  // abortChat() resolves only after the agent is idle.
+  async function stop(): Promise<void> {
+    if (!streaming) return;
+    try {
+      const result = await api.abortChat();
+      if (!result.success) setChatError(result.error.message);
+    } catch (error) {
       setChatError(error instanceof Error ? error.message : String(error));
     }
   }
@@ -150,7 +162,21 @@ export function Chat(): JSX.Element {
               placeholder={t("chat.placeholder")}
               rows={1}
             />
-            <button className="send" disabled={!input.trim() || streaming} onClick={() => void send()}><Send size={16} /></button>
+            {streaming ? (
+              <button
+                className="send"
+                disabled={false}
+                aria-label={t("chat.stop")}
+                title={t("chat.stop")}
+                onClick={() => void stop()}
+              >
+                <Square size={16} />
+              </button>
+            ) : (
+              <button className="send" disabled={!input.trim()} onClick={() => void send()}>
+                <Send size={16} />
+              </button>
+            )}
           </div>
           <div className="composer-hint">
             <span>{t("chat.hintSend")}</span>

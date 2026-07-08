@@ -99,6 +99,7 @@ export const messages: Record<Locale, Dict> = {
     "chat.roleUser": "You",
     "chat.roleAgent": "Open Wiki Studio",
     "chat.retry": "Retry",
+    "chat.stop": "Stop",
     "chat.errorNoResponse":
       "The agent did not produce a response. Please try again.",
 
@@ -159,6 +160,7 @@ export const messages: Record<Locale, Dict> = {
     "session.delete": "Delete",
     "session.confirmDelete":
       "Delete this session? This cannot be undone.",
+    "session.streaming": "Generating answer…",
 
     // ── wiki graph ─────────────────────────────────────────────────
     "nav.graph": "Graph",
@@ -271,6 +273,7 @@ export const messages: Record<Locale, Dict> = {
     "chat.roleUser": "Du",
     "chat.roleAgent": "Open Wiki Studio",
     "chat.retry": "Erneut versuchen",
+    "chat.stop": "Stopp",
     "chat.errorNoResponse":
       "Der Agent hat keine Antwort erzeugt. Bitte versuche es erneut.",
 
@@ -334,6 +337,7 @@ export const messages: Record<Locale, Dict> = {
     "session.delete": "Löschen",
     "session.confirmDelete":
       "Diese Session löschen? Dies kann nicht rückgängig gemacht werden.",
+    "session.streaming": "Antwort wird erstellt…",
 
     // ── wiki graph ─────────────────────────────────────────────────
     "nav.graph": "Graph",

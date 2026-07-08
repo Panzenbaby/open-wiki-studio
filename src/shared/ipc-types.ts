@@ -70,6 +70,8 @@ export interface SessionInfo {
   readonly path: string;
   readonly name: string;
   readonly lastModified: string;
+  /** True while an agent turn is actively streaming for this session. */
+  readonly streaming: boolean;
 }
 
 export interface ChatMessage {
@@ -78,13 +80,16 @@ export interface ChatMessage {
 }
 
 // ─── Agent events streamed to the renderer ──────────────────────────
+// Chat-stream events carry `sessionPath` so the renderer can route them to the
+// correct session's UI state when multiple sessions stream in parallel.
+// Ingest-stream events use `sessionPath: ""` (the renderer ignores it).
 export type AgentEvent =
   | { type: "message_start"; role: "user" | "assistant"; text: string }
-  | { type: "text_delta"; sessionId: string; delta: string }
+  | { type: "text_delta"; sessionId: string; sessionPath: string; delta: string }
   | { type: "message_end"; role: "user" | "assistant"; text: string }
-  | { type: "agent_start"; sessionId: string }
-  | { type: "agent_end"; sessionId: string }
-  | { type: "error"; message: string };
+  | { type: "agent_start"; sessionId: string; sessionPath: string }
+  | { type: "agent_end"; sessionId: string; sessionPath: string; aborted: boolean; lastError?: string }
+  | { type: "error"; sessionPath: string; message: string };
 
 export interface IngestSummary {
   readonly leftover: readonly string[];
@@ -138,7 +143,7 @@ export interface AgentApi {
   newSession(): Promise<Result<SessionInfo>>;
   openSession(path: string): Promise<Result<SessionInfo>>;
   deleteSession(path: string): Promise<Result<void>>;
-  getMessages(): Promise<Result<readonly ChatMessage[]>>;
+  getMessages(path: string): Promise<Result<readonly ChatMessage[]>>;
 
   // wiki graph
   getWikiGraph(): Promise<Result<WikiGraph>>;
@@ -146,6 +151,9 @@ export interface AgentApi {
   // agent
   ask(question: string): Promise<Result<void>>;
   ingest(): Promise<Result<void>>;
+  /** Abort only the current chat session's in-flight turn (background turns and ingest keep running). */
+  abortChat(): Promise<Result<void>>;
+  /** Emergency stop: abort the current chat turn AND any in-flight ingest. */
   abort(): Promise<Result<void>>;
 
   // events

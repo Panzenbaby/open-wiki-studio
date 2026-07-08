@@ -30,6 +30,7 @@ const BRIDGE_CHANNELS = [
   "getWikiGraph",
   "ask",
   "ingest",
+  "abortChat",
   "abort",
 ] as const;
 
@@ -80,10 +81,11 @@ export class IpcBridge {
       newSession: async () => repo.newSession(),
       openSession: async (path: string) => repo.openSession(path),
       deleteSession: async (path: string) => repo.deleteSession(path),
-      getMessages: async () => repo.getMessages(),
+      getMessages: async (path: string) => repo.getMessages(path),
       getWikiGraph: async () => buildWikiGraph(workspace),
       ask: async (question: string) => repo.ask(question),
       ingest: async () => repo.ingest(),
+      abortChat: async () => repo.abortChat(),
       abort: async () => repo.abort(),
     };
 
