@@ -484,11 +484,27 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .setup-steps .step.done { background: var(--accent); }
 .setup-steps .step.active { background: color-mix(in oklab, var(--accent), transparent 45%); }
 .provider-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
-.provider { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--glass-bg); cursor: pointer; transition: border-color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard); }
+.provider {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  text-align: left; /* buttons default to center */
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard);
+}
+.provider > div { flex: 1; min-width: 0; }
 .provider:hover { border-color: var(--accent); }
-.provider.selected { border-color: var(--accent); background: color-mix(in oklab, var(--accent), transparent 82%); }
+.provider.selected {
+  border-color: color-mix(in oklab, var(--accent), transparent 55%);
+  background: color-mix(in oklab, var(--accent), transparent 82%);
+}
 .provider .p-name { font-weight: 700; font-size: var(--text-sm); }
 .provider .p-sub { font-size: var(--text-xs); color: var(--muted); }
+
+.copilot-code-row { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-2) 0; }
+.copilot-device-code { flex: 1; min-width: 0; }
+.copilot-copy-btn { flex-shrink: 0; }
 
 /* ---------- workspace dashboard (C) ---------- */
 .ws { flex: 1; overflow: auto; padding: var(--space-8); }

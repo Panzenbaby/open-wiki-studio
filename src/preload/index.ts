@@ -1,7 +1,7 @@
 // Preload: exposes a strictly-typed AgentApi to the renderer via contextBridge.
 // Event methods subscribe to the streaming channels from the main process.
 import { contextBridge, ipcRenderer } from "electron";
-import type { AgentApi, AgentEvent, IngestSummary } from "../shared/ipc-types.ts";
+import type { AgentApi, AgentEvent, CopilotLoginEvent, IngestSummary } from "../shared/ipc-types.ts";
 
 const api: AgentApi = {
   getAppSelf: () => ipcRenderer.invoke("okf:getAppSelf"),
@@ -11,6 +11,11 @@ const api: AgentApi = {
   pickWorkspace: () => ipcRenderer.invoke("okf:pickWorkspace"),
 
   configureLlm: (config) => ipcRenderer.invoke("okf:configureLlm", config),
+  listAvailableModels: (provider) => ipcRenderer.invoke("okf:listAvailableModels", provider),
+  loginCopilot: () => ipcRenderer.invoke("okf:loginCopilot"),
+  cancelCopilotLogin: () => ipcRenderer.invoke("okf:cancelCopilotLogin"),
+  logoutCopilot: () => ipcRenderer.invoke("okf:logoutCopilot"),
+  openExternal: (url) => ipcRenderer.invoke("okf:openExternal", url),
 
   listFolder: (folder) => ipcRenderer.invoke("okf:listFolder", folder),
   getPreview: (relativePath) => ipcRenderer.invoke("okf:getPreview", relativePath),
@@ -44,6 +49,11 @@ const api: AgentApi = {
     const handler = (_event: unknown, payload: IngestSummary) => listener(payload);
     ipcRenderer.on("okf:ingest-summary", handler);
     return () => ipcRenderer.removeListener("okf:ingest-summary", handler);
+  },
+  onCopilotLoginEvent: (listener) => {
+    const handler = (_event: unknown, payload: CopilotLoginEvent) => listener(payload);
+    ipcRenderer.on("okf:copilot-login-event", handler);
+    return () => ipcRenderer.removeListener("okf:copilot-login-event", handler);
   },
 };
 

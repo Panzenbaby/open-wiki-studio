@@ -49,6 +49,26 @@ export const messages: Record<Locale, Dict> = {
     "llf.google.sub": "Gemini · google",
     "llf.ollama.sub": "local · openai-completions",
     "llf.openai-compatible.sub": "custom endpoint (e.g. LM Studio)",
+    "llf.github-copilot.sub": "Copilot · OAuth (github.com)",
+
+    // ── GitHub Copilot OAuth login ──────────────────────────────────
+    "copilot.login": "Log in with GitHub",
+    "copilot.logout": "Log out",
+    "copilot.loggedIn": "Signed in to GitHub Copilot",
+    "copilot.loggingIn": "Signing in…",
+    "copilot.cancel": "Cancel login",
+    "copilot.deviceCode": "Device code",
+    "copilot.deviceCodeHint":
+      "Enter this code on GitHub, then authorize. The code refreshes automatically if it expires.",
+    "copilot.openUrl": "Open GitHub",
+    "copilot.progress": "Preparing models…",
+    "copilot.loginFailed": "GitHub login failed",
+    "copilot.loginCancelled": "Login cancelled",
+    "copilot.noModels": "No Copilot models are available for your account.",
+    "copilot.selectModel": "Model",
+    "copilot.copyCode": "Copy code",
+    "copilot.copied": "Code copied",
+    "copilot.copyFailed": "Could not copy code",
 
     // ── settings ──────────────────────────────────────────────────
     "settings.title": "LLM settings",
@@ -224,6 +244,26 @@ export const messages: Record<Locale, Dict> = {
     "llf.ollama.sub": "lokal · openai-completions",
     "llf.openai-compatible.sub":
       "benutzerdefinierter Endpunkt (z. B. LM Studio)",
+    "llf.github-copilot.sub": "Copilot · OAuth (github.com)",
+
+    // ── GitHub-Copilot-OAuth-Login ──────────────────────────────────
+    "copilot.login": "Mit GitHub anmelden",
+    "copilot.logout": "Abmelden",
+    "copilot.loggedIn": "Bei GitHub Copilot angemeldet",
+    "copilot.loggingIn": "Anmeldung läuft…",
+    "copilot.cancel": "Anmeldung abbrechen",
+    "copilot.deviceCode": "Gerätecode",
+    "copilot.deviceCodeHint":
+      "Gib diesen Code auf GitHub ein und autorisiere. Der Code erneuert sich automatisch, falls er abläuft.",
+    "copilot.openUrl": "GitHub öffnen",
+    "copilot.progress": "Modelle werden vorbereitet…",
+    "copilot.loginFailed": "GitHub-Anmeldung fehlgeschlagen",
+    "copilot.loginCancelled": "Anmeldung abgebrochen",
+    "copilot.noModels": "Für dein Konto sind keine Copilot-Modelle verfügbar.",
+    "copilot.selectModel": "Modell",
+    "copilot.copyCode": "Code kopieren",
+    "copilot.copied": "Code kopiert",
+    "copilot.copyFailed": "Code konnte nicht kopiert werden",
 
     // ── settings ──────────────────────────────────────────────────
     "settings.title": "LLM-Einstellungen",

@@ -6,17 +6,32 @@ import { BrowserWindow, dialog, ipcMain, type WebContents } from "electron";
 import { addInputFiles, getPreview, listFolder, revealInFileManager } from "./files.ts";
 import { buildWikiGraph } from "./wiki-graph.ts";
 import { setLlmConfig } from "./config.ts";
-import { errorMessage, ok } from "../shared/result.ts";
+import { errorMessage, ok, err } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
-import type { Folder, LlmConfig } from "../shared/ipc-types.ts";
+import type { Folder, LlmConfig, ProviderId } from "../shared/ipc-types.ts";
 import type { AgentRepository } from "./agent.ts";
 
 const CHAT_CHANNEL = "okf:chat-event";
 const INGEST_CHANNEL = "okf:ingest-event";
 const SUMMARY_CHANNEL = "okf:ingest-summary";
+const COPILOT_LOGIN_CHANNEL = "okf:copilot-login-event";
+
+/** Known `ProviderId` values — used to validate IPC payloads before forwarding. */
+const VALID_PROVIDERS: ReadonlyArray<ProviderId> = [
+  "anthropic",
+  "openai",
+  "google",
+  "openai-compatible",
+  "ollama",
+  "github-copilot",
+];
 
 const BRIDGE_CHANNELS = [
   "configureLlm",
+  "listAvailableModels",
+  "loginCopilot",
+  "cancelCopilotLogin",
+  "logoutCopilot",
   "listFolder",
   "getPreview",
   "addInputFiles",
@@ -43,6 +58,7 @@ export class IpcBridge {
     repo.setChatListener((e) => this.send(CHAT_CHANNEL, e));
     repo.setIngestListener((e) => this.send(INGEST_CHANNEL, e));
     repo.setSummaryListener((s) => this.send(SUMMARY_CHANNEL, s));
+    repo.setCopilotLoginListener((e) => this.send(COPILOT_LOGIN_CHANNEL, e));
   }
 
   private send(channel: string, payload: unknown): void {
@@ -60,6 +76,15 @@ export class IpcBridge {
         if (!saved.success) return saved;
         return repo.configureLlm(config);
       },
+      listAvailableModels: async (provider: string) => {
+        if (!VALID_PROVIDERS.includes(provider as ProviderId)) {
+          return err(`Unknown provider: ${provider}`);
+        }
+        return repo.listAvailableModels(provider as ProviderId);
+      },
+      loginCopilot: async () => repo.loginCopilot(),
+      cancelCopilotLogin: async () => repo.cancelCopilotLogin(),
+      logoutCopilot: async () => repo.logoutCopilot(),
       listFolder: async (folder: Folder) => listFolder(workspace, folder),
       getPreview: async (relativePath: string) => getPreview(workspace, relativePath),
       addInputFiles: async (filePaths: readonly string[]) => addInputFiles(workspace, filePaths),

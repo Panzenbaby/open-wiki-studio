@@ -32,7 +32,8 @@ export type ProviderId =
   | "openai"
   | "google"
   | "openai-compatible"
-  | "ollama";
+  | "ollama"
+  | "github-copilot";
 
 export interface LlmConfig {
   readonly provider: ProviderId;
@@ -40,6 +41,20 @@ export interface LlmConfig {
   readonly apiKey?: string;
   readonly baseUrl?: string;
 }
+
+/** Model offered by a provider (`listAvailableModels`); populates the
+ *  Copilot dropdown after OAuth login. */
+export interface ModelOption {
+  readonly id: string;
+  readonly name: string;
+}
+
+// ─── Copilot OAuth login (device flow) ──────────────────────────────
+// Streamed to the renderer during `loginCopilot()`. The GHES domain `onPrompt`
+// is auto-answered with "" (github.com) and therefore not forwarded.
+export type CopilotLoginEvent =
+  | { type: "device_code"; userCode: string; verificationUri: string }
+  | { type: "progress"; message: string };
 
 // ─── Filesystem (input/wiki/archive) ─────────────────────────────────
 export type Folder = "input" | "wiki" | "archive";
@@ -129,6 +144,20 @@ export interface AgentApi {
 
   // llm
   configureLlm(config: LlmConfig): Promise<Result<void>>;
+  /** Provider models with auth configured. For Copilot a non-empty list doubles
+   *  as the "already logged in" probe. */
+  listAvailableModels(provider: ProviderId): Promise<Result<readonly ModelOption[]>>;
+  /** Run the Copilot device-code flow; device code/progress stream via
+   *  `onCopilotLoginEvent`. Resolves with the account's available models. */
+  loginCopilot(): Promise<Result<readonly ModelOption[]>>;
+  /** Abort an in-flight `loginCopilot()`. */
+  cancelCopilotLogin(): Promise<Result<void>>;
+  /** Clear the stored Copilot OAuth credential (log out). */
+  logoutCopilot(): Promise<Result<void>>;
+
+  // external
+  /** Open a URL in the default browser (Copilot verification URL). */
+  openExternal(url: string): Promise<Result<void>>;
 
   // files
   listFolder(folder: Folder): Promise<Result<readonly FileNode[]>>;
@@ -160,4 +189,5 @@ export interface AgentApi {
   onAgentEvent(listener: (event: AgentEvent) => void): () => void;
   onIngestEvent(listener: (event: AgentEvent) => void): () => void;
   onIngestSummary(listener: (summary: IngestSummary) => void): () => void;
+  onCopilotLoginEvent(listener: (event: CopilotLoginEvent) => void): () => void;
 }

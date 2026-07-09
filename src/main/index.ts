@@ -1,7 +1,7 @@
 // Electron main entry: window lifecycle, workspace selection dialog,
 // activation of the AgentRepository + IpcBridge for the chosen workspace.
 import "./polyfill.ts"; // must run before pi-coding-agent loads (undici worker_threads polyfill)
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -92,12 +92,43 @@ function registerGlobalHandlers(): void {
   // any workspace is active.
   ipcMain.handle("okf:getAppSelf", async () => {
     const llm = await getLlmConfig();
-    const noKeyProviders: ReadonlyArray<ProviderId> = ["ollama", "openai-compatible"];
+    // Providers without an API key in config.json: ollama/
+    // openai-compatible use a placeholder or custom endpoint; copilot uses
+    // an OAuth credential in auth.json, so config.json carries provider+modelId.
+    const noKeyProviders: ReadonlyArray<ProviderId> = [
+      "ollama",
+      "openai-compatible",
+      "github-copilot",
+    ];
     const hasLlmConfig =
       !!llm &&
       !!llm.modelId &&
       (!!llm.apiKey || noKeyProviders.includes(llm.provider));
     return ok({ version: "0.1.0", hasLlmConfig, platform: process.platform });
+  });
+
+  // Opens the Copilot OAuth verification URL in the default browser.
+  // Registered globally (workspace-independent).
+  ipcMain.handle("okf:openExternal", async (_event, url: string) => {
+    try {
+      if (typeof url !== "string" || url === "") {
+        return err("Invalid URL");
+      }
+      // http(s) only — guard against `open` launching local files.
+      let parsed: URL;
+      try {
+        parsed = new URL(url);
+      } catch {
+        return err("Invalid URL");
+      }
+      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+        return err("Invalid URL");
+      }
+      await shell.openExternal(url);
+      return ok(undefined);
+    } catch (error) {
+      return err(`Failed to open URL: ${errorMessage(error)}`);
+    }
   });
 
   ipcMain.handle("okf:pickWorkspace", async (): Promise<Result<WorkspaceInfo | null>> => {

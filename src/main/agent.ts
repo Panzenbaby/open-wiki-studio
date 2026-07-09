@@ -39,8 +39,11 @@ import { mainT } from "./i18n.ts";
 import type {
   AgentEvent,
   ChatMessage,
+  CopilotLoginEvent,
   IngestSummary,
   LlmConfig,
+  ModelOption,
+  ProviderId,
   Result,
   SessionInfo,
 } from "../shared/ipc-types.ts";
@@ -80,6 +83,8 @@ export class AgentRepository {
   private chatListener: ((event: AgentEvent) => void) | null = null;
   private ingestListener: ((event: AgentEvent) => void) | null = null;
   private summaryListener: ((summary: IngestSummary) => void) | null = null;
+  private copilotLoginListener: ((event: CopilotLoginEvent) => void) | null = null;
+  private copilotAbort: AbortController | null = null;
   private ingestUnsub: (() => void) | null = null;
   private pi: PiModule | null = null;
   private ingestModel: ResolvedModel | null = null;
@@ -151,6 +156,9 @@ export class AgentRepository {
   }
   setSummaryListener(listener: (summary: IngestSummary) => void): void {
     this.summaryListener = listener;
+  }
+  setCopilotLoginListener(listener: (event: CopilotLoginEvent) => void): void {
+    this.copilotLoginListener = listener;
   }
 
   /**
@@ -417,6 +425,85 @@ export class AgentRepository {
       return ok(undefined);
     } catch (error) {
       return err<void>(`Failed to configure LLM: ${errorMessage(error)}`);
+    }
+  }
+
+  // ─── GitHub Copilot OAuth ────────────────────────────────────────
+  /** For Copilot this doubles as the "already logged in" probe: a non-empty
+   *  result means an OAuth credential is stored, so the form shows the
+   *  model dropdown instead of the login button. */
+  listAvailableModels(provider: ProviderId): Result<readonly ModelOption[]> {
+    try {
+      const models = this.services.modelRegistry
+        .getAvailable()
+        .filter((model) => model.provider === provider)
+        .map((model) => ({ id: model.id, name: model.name }));
+      return ok(models);
+    } catch (error) {
+      return err<readonly ModelOption[]>(
+        `Failed to list models: ${errorMessage(error)}`,
+      );
+    }
+  }
+
+  /** Run the Copilot OAuth device-code flow. `onPrompt` is auto-answered
+   *  with "" so it uses github.com (no GHES). Blocks until the user authorizes
+   *  in the browser; the credential is persisted by AuthStorage. Cancellable
+   *  via `cancelCopilotLogin()`, which sets `cause: "cancelled"` on abort. */
+  async loginCopilot(): Promise<Result<readonly ModelOption[]>> {
+    this.copilotAbort?.abort();
+    this.copilotAbort = new AbortController();
+    const signal = this.copilotAbort.signal;
+    try {
+      await this.services.authStorage.login("github-copilot", {
+        onAuth: () => {},
+        onDeviceCode: (info) => {
+          this.copilotLoginListener?.({
+            type: "device_code",
+            userCode: info.userCode,
+            verificationUri: info.verificationUri,
+          });
+        },
+        // Auto-answer the GHES domain prompt → github.com (no GHES).
+        onPrompt: async () => "",
+        onProgress: (message) => {
+          this.copilotLoginListener?.({ type: "progress", message });
+        },
+        onSelect: async () => undefined,
+        signal,
+      });
+      this.copilotAbort = null;
+      return this.listAvailableModels("github-copilot");
+    } catch (error) {
+      this.copilotAbort = null;
+      // Abort (cancel) vs. real failure — the renderer shows a neutral
+      // notice instead of an error toast on `cause: "cancelled"`.
+      if (signal.aborted) {
+        return err<readonly ModelOption[]>(
+          "Login cancelled",
+          { cause: "cancelled" },
+        );
+      }
+      return err<readonly ModelOption[]>(errorMessage(error));
+    }
+  }
+
+  async cancelCopilotLogin(): Promise<Result<void>> {
+    try {
+      this.copilotAbort?.abort();
+      this.copilotAbort = null;
+      return ok(undefined);
+    } catch (error) {
+      return err<void>(`Failed to cancel login: ${errorMessage(error)}`);
+    }
+  }
+
+  async logoutCopilot(): Promise<Result<void>> {
+    try {
+      this.services.authStorage.logout("github-copilot");
+      return ok(undefined);
+    } catch (error) {
+      return err<void>(`Failed to log out: ${errorMessage(error)}`);
     }
   }
 
