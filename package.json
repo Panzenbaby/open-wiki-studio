@@ -11,6 +11,8 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "check": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "package": "npm run package:mac && npm run package:win && npm run package:linux",
     "package:mac": "electron-vite build && electron-builder --mac --arm64 --x64",
     "package:win": "electron-vite build && electron-builder --win --arm64 --x64",
@@ -37,7 +39,8 @@
     "electron-vite": "^2.3.0",
     "typebox": "*",
     "typescript": "^5.5.4",
-    "vite": "^5.3.3"
+    "vite": "^5.3.3",
+    "vitest": "^4.1.10"
   },
   "build": {
     "appId": "dev.panzenbaby.openwikistudio",

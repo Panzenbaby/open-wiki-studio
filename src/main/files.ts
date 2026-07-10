@@ -1,8 +1,16 @@
 // Filesystem operations on the workspace folders, returned as Result<T>.
+//
+// Concept reading (wiki .md: conceptId derivation, frontmatter metadata) is
+// delegated to ConceptStore. This module keeps the non-concern parts:
+//   - listFolder: listing input/wiki/archive as FileNode (with size — a broader
+//     shape than concepts, any file type)
+//   - getPreview: single-file preview — wiki .md delegates to the store; text
+//     and binary stay here
+//   - addInputFiles / revealInFileManager: input-folder writes + OS integration
 import { copyFile, mkdir, readFile, stat } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { shell } from "electron";
-import { parseDocument } from "./frontmatter.ts";
+import { ConceptStore } from "./concept-store.ts";
 import { ok, err, errorMessage } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
 import type {
@@ -12,8 +20,6 @@ import type {
   Folder,
   Result,
 } from "../shared/ipc-types.ts";
-
-const RESERVED = new Set(["index.md", "log.md"]);
 
 function workspaceDir(workspace: string, folder: Folder): string {
   return join(workspace, folder);
@@ -31,6 +37,13 @@ function safeResolve(baseDir: string, relativePath: string): string | null {
   const rel = relative(baseDir, resolved);
   if (rel.startsWith(`..${sep}`) || rel === `..`) return null;
   return resolved;
+}
+
+/** Is `relativePath` a wiki markdown file (starts with `wiki/`)? The store
+ *  handles only those; everything else (input/archive/text/binary) is read
+ *  directly here. */
+function isWikiMarkdown(relativePath: string): boolean {
+  return relativePath.startsWith("wiki/") && relativePath.endsWith(".md");
 }
 
 async function walk(dir: string, root: string): Promise<FileNode[]> {
@@ -76,33 +89,44 @@ export async function getPreview(
   workspace: string,
   relativePath: string,
 ): Promise<Result<FilePreview>> {
-  // relativePath may be "wiki/foo.md" or just "foo.md"; resolve under workspace.
   const absolute = safeResolve(workspace, relativePath);
   if (!absolute) {
     return err<FilePreview>(mainT("error.invalidPath", { path: relativePath }), { path: relativePath });
   }
-  try {
-    const content = await readFile(absolute, "utf8");
-    const isMarkdown = relativePath.endsWith(".md");
-    const name = basename(relativePath);
-    if (isMarkdown && !RESERVED.has(name)) {
-      const parsed = parseDocument(content);
-      const fm = parsed.frontmatter;
-      const info: ConceptInfo | undefined = fm
-        ? {
-            conceptId: relativePath.replace(/^wiki\//, "").replace(/\.md$/, ""),
-            title: fm.title ?? fm.type ?? name,
-            description: fm.description ?? "",
-            type: fm.type ?? mainT("concept.untyped"),
-          }
-        : undefined;
+
+  // Wiki markdown: delegate concept reading (conceptId, frontmatter metadata,
+  // body) to the store. Reserved files (index/log) come back with kind !==
+  // "concept" and no ConceptInfo, matching the previous RESERVED behaviour.
+  if (isWikiMarkdown(relativePath)) {
+    const store = new ConceptStore(workspace);
+    const concept = await store.readConcept(relativePath);
+    if (concept) {
+      const info: ConceptInfo | undefined =
+        concept.kind === "concept"
+          ? {
+              conceptId: concept.conceptId,
+              title: concept.title,
+              description: concept.description,
+              type: concept.type,
+            }
+          : undefined;
       return ok({
         relativePath,
         kind: "markdown",
-        content: parsed.body,
+        content: concept.body,
         frontmatter: info,
       });
     }
+    // readConcept returned null (file vanished / unreadable) — fall through to a
+    // direct read so the error surfaces instead of a silent empty preview.
+  }
+
+  // Non-wiki files, non-markdown, or a wiki .md the store could not read: read
+  // directly. Non-wiki .md is shown as raw markdown (no concept metadata) —
+  // input/archive documents are not concepts.
+  try {
+    const content = await readFile(absolute, "utf8");
+    const isMarkdown = relativePath.endsWith(".md");
     return ok({
       relativePath,
       kind: isMarkdown ? "markdown" : "text",

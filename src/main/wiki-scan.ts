@@ -1,11 +1,13 @@
-// Lightweight wiki scanning for the ingest summary (before/after diff +
-// leftover detection). Uses only node:fs so it bundles cleanly into the main
-// process without jiti. Mirrors the semantics of pi-okf-wiki/wiki.ts.
+// Wiki snapshot + diff for the ingest summary. The concept enumeration and
+// frontmatter handling live in ConceptStore now; this module keeps the two
+// things that are caller policies, not concept knowledge:
+//   - snapshotWiki / diffSnapshots: hashing body + diffing before/after
+//   - listInputFiles: listing the input/ folder (a different folder, with a
+//     different shape — just relative paths, no concept parsing)
 import { createHash } from "node:crypto";
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-
-const RESERVED = new Set(["index.md", "log.md"]);
+import { ConceptStore } from "./concept-store.ts";
 
 export interface WikiSnapshot {
   readonly entries: ReadonlyMap<string, string>; // conceptId -> sha1
@@ -16,59 +18,20 @@ export interface WikiDiff {
   readonly updated: readonly string[];
 }
 
-function isConcept(relativePath: string): boolean {
-  if (!relativePath.endsWith(".md")) return false;
-  const segments = relativePath.split("/");
-  return segments.length > 0 && !RESERVED.has(segments[segments.length - 1]);
-}
-
-function conceptId(relativePath: string): string {
-  return relativePath.endsWith(".md") ? relativePath.slice(0, -3) : relativePath;
-}
-
-async function walk(dir: string, root: string): Promise<readonly { relativePath: string; absolutePath: string }[]> {
-  const out: { relativePath: string; absolutePath: string }[] = [];
-  let entries: import("node:fs").Dirent[];
-  try {
-    entries = await readdir(dir, { withFileTypes: true });
-  } catch {
-    return out;
-  }
-  for (const entry of entries) {
-    if (entry.name.startsWith(".")) continue;
-    const abs = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      out.push(...(await walk(abs, root)));
-    } else if (entry.isFile()) {
-      const rel = relative(root, abs).split(sep).join("/");
-      out.push({ relativePath: rel, absolutePath: abs });
-    }
-  }
-  return out;
-}
-
+/** Snapshot the wiki for ingest diffing: conceptId -> sha1(body). Reserved
+ *  files (index.md/log.md) are excluded — they are generated, not
+ *  agent-authored concepts the diff should report. */
 export async function snapshotWiki(workspace: string): Promise<WikiSnapshot> {
-  const wikiDir = join(workspace, "wiki");
-  try {
-    await stat(wikiDir);
-  } catch {
-    return { entries: new Map() };
-  }
-  const files = await walk(wikiDir, wikiDir);
+  const store = new ConceptStore(workspace);
+  const concepts = await store.listConcepts();
   const entries = new Map<string, string>();
-  for (const file of files) {
-    if (!isConcept(file.relativePath)) continue;
-    let content: string;
-    try {
-      content = await readFile(file.absolutePath, "utf8");
-    } catch {
-      continue;
-    }
-    entries.set(conceptId(file.relativePath), createHash("sha1").update(content).digest("hex"));
+  for (const concept of concepts) {
+    entries.set(concept.conceptId, createHash("sha1").update(concept.body).digest("hex"));
   }
   return { entries };
 }
 
+/** Diff two snapshots into created/updated concept lists (sorted). */
 export function diffSnapshots(before: WikiSnapshot, after: WikiSnapshot): WikiDiff {
   const created: string[] = [];
   const updated: string[] = [];
@@ -82,6 +45,33 @@ export function diffSnapshots(before: WikiSnapshot, after: WikiSnapshot): WikiDi
   return { created, updated };
 }
 
+/** List files still in input/ after an ingest (the agent did not consume
+ *  them). Walks input/ directly — a different folder with a different shape
+ *  (just relative paths), so it is not part of ConceptStore. */
+async function walkInput(
+  dir: string,
+  root: string,
+): Promise<readonly { relativePath: string; absolutePath: string }[]> {
+  const out: { relativePath: string; absolutePath: string }[] = [];
+  let entries: import("node:fs").Dirent[];
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    if (entry.name.startsWith(".")) continue;
+    const abs = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...(await walkInput(abs, root)));
+    } else if (entry.isFile()) {
+      const rel = relative(root, abs).split(sep).join("/");
+      out.push({ relativePath: rel, absolutePath: abs });
+    }
+  }
+  return out;
+}
+
 export async function listInputFiles(workspace: string): Promise<readonly string[]> {
   const inputDir = join(workspace, "input");
   try {
@@ -89,6 +79,6 @@ export async function listInputFiles(workspace: string): Promise<readonly string
   } catch {
     return [];
   }
-  const files = await walk(inputDir, inputDir);
+  const files = await walkInput(inputDir, inputDir);
   return files.map((f) => f.relativePath).sort();
 }
