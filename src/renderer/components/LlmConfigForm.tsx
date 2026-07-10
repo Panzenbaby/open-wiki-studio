@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSetAtom } from "jotai";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
-import { toastAtom } from "../store.ts";
+import { llmConfiguredAtom, toastAtom } from "../store.ts";
 import type { CopilotLoginEvent, LlmConfig, ModelOption, ProviderId } from "../../shared/ipc-types.ts";
 
 type ProviderDef = {
@@ -42,6 +42,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   const [baseUrl, setBaseUrl] = useState(props.initial?.baseUrl ?? "");
   const [busy, setBusy] = useState(false);
   const setToast = useSetAtom(toastAtom);
+  const setLlmConfigured = useSetAtom(llmConfiguredAtom);
 
   // Live provider for async callbacks: a login completing while the user is
   // on another provider must not clobber that provider's modelId.
@@ -319,6 +320,10 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
       setToast({ message: `${t("llf.saveFailed")}: ${result.error.message}`, kind: "error" });
       return;
     }
+    // Keep the renderer's notion of "an LLM is configured" in sync after
+    // any successful save (FirstRun and Settings share this form). The
+    // atom otherwise only refreshes at workspace-open via getAppSelf.
+    setLlmConfigured(true);
     props.onSaved();
   }
 

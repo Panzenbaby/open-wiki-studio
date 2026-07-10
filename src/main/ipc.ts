@@ -45,6 +45,7 @@ const BRIDGE_CHANNELS = [
   "getMessages",
   "getWikiGraph",
   "ask",
+  "retryChat",
   "ingest",
   "abortChat",
   "abort",
@@ -79,13 +80,13 @@ export class IpcBridge {
       },
       listAvailableModels: async (provider: string) => {
         if (!VALID_PROVIDERS.includes(provider as ProviderId)) {
-          return err(`Unknown provider: ${provider}`);
+          return err(mainT("error.unknownProvider", { provider }));
         }
         return repo.listAvailableModels(provider as ProviderId);
       },
       loadModels: async (provider: string, apiKey: string | undefined, baseUrl: string | undefined) => {
         if (!VALID_PROVIDERS.includes(provider as ProviderId)) {
-          return err(`Unknown provider: ${provider}`);
+          return err(mainT("error.unknownProvider", { provider }));
         }
         return repo.loadModels(provider as ProviderId, apiKey, baseUrl);
       },
@@ -116,6 +117,7 @@ export class IpcBridge {
       getMessages: async (path: string) => repo.getMessages(path),
       getWikiGraph: async () => buildWikiGraph(workspace),
       ask: async (question: string) => repo.ask(question),
+      retryChat: async (question: string) => repo.retryChat(question),
       ingest: async () => repo.ingest(),
       abortChat: async () => repo.abortChat(),
       abort: async () => repo.abort(),

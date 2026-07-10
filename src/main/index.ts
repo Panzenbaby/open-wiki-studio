@@ -78,7 +78,7 @@ async function activateWorkspace(folderPath: string): Promise<Result<WorkspaceIn
     }
     return await rememberWorkspace(folderPath);
   } catch (error) {
-    return err<WorkspaceInfo>(`Failed to activate workspace: ${errorMessage(error)}`);
+    return err<WorkspaceInfo>(mainT("error.activateWorkspace", { detail: errorMessage(error) }));
   }
 }
 
@@ -112,22 +112,22 @@ function registerGlobalHandlers(): void {
   ipcMain.handle("okf:openExternal", async (_event, url: string) => {
     try {
       if (typeof url !== "string" || url === "") {
-        return err("Invalid URL");
+        return err(mainT("error.invalidUrl"));
       }
       // http(s) only — guard against `open` launching local files.
       let parsed: URL;
       try {
         parsed = new URL(url);
       } catch {
-        return err("Invalid URL");
+        return err(mainT("error.invalidUrl"));
       }
       if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-        return err("Invalid URL");
+        return err(mainT("error.invalidUrl"));
       }
       await shell.openExternal(url);
       return ok(undefined);
     } catch (error) {
-      return err(`Failed to open URL: ${errorMessage(error)}`);
+      return err(mainT("error.openUrl", { detail: errorMessage(error) }));
     }
   });
 
@@ -146,15 +146,15 @@ function registerGlobalHandlers(): void {
     // an existing directory before activating. Refusing early gives a clear
     // error instead of a cryptic failure deep inside AgentRepository.create.
     if (typeof path !== "string" || path === "") {
-      return err<WorkspaceInfo>("Invalid workspace path");
+      return err<WorkspaceInfo>(mainT("error.invalidWorkspacePath"));
     }
     try {
       const info = await stat(path);
       if (!info.isDirectory()) {
-        return err<WorkspaceInfo>(`Not a directory: ${path}`, { path });
+        return err<WorkspaceInfo>(mainT("error.notADirectory", { path }), { path });
       }
     } catch {
-      return err<WorkspaceInfo>(`Workspace not found: ${path}`, { path });
+      return err<WorkspaceInfo>(mainT("error.workspaceNotFound", { path }), { path });
     }
     return activateWorkspace(path);
   });

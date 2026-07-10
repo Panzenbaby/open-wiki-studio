@@ -173,6 +173,6 @@ export async function buildWikiGraph(workspace: string): Promise<Result<WikiGrap
 
     return ok({ nodes, edges });
   } catch (error) {
-    return err<WikiGraph>(`Failed to build wiki graph: ${errorMessage(error)}`);
+    return err<WikiGraph>(mainT("error.buildWikiGraph", { detail: errorMessage(error) }));
   }
 }

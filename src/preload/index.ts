@@ -32,6 +32,7 @@ const api: AgentApi = {
   getWikiGraph: () => ipcRenderer.invoke("okf:getWikiGraph"),
 
   ask: (question) => ipcRenderer.invoke("okf:ask", question),
+  retryChat: (question) => ipcRenderer.invoke("okf:retryChat", question),
   ingest: () => ipcRenderer.invoke("okf:ingest"),
   abortChat: () => ipcRenderer.invoke("okf:abortChat"),
   abort: () => ipcRenderer.invoke("okf:abort"),

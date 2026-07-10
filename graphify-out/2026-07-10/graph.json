@@ -794,7 +794,7 @@
       "label": ".listAvailableModels()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L442",
+      "source_location": "L435",
       "_origin": "ast",
       "id": "main_agent_agentrepository_listavailablemodels",
       "community": 2,
@@ -804,7 +804,7 @@
       "label": ".loadModels()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L469",
+      "source_location": "L462",
       "_origin": "ast",
       "id": "main_agent_agentrepository_loadmodels",
       "community": 2,
@@ -814,7 +814,7 @@
       "label": ".loginCopilot()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L504",
+      "source_location": "L497",
       "_origin": "ast",
       "id": "main_agent_agentrepository_logincopilot",
       "community": 2,
@@ -824,7 +824,7 @@
       "label": ".cancelCopilotLogin()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L542",
+      "source_location": "L535",
       "_origin": "ast",
       "id": "main_agent_agentrepository_cancelcopilotlogin",
       "community": 2,
@@ -834,7 +834,7 @@
       "label": ".logoutCopilot()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L552",
+      "source_location": "L545",
       "_origin": "ast",
       "id": "main_agent_agentrepository_logoutcopilot",
       "community": 2,
@@ -844,7 +844,7 @@
       "label": ".listSessions()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L562",
+      "source_location": "L555",
       "_origin": "ast",
       "id": "main_agent_agentrepository_listsessions",
       "community": 2,
@@ -854,7 +854,7 @@
       "label": ".newSession()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L580",
+      "source_location": "L571",
       "_origin": "ast",
       "id": "main_agent_agentrepository_newsession",
       "community": 2,
@@ -864,7 +864,7 @@
       "label": ".deleteSession()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L605",
+      "source_location": "L594",
       "_origin": "ast",
       "id": "main_agent_agentrepository_deletesession",
       "community": 2,
@@ -874,7 +874,7 @@
       "label": ".openSession()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L621",
+      "source_location": "L610",
       "_origin": "ast",
       "id": "main_agent_agentrepository_opensession",
       "community": 2,
@@ -884,37 +884,27 @@
       "label": ".getMessages()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L661",
+      "source_location": "L648",
       "_origin": "ast",
       "id": "main_agent_agentrepository_getmessages",
-      "community": 2,
+      "community": 12,
       "norm_label": ".getmessages()"
     },
     {
       "label": ".ask()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L682",
+      "source_location": "L667",
       "_origin": "ast",
       "id": "main_agent_agentrepository_ask",
       "community": 2,
       "norm_label": ".ask()"
     },
     {
-      "label": ".retryChat()",
-      "file_type": "code",
-      "source_file": "src/main/agent.ts",
-      "source_location": "L717",
-      "_origin": "ast",
-      "id": "main_agent_agentrepository_retrychat",
-      "community": 2,
-      "norm_label": ".retrychat()"
-    },
-    {
       "label": ".ingest()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L730",
+      "source_location": "L686",
       "_origin": "ast",
       "id": "main_agent_agentrepository_ingest",
       "community": 2,
@@ -924,7 +914,7 @@
       "label": ".abortChat()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L858",
+      "source_location": "L799",
       "_origin": "ast",
       "id": "main_agent_agentrepository_abortchat",
       "community": 2,
@@ -934,7 +924,7 @@
       "label": ".abort()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L870",
+      "source_location": "L811",
       "_origin": "ast",
       "id": "main_agent_agentrepository_abort",
       "community": 2,
@@ -944,7 +934,7 @@
       "label": ".dispose()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L885",
+      "source_location": "L826",
       "_origin": "ast",
       "id": "main_agent_agentrepository_dispose",
       "community": 2,
@@ -954,7 +944,7 @@
       "label": "createIngestSession()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L914",
+      "source_location": "L855",
       "_origin": "ast",
       "id": "main_agent_createingestsession",
       "community": 2,
@@ -964,7 +954,7 @@
       "label": "AgentMessageLike",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L930",
+      "source_location": "L871",
       "_origin": "ast",
       "id": "main_agent_agentmessagelike",
       "community": 12,
@@ -974,7 +964,7 @@
       "label": "lastAssistantAborted()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L941",
+      "source_location": "L882",
       "_origin": "ast",
       "id": "main_agent_lastassistantaborted",
       "community": 12,
@@ -984,27 +974,17 @@
       "label": "lastAssistantErrorMessage()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L955",
+      "source_location": "L896",
       "_origin": "ast",
       "id": "main_agent_lastassistanterrormessage",
       "community": 12,
       "norm_label": "lastassistanterrormessage()"
     },
     {
-      "label": "dedupeProviderErrorMessage()",
-      "file_type": "code",
-      "source_file": "src/main/agent.ts",
-      "source_location": "L984",
-      "_origin": "ast",
-      "id": "main_agent_dedupeprovidererrormessage",
-      "community": 12,
-      "norm_label": "dedupeprovidererrormessage()"
-    },
-    {
       "label": "extractMessages()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L993",
+      "source_location": "L911",
       "_origin": "ast",
       "id": "main_agent_extractmessages",
       "community": 12,
@@ -1014,7 +994,7 @@
       "label": "extractText()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L1027",
+      "source_location": "L925",
       "_origin": "ast",
       "id": "main_agent_extracttext",
       "community": 12,
@@ -1024,7 +1004,7 @@
       "label": "ensureV1Suffix()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L1047",
+      "source_location": "L945",
       "_origin": "ast",
       "id": "main_agent_ensurev1suffix",
       "community": 12,
@@ -1034,7 +1014,7 @@
       "label": "ollamaCloudId()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L1053",
+      "source_location": "L951",
       "_origin": "ast",
       "id": "main_agent_ollamacloudid",
       "community": 12,
@@ -1044,7 +1024,7 @@
       "label": "OpenAiModelList",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L1057",
+      "source_location": "L955",
       "_origin": "ast",
       "id": "main_agent_openaimodellist",
       "community": 12,
@@ -1054,7 +1034,7 @@
       "label": "fetchModelList()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L1061",
+      "source_location": "L959",
       "_origin": "ast",
       "id": "main_agent_fetchmodellist",
       "community": 12,
@@ -1064,7 +1044,7 @@
       "label": "fetchOllamaModels()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L1084",
+      "source_location": "L982",
       "_origin": "ast",
       "id": "main_agent_fetchollamamodels",
       "community": 12,
@@ -1074,7 +1054,7 @@
       "label": "fetchOpenAiCompatibleModels()",
       "file_type": "code",
       "source_file": "src/main/agent.ts",
-      "source_location": "L1112",
+      "source_location": "L1010",
       "_origin": "ast",
       "id": "main_agent_fetchopenaicompatiblemodels",
       "community": 12,
@@ -1094,7 +1074,7 @@
       "label": "ConfigShape",
       "file_type": "code",
       "source_file": "src/main/config.ts",
-      "source_location": "L11",
+      "source_location": "L10",
       "_origin": "ast",
       "id": "main_config_configshape",
       "community": 9,
@@ -1104,7 +1084,7 @@
       "label": "configPath()",
       "file_type": "code",
       "source_file": "src/main/config.ts",
-      "source_location": "L17",
+      "source_location": "L16",
       "_origin": "ast",
       "id": "main_config_configpath",
       "community": 9,
@@ -1114,7 +1094,7 @@
       "label": "configChain",
       "file_type": "code",
       "source_file": "src/main/config.ts",
-      "source_location": "L25",
+      "source_location": "L24",
       "_origin": "ast",
       "id": "main_config_configchain",
       "community": 9,
@@ -1124,7 +1104,7 @@
       "label": "withConfigLock()",
       "file_type": "code",
       "source_file": "src/main/config.ts",
-      "source_location": "L26",
+      "source_location": "L25",
       "_origin": "ast",
       "id": "main_config_withconfiglock",
       "community": 9,
@@ -1134,7 +1114,7 @@
       "label": "readConfig()",
       "file_type": "code",
       "source_file": "src/main/config.ts",
-      "source_location": "L37",
+      "source_location": "L36",
       "_origin": "ast",
       "id": "main_config_readconfig",
       "community": 9,
@@ -1144,7 +1124,7 @@
       "label": "writeConfig()",
       "file_type": "code",
       "source_file": "src/main/config.ts",
-      "source_location": "L53",
+      "source_location": "L52",
       "_origin": "ast",
       "id": "main_config_writeconfig",
       "community": 9,
@@ -1154,7 +1134,7 @@
       "label": "toInfo()",
       "file_type": "code",
       "source_file": "src/main/config.ts",
-      "source_location": "L58",
+      "source_location": "L57",
       "_origin": "ast",
       "id": "main_config_toinfo",
       "community": 9,
@@ -1164,7 +1144,7 @@
       "label": "listRecentWorkspaces()",
       "file_type": "code",
       "source_file": "src/main/config.ts",
-      "source_location": "L67",
+      "source_location": "L66",
       "_origin": "ast",
       "id": "main_config_listrecentworkspaces",
       "community": 9,
@@ -1174,7 +1154,7 @@
       "label": "getLastWorkspace()",
       "file_type": "code",
       "source_file": "src/main/config.ts",
-      "source_location": "L72",
+      "source_location": "L71",
       "_origin": "ast",
       "id": "main_config_getlastworkspace",
       "community": 9,
@@ -1184,7 +1164,7 @@
       "label": "rememberWorkspace()",
       "file_type": "code",
       "source_file": "src/main/config.ts",
-      "source_location": "L76",
+      "source_location": "L75",
       "_origin": "ast",
       "id": "main_config_rememberworkspace",
       "community": 9,
@@ -1194,7 +1174,7 @@
       "label": "getLlmConfig()",
       "file_type": "code",
       "source_file": "src/main/config.ts",
-      "source_location": "L97",
+      "source_location": "L96",
       "_origin": "ast",
       "id": "main_config_getllmconfig",
       "community": 9,
@@ -1204,7 +1184,7 @@
       "label": "setLlmConfig()",
       "file_type": "code",
       "source_file": "src/main/config.ts",
-      "source_location": "L101",
+      "source_location": "L100",
       "_origin": "ast",
       "id": "main_config_setllmconfig",
       "community": 9,
@@ -1407,7 +1387,7 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "main_i18n_getlocale",
-      "community": 8,
+      "community": 0,
       "norm_label": "getlocale()"
     },
     {
@@ -1417,7 +1397,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "main_i18n_maint",
-      "community": 2,
+      "community": 0,
       "norm_label": "maint()"
     },
     {
@@ -1447,7 +1427,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "main_index_getappiconpath",
-      "community": 9,
+      "community": 0,
       "norm_label": "getappiconpath()"
     },
     {
@@ -1457,7 +1437,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "main_index_log",
-      "community": 9,
+      "community": 0,
       "norm_label": "log()"
     },
     {
@@ -1487,7 +1467,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "main_index_fatal",
-      "community": 9,
+      "community": 0,
       "norm_label": "fatal()"
     },
     {
@@ -1517,7 +1497,7 @@
       "source_location": "L163",
       "_origin": "ast",
       "id": "main_index_createwindow",
-      "community": 9,
+      "community": 0,
       "norm_label": "createwindow()"
     },
     {
@@ -1554,7 +1534,7 @@
       "label": "IpcBridge",
       "file_type": "code",
       "source_file": "src/main/ipc.ts",
-      "source_location": "L54",
+      "source_location": "L53",
       "_origin": "ast",
       "id": "main_ipc_ipcbridge",
       "community": 9,
@@ -1564,7 +1544,7 @@
       "label": ".constructor()",
       "file_type": "code",
       "source_file": "src/main/ipc.ts",
-      "source_location": "L55",
+      "source_location": "L54",
       "_origin": "ast",
       "id": "main_ipc_ipcbridge_constructor",
       "community": 9,
@@ -1574,7 +1554,7 @@
       "label": ".send()",
       "file_type": "code",
       "source_file": "src/main/ipc.ts",
-      "source_location": "L66",
+      "source_location": "L65",
       "_origin": "ast",
       "id": "main_ipc_ipcbridge_send",
       "community": 9,
@@ -1584,7 +1564,7 @@
       "label": ".register()",
       "file_type": "code",
       "source_file": "src/main/ipc.ts",
-      "source_location": "L70",
+      "source_location": "L69",
       "_origin": "ast",
       "id": "main_ipc_ipcbridge_register",
       "community": 9,
@@ -1884,7 +1864,7 @@
       "label": "updateLastAssistant()",
       "file_type": "code",
       "source_file": "src/renderer/App.tsx",
-      "source_location": "L189",
+      "source_location": "L179",
       "_origin": "ast",
       "id": "renderer_app_updatelastassistant",
       "community": 8,
@@ -2114,7 +2094,7 @@
       "label": "CopilotSectionProps",
       "file_type": "code",
       "source_file": "src/renderer/components/LlmConfigForm.tsx",
-      "source_location": "L454",
+      "source_location": "L449",
       "_origin": "ast",
       "id": "components_llmconfigform_copilotsectionprops",
       "community": 8,
@@ -2124,7 +2104,7 @@
       "label": "CopilotSection()",
       "file_type": "code",
       "source_file": "src/renderer/components/LlmConfigForm.tsx",
-      "source_location": "L468",
+      "source_location": "L463",
       "_origin": "ast",
       "id": "components_llmconfigform_copilotsection",
       "community": 8,
@@ -2534,7 +2514,7 @@
       "label": "Chat()",
       "file_type": "code",
       "source_file": "src/renderer/screens/Chat.tsx",
-      "source_location": "L11",
+      "source_location": "L10",
       "_origin": "ast",
       "id": "screens_chat_chat",
       "community": 8,
@@ -3064,7 +3044,7 @@
       "label": "t()",
       "file_type": "code",
       "source_file": "src/shared/i18n.ts",
-      "source_location": "L482",
+      "source_location": "L414",
       "_origin": "ast",
       "id": "shared_i18n_t",
       "community": 8,
@@ -3197,7 +3177,7 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "shared_ipc_types_filepreview",
-      "community": 0,
+      "community": 4,
       "norm_label": "filepreview"
     },
     {
@@ -3791,146 +3771,6 @@
       "norm_label": "known caveats (validate on first run)"
     },
     {
-      "label": "chat-retry-and-error-handling-plan.md",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan",
-      "community": 5,
-      "norm_label": "chat-retry-and-error-handling-plan.md"
-    },
-    {
-      "label": "Chat-Retry-Bug & Fehlerhandling \u2014 Umsetzungsplan",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan_chat_retry_bug_fehlerhandling_umsetzungsplan",
-      "community": 5,
-      "norm_label": "chat-retry-bug & fehlerhandling \u2014 umsetzungsplan"
-    },
-    {
-      "label": "Problem",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L3",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan_problem",
-      "community": 5,
-      "norm_label": "problem"
-    },
-    {
-      "label": "Root Cause",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L9",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan_root_cause",
-      "community": 5,
-      "norm_label": "root cause"
-    },
-    {
-      "label": "Entscheidungen",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L36",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan_entscheidungen",
-      "community": 5,
-      "norm_label": "entscheidungen"
-    },
-    {
-      "label": "Umsetzung",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L54",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan_umsetzung",
-      "community": 5,
-      "norm_label": "umsetzung"
-    },
-    {
-      "label": "A. Main process \u2014 `retryChat` IPC (nicht-destruktives Re-Prompt)",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L56",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan_a_main_process_retrychat_ipc_nicht_destruktives_re_prompt",
-      "community": 5,
-      "norm_label": "a. main process \u2014 `retrychat` ipc (nicht-destruktives re-prompt)"
-    },
-    {
-      "label": "Warum kein Branching",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L94",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan_warum_kein_branching",
-      "community": 5,
-      "norm_label": "warum kein branching"
-    },
-    {
-      "label": "B. Defensive `extractMessages`",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L109",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan_b_defensive_extractmessages",
-      "community": 5,
-      "norm_label": "b. defensive `extractmessages`"
-    },
-    {
-      "label": "C. i18n",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L132",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan_c_i18n",
-      "community": 5,
-      "norm_label": "c. i18n"
-    },
-    {
-      "label": "D. Renderer \u2014 `retry()`-H\u00e4rtung + `runTurn`-Helper + `stop()`-Fix",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L137",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan_d_renderer_retry_h\u00e4rtung_runturn_helper_stop_fix",
-      "community": 5,
-      "norm_label": "d. renderer \u2014 `retry()`-hartung + `runturn`-helper + `stop()`-fix"
-    },
-    {
-      "label": "E. Validierung",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L206",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan_e_validierung",
-      "community": 5,
-      "norm_label": "e. validierung"
-    },
-    {
-      "label": "Datei-\u00dcbersicht",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L215",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan_datei_\u00fcbersicht",
-      "community": 5,
-      "norm_label": "datei-ubersicht"
-    },
-    {
-      "label": "Risiko / Edge-Cases",
-      "file_type": "document",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L226",
-      "_origin": "ast",
-      "id": "docs_chat_retry_and_error_handling_plan_risiko_edge_cases",
-      "community": 5,
-      "norm_label": "risiko / edge-cases"
-    },
-    {
       "label": "pi-open-wiki extension",
       "file_type": "concept",
       "source_file": "README.md",
@@ -4283,9 +4123,9 @@
       "source_file": "package.json",
       "source_location": "L17",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "package_scripts",
-      "target": "package_scripts_package_linux"
+      "target": "package_scripts_package_linux",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4293,9 +4133,9 @@
       "source_file": "package.json",
       "source_location": "L15",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "package_scripts",
-      "target": "package_scripts_package_mac"
+      "target": "package_scripts_package_mac",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4303,9 +4143,9 @@
       "source_file": "package.json",
       "source_location": "L16",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "package_scripts",
-      "target": "package_scripts_package_win"
+      "target": "package_scripts_package_win",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4543,9 +4383,9 @@
       "source_file": "package.json",
       "source_location": "L45",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "package_build",
-      "target": "package_build_icon"
+      "target": "package_build_icon",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4603,9 +4443,9 @@
       "source_file": "package.json",
       "source_location": "L76",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "package_build_mac",
-      "target": "package_mac_icon"
+      "target": "package_mac_icon",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4623,9 +4463,9 @@
       "source_file": "package.json",
       "source_location": "L80",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "package_build_win",
-      "target": "package_win_icon"
+      "target": "package_win_icon",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4653,9 +4493,9 @@
       "source_file": "package.json",
       "source_location": "L85",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "package_build_linux",
-      "target": "package_linux_icon"
+      "target": "package_linux_icon",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4673,9 +4513,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L871",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "main_agent_agentmessagelike"
+      "target": "main_agent_agentmessagelike",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4703,18 +4543,8 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L855",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "main_agent_createingestsession"
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main/agent.ts",
-      "source_location": "L984",
-      "weight": 1.0,
-      "source": "main_agent",
-      "target": "main_agent_dedupeprovidererrormessage",
+      "target": "main_agent_createingestsession",
       "confidence_score": 1.0
     },
     {
@@ -4723,9 +4553,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L945",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "main_agent_ensurev1suffix"
+      "target": "main_agent_ensurev1suffix",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4733,9 +4563,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L911",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "main_agent_extractmessages"
+      "target": "main_agent_extractmessages",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4753,9 +4583,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L959",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "main_agent_fetchmodellist"
+      "target": "main_agent_fetchmodellist",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4763,9 +4593,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L982",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "main_agent_fetchollamamodels"
+      "target": "main_agent_fetchollamamodels",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4773,9 +4603,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L1010",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "main_agent_fetchopenaicompatiblemodels"
+      "target": "main_agent_fetchopenaicompatiblemodels",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4783,9 +4613,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L882",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "main_agent_lastassistantaborted"
+      "target": "main_agent_lastassistantaborted",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4793,9 +4623,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L896",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "main_agent_lastassistanterrormessage"
+      "target": "main_agent_lastassistanterrormessage",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4803,9 +4633,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L69",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "main_agent_livechatsession"
+      "target": "main_agent_livechatsession",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4813,9 +4643,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L951",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "main_agent_ollamacloudid"
+      "target": "main_agent_ollamacloudid",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4823,9 +4653,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L955",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "main_agent_openaimodellist"
+      "target": "main_agent_openaimodellist",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -4843,9 +4673,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L33",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "main_agent_resolvedmodel"
+      "target": "main_agent_resolvedmodel",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -4975,9 +4805,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L39",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "shared_ipc_types_copilotloginevent"
+      "target": "shared_ipc_types_copilotloginevent",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -5008,9 +4838,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L39",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "shared_ipc_types_modeloption"
+      "target": "shared_ipc_types_modeloption",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -5019,9 +4849,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L39",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent",
-      "target": "shared_ipc_types_providerid"
+      "target": "shared_ipc_types_providerid",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -5160,9 +4990,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L799",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository",
-      "target": "main_agent_agentrepository_abortchat"
+      "target": "main_agent_agentrepository_abortchat",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -5190,9 +5020,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L535",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository",
-      "target": "main_agent_agentrepository_cancelcopilotlogin"
+      "target": "main_agent_agentrepository_cancelcopilotlogin",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -5230,9 +5060,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L228",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository",
-      "target": "main_agent_agentrepository_createlivechatsession"
+      "target": "main_agent_agentrepository_createlivechatsession",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -5260,9 +5090,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L318",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository",
-      "target": "main_agent_agentrepository_droplivechatsession"
+      "target": "main_agent_agentrepository_droplivechatsession",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -5270,9 +5100,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L350",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository",
-      "target": "main_agent_agentrepository_evictidlesessions"
+      "target": "main_agent_agentrepository_evictidlesessions",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -5320,9 +5150,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L435",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository",
-      "target": "main_agent_agentrepository_listavailablemodels"
+      "target": "main_agent_agentrepository_listavailablemodels",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -5340,9 +5170,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L462",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository",
-      "target": "main_agent_agentrepository_loadmodels"
+      "target": "main_agent_agentrepository_loadmodels",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -5350,9 +5180,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L497",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository",
-      "target": "main_agent_agentrepository_logincopilot"
+      "target": "main_agent_agentrepository_logincopilot",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -5360,9 +5190,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L545",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository",
-      "target": "main_agent_agentrepository_logoutcopilot"
+      "target": "main_agent_agentrepository_logoutcopilot",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -5390,18 +5220,8 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L301",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository",
-      "target": "main_agent_agentrepository_resetingestsession"
-    },
-    {
-      "relation": "method",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main/agent.ts",
-      "source_location": "L717",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository",
-      "target": "main_agent_agentrepository_retrychat",
+      "target": "main_agent_agentrepository_resetingestsession",
       "confidence_score": 1.0
     },
     {
@@ -5420,9 +5240,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L160",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository",
-      "target": "main_agent_agentrepository_setcopilotloginlistener"
+      "target": "main_agent_agentrepository_setcopilotloginlistener",
+      "confidence_score": 1.0
     },
     {
       "relation": "method",
@@ -5450,9 +5270,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L335",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository",
-      "target": "main_agent_agentrepository_touchlivesession"
+      "target": "main_agent_agentrepository_touchlivesession",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -5472,9 +5292,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L86",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository",
-      "target": "shared_ipc_types_copilotloginevent"
+      "target": "shared_ipc_types_copilotloginevent",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -5549,9 +5369,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L142",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_create",
-      "target": "main_agent_agentrepository_newsession"
+      "target": "main_agent_agentrepository_newsession",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5560,9 +5380,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L140",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_create",
-      "target": "main_agent_agentrepository_opensession"
+      "target": "main_agent_agentrepository_opensession",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5571,20 +5391,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L132",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_create",
-      "target": "main_agent_createingestsession"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L146",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_create",
-      "target": "main_i18n_maint"
+      "target": "main_agent_createingestsession",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5681,9 +5490,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L160",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_setcopilotloginlistener",
-      "target": "shared_ipc_types_copilotloginevent"
+      "target": "shared_ipc_types_copilotloginevent",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5703,9 +5512,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L262",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_createlivechatsession",
-      "target": "main_agent_agentrepository_forward"
+      "target": "main_agent_agentrepository_forward",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -5725,9 +5534,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L314",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_resetingestsession",
-      "target": "main_agent_agentrepository_bindingest"
+      "target": "main_agent_agentrepository_bindingest",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5747,9 +5556,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L575",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_newsession",
-      "target": "main_agent_agentrepository_createlivechatsession"
+      "target": "main_agent_agentrepository_createlivechatsession",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5758,9 +5567,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L627",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_opensession",
-      "target": "main_agent_agentrepository_createlivechatsession"
+      "target": "main_agent_agentrepository_createlivechatsession",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5769,9 +5578,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L691",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_ingest",
-      "target": "main_agent_agentrepository_resetingestsession"
+      "target": "main_agent_agentrepository_resetingestsession",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5780,9 +5589,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L305",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_resetingestsession",
-      "target": "main_agent_agentrepository_dispose"
+      "target": "main_agent_agentrepository_dispose",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5791,9 +5600,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L309",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_resetingestsession",
-      "target": "main_agent_createingestsession"
+      "target": "main_agent_createingestsession",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5802,9 +5611,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L598",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_deletesession",
-      "target": "main_agent_agentrepository_droplivechatsession"
+      "target": "main_agent_agentrepository_droplivechatsession",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5813,9 +5622,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L829",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_dispose",
-      "target": "main_agent_agentrepository_droplivechatsession"
+      "target": "main_agent_agentrepository_droplivechatsession",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5824,9 +5633,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L356",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_evictidlesessions",
-      "target": "main_agent_agentrepository_droplivechatsession"
+      "target": "main_agent_agentrepository_droplivechatsession",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5835,9 +5644,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L615",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_opensession",
-      "target": "main_agent_agentrepository_touchlivesession"
+      "target": "main_agent_agentrepository_touchlivesession",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5846,9 +5655,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L582",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_newsession",
-      "target": "main_agent_agentrepository_evictidlesessions"
+      "target": "main_agent_agentrepository_evictidlesessions",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -5857,20 +5666,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L634",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_opensession",
-      "target": "main_agent_agentrepository_evictidlesessions"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L426",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_configurellm",
-      "target": "main_i18n_maint"
+      "target": "main_agent_agentrepository_evictidlesessions",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -5928,26 +5726,15 @@
       "target": "shared_result_ok"
     },
     {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L451",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_listavailablemodels",
-      "target": "main_i18n_maint"
-    },
-    {
       "relation": "references",
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "src/main/agent.ts",
       "source_location": "L435",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_listavailablemodels",
-      "target": "shared_ipc_types_modeloption"
+      "target": "shared_ipc_types_modeloption",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -5956,9 +5743,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L435",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_listavailablemodels",
-      "target": "shared_ipc_types_providerid"
+      "target": "shared_ipc_types_providerid",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -5967,9 +5754,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L435",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_listavailablemodels",
-      "target": "shared_ipc_types_result"
+      "target": "shared_ipc_types_result",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -6011,9 +5798,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L520",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_logincopilot",
-      "target": "main_agent_agentrepository_listavailablemodels"
+      "target": "main_agent_agentrepository_listavailablemodels",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -6022,9 +5809,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L472",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_loadmodels",
-      "target": "main_agent_ensurev1suffix"
+      "target": "main_agent_ensurev1suffix",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -6033,9 +5820,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L473",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_loadmodels",
-      "target": "main_agent_fetchollamamodels"
+      "target": "main_agent_fetchollamamodels",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -6044,20 +5831,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L477",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_loadmodels",
-      "target": "main_agent_fetchopenaicompatiblemodels"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L483",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_loadmodels",
-      "target": "main_i18n_maint"
+      "target": "main_agent_fetchopenaicompatiblemodels",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -6066,9 +5842,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L462",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_loadmodels",
-      "target": "shared_ipc_types_modeloption"
+      "target": "shared_ipc_types_modeloption",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -6077,9 +5853,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L462",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_loadmodels",
-      "target": "shared_ipc_types_providerid"
+      "target": "shared_ipc_types_providerid",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -6088,9 +5864,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L462",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_loadmodels",
-      "target": "shared_ipc_types_result"
+      "target": "shared_ipc_types_result",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -6132,9 +5908,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L498",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_logincopilot",
-      "target": "main_agent_agentrepository_abort"
+      "target": "main_agent_agentrepository_abort",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -6143,9 +5919,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L497",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_logincopilot",
-      "target": "shared_ipc_types_modeloption"
+      "target": "shared_ipc_types_modeloption",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -6154,9 +5930,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L497",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_logincopilot",
-      "target": "shared_ipc_types_result"
+      "target": "shared_ipc_types_result",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -6187,20 +5963,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L537",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_cancelcopilotlogin",
-      "target": "main_agent_agentrepository_abort"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L548",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_cancelcopilotlogin",
-      "target": "main_i18n_maint"
+      "target": "main_agent_agentrepository_abort",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -6209,9 +5974,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L535",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_cancelcopilotlogin",
-      "target": "shared_ipc_types_result"
+      "target": "shared_ipc_types_result",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -6247,26 +6012,15 @@
       "target": "shared_result_ok"
     },
     {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L557",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_logoutcopilot",
-      "target": "main_i18n_maint"
-    },
-    {
       "relation": "references",
       "context": "generic_arg",
       "confidence": "EXTRACTED",
       "source_file": "src/main/agent.ts",
       "source_location": "L545",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_logoutcopilot",
-      "target": "shared_ipc_types_result"
+      "target": "shared_ipc_types_result",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -6300,17 +6054,6 @@
       "weight": 1.0,
       "source": "main_agent_agentrepository_logoutcopilot",
       "target": "shared_result_ok"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L575",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_listsessions",
-      "target": "main_i18n_maint"
     },
     {
       "relation": "references",
@@ -6432,17 +6175,6 @@
       "weight": 1.0,
       "source": "main_agent_agentrepository_newsession",
       "target": "shared_result_ok"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L607",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_deletesession",
-      "target": "main_i18n_maint"
     },
     {
       "relation": "references",
@@ -6572,9 +6304,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L654",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_getmessages",
-      "target": "main_agent_extractmessages"
+      "target": "main_agent_extractmessages",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -6586,17 +6318,6 @@
       "confidence_score": 1.0,
       "source": "main_agent_agentrepository_getmessages",
       "target": "main_agent_extracttext"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L676",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_getmessages",
-      "target": "main_i18n_maint"
     },
     {
       "relation": "references",
@@ -6665,17 +6386,6 @@
       "target": "shared_text_stripquerycommand"
     },
     {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L692",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_ask",
-      "target": "main_i18n_maint"
-    },
-    {
       "relation": "references",
       "context": "generic_arg",
       "confidence": "EXTRACTED",
@@ -6718,72 +6428,6 @@
       "weight": 1.0,
       "source": "main_agent_agentrepository_ask",
       "target": "shared_result_ok"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L721",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_retrychat",
-      "target": "main_i18n_maint"
-    },
-    {
-      "relation": "references",
-      "context": "generic_arg",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main/agent.ts",
-      "source_location": "L717",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_retrychat",
-      "target": "shared_ipc_types_result",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L721",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_retrychat",
-      "target": "shared_result_err"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L726",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_retrychat",
-      "target": "shared_result_errormessage"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L724",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_retrychat",
-      "target": "shared_result_ok"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/agent.ts",
-      "source_location": "L835",
-      "weight": 1.0,
-      "source": "main_agent_agentrepository_ingest",
-      "target": "main_i18n_maint"
     },
     {
       "relation": "calls",
@@ -6869,9 +6513,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L803",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_abortchat",
-      "target": "main_agent_agentrepository_abort"
+      "target": "main_agent_agentrepository_abort",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -6880,9 +6524,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L799",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_agentrepository_abortchat",
-      "target": "shared_ipc_types_result"
+      "target": "shared_ipc_types_result",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -6966,22 +6610,11 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/main/agent.ts",
-      "source_location": "L967",
-      "weight": 1.0,
-      "source": "main_agent_lastassistanterrormessage",
-      "target": "main_agent_dedupeprovidererrormessage",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main/agent.ts",
       "source_location": "L916",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_extractmessages",
-      "target": "main_agent_extracttext"
+      "target": "main_agent_extracttext",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -6990,9 +6623,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L919",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_extractmessages",
-      "target": "shared_text_stripquerycommand"
+      "target": "shared_text_stripquerycommand",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -7001,9 +6634,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L1011",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_fetchopenaicompatiblemodels",
-      "target": "main_agent_ensurev1suffix"
+      "target": "main_agent_ensurev1suffix",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -7012,9 +6645,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L995",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_fetchollamamodels",
-      "target": "main_agent_ollamacloudid"
+      "target": "main_agent_ollamacloudid",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -7023,9 +6656,9 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L983",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_fetchollamamodels",
-      "target": "main_agent_fetchmodellist"
+      "target": "main_agent_fetchmodellist",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -7034,30 +6667,8 @@
       "source_file": "src/main/agent.ts",
       "source_location": "L1012",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_agent_fetchopenaicompatiblemodels",
-      "target": "main_agent_fetchmodellist"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main/agent.ts",
-      "source_location": "L1106",
-      "weight": 1.0,
-      "source": "main_agent_fetchollamamodels",
-      "target": "main_i18n_maint",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main/agent.ts",
-      "source_location": "L1116",
-      "weight": 1.0,
-      "source": "main_agent_fetchopenaicompatiblemodels",
-      "target": "main_i18n_maint",
+      "target": "main_agent_fetchmodellist",
       "confidence_score": 1.0
     },
     {
@@ -7066,9 +6677,9 @@
       "source_file": "src/main/config.ts",
       "source_location": "L24",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_config",
-      "target": "main_config_configchain"
+      "target": "main_config_configchain",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -7166,9 +6777,9 @@
       "source_file": "src/main/config.ts",
       "source_location": "L25",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_config",
-      "target": "main_config_withconfiglock"
+      "target": "main_config_withconfiglock",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -7179,28 +6790,6 @@
       "confidence_score": 1.0,
       "source": "main_config",
       "target": "main_config_writeconfig"
-    },
-    {
-      "relation": "imports_from",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main/config.ts",
-      "source_location": "L6",
-      "weight": 1.0,
-      "source": "main_config",
-      "target": "main_i18n",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "imports",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main/config.ts",
-      "source_location": "L6",
-      "weight": 1.0,
-      "source": "main_config",
-      "target": "main_i18n_maint",
-      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -7363,9 +6952,9 @@
       "source_file": "src/main/config.ts",
       "source_location": "L78",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_config_rememberworkspace",
-      "target": "main_config_withconfiglock"
+      "target": "main_config_withconfiglock",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -7374,9 +6963,9 @@
       "source_file": "src/main/config.ts",
       "source_location": "L101",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_config_setllmconfig",
-      "target": "main_config_withconfiglock"
+      "target": "main_config_withconfiglock",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -7698,9 +7287,9 @@
       "source_file": "src/main/files.ts",
       "source_location": "L28",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_files",
-      "target": "main_files_saferesolve"
+      "target": "main_files_saferesolve",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -7927,9 +7516,9 @@
       "source_file": "src/main/files.ts",
       "source_location": "L80",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_files_getpreview",
-      "target": "main_files_saferesolve"
+      "target": "main_files_saferesolve",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -7938,9 +7527,9 @@
       "source_file": "src/main/files.ts",
       "source_location": "L155",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_files_revealinfilemanager",
-      "target": "main_files_saferesolve"
+      "target": "main_files_saferesolve",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -7952,17 +7541,6 @@
       "confidence_score": 1.0,
       "source": "main_files_listfolder",
       "target": "main_files_walk"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/files.ts",
-      "source_location": "L71",
-      "weight": 1.0,
-      "source": "main_files_listfolder",
-      "target": "main_i18n_maint"
     },
     {
       "relation": "calls",
@@ -8150,17 +7728,6 @@
       "confidence_score": 1.0,
       "source": "main_ipc",
       "target": "main_files_addinputfiles"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/files.ts",
-      "source_location": "L157",
-      "weight": 1.0,
-      "source": "main_files_revealinfilemanager",
-      "target": "main_i18n_maint"
     },
     {
       "relation": "calls",
@@ -8564,17 +8131,6 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/main/index.ts",
-      "source_location": "L81",
-      "weight": 1.0,
-      "source": "main_index_activateworkspace",
-      "target": "main_i18n_maint",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/main/index.ts",
       "source_location": "L115",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -8623,17 +8179,6 @@
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "main_wiki_graph",
-      "target": "main_i18n_maint"
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/main/wiki-graph.ts",
-      "source_location": "L176",
-      "weight": 1.0,
-      "source": "main_wiki_graph_buildwikigraph",
       "target": "main_i18n_maint"
     },
     {
@@ -8714,9 +8259,9 @@
       "source_file": "src/main/index.ts",
       "source_location": "L21",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_index",
-      "target": "main_index_getappiconpath"
+      "target": "main_index_getappiconpath",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -8876,9 +8421,9 @@
       "source_file": "src/main/index.ts",
       "source_location": "L172",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_index_createwindow",
-      "target": "main_index_getappiconpath"
+      "target": "main_index_getappiconpath",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -8887,9 +8432,9 @@
       "source_file": "src/main/index.ts",
       "source_location": "L26",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_index_getappiconpath",
-      "target": "main_index_log"
+      "target": "main_index_log",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -8964,9 +8509,9 @@
       "source_file": "src/main/index.ts",
       "source_location": "L115",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_index_registerglobalhandlers",
-      "target": "shared_result_err"
+      "target": "shared_result_err",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -8975,9 +8520,9 @@
       "source_file": "src/main/index.ts",
       "source_location": "L130",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_index_registerglobalhandlers",
-      "target": "shared_result_errormessage"
+      "target": "shared_result_errormessage",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -9016,9 +8561,9 @@
       "source_file": "src/main/ipc.ts",
       "source_location": "L20",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_ipc",
-      "target": "main_ipc_valid_providers"
+      "target": "main_ipc_valid_providers",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -9082,9 +8627,9 @@
       "source_file": "src/main/ipc.ts",
       "source_location": "L11",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_ipc",
-      "target": "shared_ipc_types_providerid"
+      "target": "shared_ipc_types_providerid",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -9104,9 +8649,9 @@
       "source_file": "src/main/ipc.ts",
       "source_location": "L9",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "main_ipc",
-      "target": "shared_result_err"
+      "target": "shared_result_err",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -9662,9 +9207,9 @@
       "source_file": "src/preload/index.ts",
       "source_location": "L4",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "preload_index",
-      "target": "shared_ipc_types_copilotloginevent"
+      "target": "shared_ipc_types_copilotloginevent",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -9706,9 +9251,9 @@
       "source_file": "src/renderer/App.tsx",
       "source_location": "L24",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "renderer_app",
-      "target": "components_toast"
+      "target": "components_toast",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -9717,9 +9262,9 @@
       "source_file": "src/renderer/App.tsx",
       "source_location": "L24",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "renderer_app",
-      "target": "components_toast_toast"
+      "target": "components_toast_toast",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -9836,9 +9381,9 @@
       "source_file": "src/renderer/App.tsx",
       "source_location": "L4",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "renderer_app",
-      "target": "renderer_store_currentsessionatom"
+      "target": "renderer_store_currentsessionatom",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -9935,9 +9480,9 @@
       "source_file": "src/renderer/App.tsx",
       "source_location": "L4",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "renderer_app",
-      "target": "renderer_store_streamingsessionsatom"
+      "target": "renderer_store_streamingsessionsatom",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -10165,9 +9710,9 @@
       "source_file": "src/renderer/components/AppShell.tsx",
       "source_location": "L6",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_appshell",
-      "target": "renderer_store_chaterroratom"
+      "target": "renderer_store_chaterroratom",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -10176,9 +9721,9 @@
       "source_file": "src/renderer/components/AppShell.tsx",
       "source_location": "L6",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_appshell",
-      "target": "renderer_store_chatstreamingatom"
+      "target": "renderer_store_chatstreamingatom",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -10308,9 +9853,9 @@
       "source_file": "src/renderer/components/AppShell.tsx",
       "source_location": "L6",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_appshell",
-      "target": "renderer_store_streamingsessionsatom"
+      "target": "renderer_store_streamingsessionsatom",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -10319,9 +9864,9 @@
       "source_file": "src/renderer/components/AppShell.tsx",
       "source_location": "L6",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_appshell",
-      "target": "renderer_store_toastatom"
+      "target": "renderer_store_toastatom",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -10462,9 +10007,9 @@
       "source_file": "src/renderer/components/AppShell.tsx",
       "source_location": "L27",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_appshell",
-      "target": "shared_ipc_types"
+      "target": "shared_ipc_types",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -10473,9 +10018,9 @@
       "source_file": "src/renderer/components/AppShell.tsx",
       "source_location": "L27",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_appshell",
-      "target": "shared_ipc_types_sessioninfo"
+      "target": "shared_ipc_types_sessioninfo",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -10857,9 +10402,9 @@
       "source_file": "src/renderer/components/LlmConfigForm.tsx",
       "source_location": "L463",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_llmconfigform",
-      "target": "components_llmconfigform_copilotsection"
+      "target": "components_llmconfigform_copilotsection",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -10867,9 +10412,9 @@
       "source_file": "src/renderer/components/LlmConfigForm.tsx",
       "source_location": "L449",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_llmconfigform",
-      "target": "components_llmconfigform_copilotsectionprops"
+      "target": "components_llmconfigform_copilotsectionprops",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -10877,9 +10422,9 @@
       "source_file": "src/renderer/components/LlmConfigForm.tsx",
       "source_location": "L29",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_llmconfigform",
-      "target": "components_llmconfigform_copilotstatus"
+      "target": "components_llmconfigform_copilotstatus",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -10961,19 +10506,8 @@
       "source_file": "src/renderer/components/LlmConfigForm.tsx",
       "source_location": "L5",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_llmconfigform",
-      "target": "renderer_store"
-    },
-    {
-      "relation": "imports",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "src/renderer/components/LlmConfigForm.tsx",
-      "source_location": "L5",
-      "weight": 1.0,
-      "source": "components_llmconfigform",
-      "target": "renderer_store_llmconfiguredatom",
+      "target": "renderer_store",
       "confidence_score": 1.0
     },
     {
@@ -10983,9 +10517,9 @@
       "source_file": "src/renderer/components/LlmConfigForm.tsx",
       "source_location": "L5",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_llmconfigform",
-      "target": "renderer_store_toastatom"
+      "target": "renderer_store_toastatom",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -11005,9 +10539,9 @@
       "source_file": "src/renderer/components/LlmConfigForm.tsx",
       "source_location": "L6",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_llmconfigform",
-      "target": "shared_ipc_types_copilotloginevent"
+      "target": "shared_ipc_types_copilotloginevent",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -11027,9 +10561,9 @@
       "source_file": "src/renderer/components/LlmConfigForm.tsx",
       "source_location": "L6",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_llmconfigform",
-      "target": "shared_ipc_types_modeloption"
+      "target": "shared_ipc_types_modeloption",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -11525,9 +11059,9 @@
       "source_file": "src/renderer/components/Sidebar.tsx",
       "source_location": "L4",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_sidebar",
-      "target": "renderer_store_streamingsessionsatom"
+      "target": "renderer_store_streamingsessionsatom",
+      "confidence_score": 1.0
     },
     {
       "relation": "calls",
@@ -11557,9 +11091,9 @@
       "source_file": "src/renderer/components/Toast.tsx",
       "source_location": "L9",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_toast",
-      "target": "components_toast_toast"
+      "target": "components_toast_toast",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -11568,9 +11102,9 @@
       "source_file": "src/renderer/components/Toast.tsx",
       "source_location": "L3",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_toast",
-      "target": "renderer_store"
+      "target": "renderer_store",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -11579,9 +11113,9 @@
       "source_file": "src/renderer/components/Toast.tsx",
       "source_location": "L3",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "components_toast",
-      "target": "renderer_store_toastatom"
+      "target": "renderer_store_toastatom",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -11696,9 +11230,9 @@
       "source_file": "src/renderer/global.d.ts",
       "source_location": "L9",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "renderer_global_d",
-      "target": "renderer_global_d_file"
+      "target": "renderer_global_d_file",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -12547,28 +12081,6 @@
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "src/renderer/screens/Chat.tsx",
-      "source_location": "L8",
-      "weight": 1.0,
-      "source": "screens_chat",
-      "target": "shared_ipc_types",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "imports",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "src/renderer/screens/Chat.tsx",
-      "source_location": "L8",
-      "weight": 1.0,
-      "source": "screens_chat",
-      "target": "shared_ipc_types_result",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "imports_from",
-      "context": "import",
-      "confidence": "EXTRACTED",
-      "source_file": "src/renderer/screens/Chat.tsx",
       "source_location": "L7",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -13142,9 +12654,9 @@
       "source_file": "src/renderer/screens/WorkspacePicker.tsx",
       "source_location": "L4",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "screens_workspacepicker",
-      "target": "renderer_store_toastatom"
+      "target": "renderer_store_toastatom",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -13404,9 +12916,9 @@
       "source_file": "src/renderer/store.ts",
       "source_location": "L40",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "renderer_store",
-      "target": "renderer_store_streamingsessionsatom"
+      "target": "renderer_store_streamingsessionsatom",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -13619,9 +13131,9 @@
       "source_file": "src/shared/ipc-types.ts",
       "source_location": "L55",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "shared_ipc_types",
-      "target": "shared_ipc_types_copilotloginevent"
+      "target": "shared_ipc_types_copilotloginevent",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -13699,9 +13211,9 @@
       "source_file": "src/shared/ipc-types.ts",
       "source_location": "L47",
       "weight": 1.0,
-      "confidence_score": 1.0,
       "source": "shared_ipc_types",
-      "target": "shared_ipc_types_modeloption"
+      "target": "shared_ipc_types_modeloption",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -14297,136 +13809,6 @@
       "target": "readme_isolierung_vom_nutzer_pi_setup"
     },
     {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L1",
-      "weight": 1.0,
-      "source": "docs_chat_retry_and_error_handling_plan",
-      "target": "docs_chat_retry_and_error_handling_plan_chat_retry_bug_fehlerhandling_umsetzungsplan",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L215",
-      "weight": 1.0,
-      "source": "docs_chat_retry_and_error_handling_plan_chat_retry_bug_fehlerhandling_umsetzungsplan",
-      "target": "docs_chat_retry_and_error_handling_plan_datei_\u00fcbersicht",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L36",
-      "weight": 1.0,
-      "source": "docs_chat_retry_and_error_handling_plan_chat_retry_bug_fehlerhandling_umsetzungsplan",
-      "target": "docs_chat_retry_and_error_handling_plan_entscheidungen",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L3",
-      "weight": 1.0,
-      "source": "docs_chat_retry_and_error_handling_plan_chat_retry_bug_fehlerhandling_umsetzungsplan",
-      "target": "docs_chat_retry_and_error_handling_plan_problem",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L226",
-      "weight": 1.0,
-      "source": "docs_chat_retry_and_error_handling_plan_chat_retry_bug_fehlerhandling_umsetzungsplan",
-      "target": "docs_chat_retry_and_error_handling_plan_risiko_edge_cases",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L9",
-      "weight": 1.0,
-      "source": "docs_chat_retry_and_error_handling_plan_chat_retry_bug_fehlerhandling_umsetzungsplan",
-      "target": "docs_chat_retry_and_error_handling_plan_root_cause",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L54",
-      "weight": 1.0,
-      "source": "docs_chat_retry_and_error_handling_plan_chat_retry_bug_fehlerhandling_umsetzungsplan",
-      "target": "docs_chat_retry_and_error_handling_plan_umsetzung",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L56",
-      "weight": 1.0,
-      "source": "docs_chat_retry_and_error_handling_plan_umsetzung",
-      "target": "docs_chat_retry_and_error_handling_plan_a_main_process_retrychat_ipc_nicht_destruktives_re_prompt",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L109",
-      "weight": 1.0,
-      "source": "docs_chat_retry_and_error_handling_plan_umsetzung",
-      "target": "docs_chat_retry_and_error_handling_plan_b_defensive_extractmessages",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L132",
-      "weight": 1.0,
-      "source": "docs_chat_retry_and_error_handling_plan_umsetzung",
-      "target": "docs_chat_retry_and_error_handling_plan_c_i18n",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L137",
-      "weight": 1.0,
-      "source": "docs_chat_retry_and_error_handling_plan_umsetzung",
-      "target": "docs_chat_retry_and_error_handling_plan_d_renderer_retry_h\u00e4rtung_runturn_helper_stop_fix",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L206",
-      "weight": 1.0,
-      "source": "docs_chat_retry_and_error_handling_plan_umsetzung",
-      "target": "docs_chat_retry_and_error_handling_plan_e_validierung",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "docs/chat-retry-and-error-handling-plan.md",
-      "source_location": "L94",
-      "weight": 1.0,
-      "source": "docs_chat_retry_and_error_handling_plan_umsetzung",
-      "target": "docs_chat_retry_and_error_handling_plan_warum_kein_branching",
-      "confidence_score": 1.0
-    },
-    {
       "relation": "references",
       "confidence": "INFERRED",
       "confidence_score": 0.85,
@@ -14533,5 +13915,5 @@
       "source_file": "README.md"
     }
   ],
-  "built_at_commit": "6d3c98696aced15d1df5cbc490fb4d6b5006791d"
+  "built_at_commit": "9b0ead3fb76a58620848be2ae28da9375956cd68"
 }

@@ -133,7 +133,17 @@ export function App(): JSX.Element {
       } else if (event.type === "text_delta") {
         setIngestStream((prev) => prev + event.delta);
       } else if (event.type === "agent_end") {
-        setIngestState("done");
+        if (event.lastError) {
+          // Turn failed (stopReason "error") — surface the real error and
+          // reset to idle instead of showing a misleading "done". This is
+          // the redundant path to the IPC return value from repo.ingest();
+          // both carry the same failure so the user never sees a silent
+          // "done" when the provider was unreachable/misconfigured.
+          setIngestState("idle");
+          setIngestError(event.lastError);
+        } else {
+          setIngestState("done");
+        }
       } else if (event.type === "error") {
         setIngestState("idle");
         setIngestError(event.message);

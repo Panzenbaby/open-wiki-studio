@@ -143,7 +143,7 @@ export class AgentRepository {
       }
       return ok(repo);
     } catch (error) {
-      return err<AgentRepository>(`Failed to create agent: ${errorMessage(error)}`);
+      return err<AgentRepository>(mainT("error.createAgent", { detail: errorMessage(error) }));
     }
   }
 
@@ -418,13 +418,20 @@ export class AgentRepository {
           }
         }
       } else {
-        console.log(
-          `[open-wiki-studio] LLM model not found in registry: ${config.provider}/${config.modelId}`,
+        // Model not found in registry — surface as an error so the
+        // config form can warn the user immediately, instead of letting the
+        // misconfiguration explode silently at the next ingest/chat turn.
+        // The previously configured model (if any) stays active.
+        return err<void>(
+          mainT("error.modelNotFound", {
+            provider: config.provider,
+            modelId: config.modelId,
+          }),
         );
       }
       return ok(undefined);
     } catch (error) {
-      return err<void>(`Failed to configure LLM: ${errorMessage(error)}`);
+      return err<void>(errorMessage(error));
     }
   }
 
@@ -441,7 +448,7 @@ export class AgentRepository {
       return ok(models);
     } catch (error) {
       return err<readonly ModelOption[]>(
-        `Failed to list models: ${errorMessage(error)}`,
+        mainT("error.listModels", { detail: errorMessage(error) }),
       );
     }
   }
@@ -473,7 +480,7 @@ export class AgentRepository {
         return ok(await fetchOllamaModels(base));
       }
       if (provider === "openai-compatible") {
-        if (!baseUrl) return err<readonly ModelOption[]>("Base URL required");
+        if (!baseUrl) return err<readonly ModelOption[]>(mainT("error.baseUrlRequired"));
         return ok(await fetchOpenAiCompatibleModels(baseUrl, apiKey));
       }
       // anthropic / openai / google — static built-in catalog, auth-gated.
@@ -486,7 +493,7 @@ export class AgentRepository {
         .map((model) => ({ id: model.id, name: model.name }));
       return ok(models);
     } catch (error) {
-      return err<readonly ModelOption[]>(`Failed to load models: ${errorMessage(error)}`);
+      return err<readonly ModelOption[]>(errorMessage(error));
     }
   }
 
@@ -538,7 +545,7 @@ export class AgentRepository {
       this.copilotAbort = null;
       return ok(undefined);
     } catch (error) {
-      return err<void>(`Failed to cancel login: ${errorMessage(error)}`);
+      return err<void>(mainT("error.cancelLogin", { detail: errorMessage(error) }));
     }
   }
 
@@ -547,7 +554,7 @@ export class AgentRepository {
       this.services.authStorage.logout("github-copilot");
       return ok(undefined);
     } catch (error) {
-      return err<void>(`Failed to log out: ${errorMessage(error)}`);
+      return err<void>(mainT("error.logout", { detail: errorMessage(error) }));
     }
   }
 
@@ -564,7 +571,9 @@ export class AgentRepository {
         })),
       );
     } catch (error) {
-      return err<readonly SessionInfo[]>(`Failed to list sessions: ${errorMessage(error)}`);
+      return err<readonly SessionInfo[]>(
+        mainT("error.listSessions", { detail: errorMessage(error) }),
+      );
     }
   }
 
@@ -587,13 +596,15 @@ export class AgentRepository {
         streaming: false,
       });
     } catch (error) {
-      return err<SessionInfo>(`Failed to create session: ${errorMessage(error)}`);
+      return err<SessionInfo>(
+        mainT("error.createSession", { detail: errorMessage(error) }),
+      );
     }
   }
 
   async deleteSession(path: string): Promise<Result<void>> {
     if (path === this.currentPath) {
-      return err<void>(`Cannot delete the active session`, { path });
+      return err<void>(mainT("error.cannotDeleteActiveSession"), { path });
     }
     this.dropLiveChatSession(path);
     try {
@@ -601,7 +612,7 @@ export class AgentRepository {
       return ok(undefined);
     } catch (error) {
       return err<void>(
-        `Failed to delete session: ${errorMessage(error)}`,
+        mainT("error.deleteSession", { detail: errorMessage(error) }),
         { path },
       );
     }
@@ -641,7 +652,9 @@ export class AgentRepository {
         streaming: false,
       });
     } catch (error) {
-      return err<SessionInfo>(`Failed to open session: ${errorMessage(error)}`);
+      return err<SessionInfo>(
+        mainT("error.openSession", { detail: errorMessage(error) }),
+      );
     }
   }
 
@@ -659,7 +672,9 @@ export class AgentRepository {
       }
       return ok(out);
     } catch (error) {
-      return err<readonly ChatMessage[]>(`Failed to read session: ${errorMessage(error)}`);
+      return err<readonly ChatMessage[]>(
+        mainT("error.readSession", { detail: errorMessage(error) }),
+      );
     }
   }
 
@@ -674,12 +689,41 @@ export class AgentRepository {
     try {
       const live = this.currentPath ? this.liveSessions.get(this.currentPath) : undefined;
       if (!live) {
-        return err<void>("No active session");
+        return err<void>(mainT("error.noActiveSession"));
       }
       await live.session.prompt(`/wiki-query ${question}`);
       return ok(undefined);
     } catch (error) {
-      return err<void>(`Ask failed: ${errorMessage(error)}`);
+      return err<void>(errorMessage(error));
+    }
+  }
+
+  /**
+   * Retry the last chat turn by re-prompting with the same question.
+   *
+   * This is intentionally NON-destructive: it does NOT branch the session.
+   * Branching (`navigateTree` to the parent of the last user message) was tried
+   * and rejected because Pi sessions do not persist the leaf pointer across
+   * restarts (`_buildIndex` resets it to the last entry) and `getBranch()`
+   * returns root→leaf order, so a branch-based retry targeted the OLDEST user
+   * message and wiped the conversation, leaving an empty session on restart.
+   *
+   * Re-prompting appends a fresh user+assistant pair (the previous failed
+   * assistant stays on the linear path as an empty `stopReason: "error"`
+   * entry). `extractMessages` drops those empty finalized assistants and
+   * collapses the resulting consecutive duplicate user messages, so the UI
+   * stays clean after restart without any destructive session mutation.
+   */
+  async retryChat(question: string): Promise<Result<void>> {
+    try {
+      const live = this.currentPath ? this.liveSessions.get(this.currentPath) : undefined;
+      if (!live) {
+        return err<void>(mainT("error.noActiveSession"));
+      }
+      await live.session.prompt(`/wiki-query ${question}`);
+      return ok(undefined);
+    } catch (error) {
+      return err<void>(errorMessage(error));
     }
   }
 
@@ -776,6 +820,21 @@ export class AgentRepository {
       const after = await snapshotWiki(this.workspace);
       const diff = diffSnapshots(before, after);
       const leftover = await listInputFiles(this.workspace);
+
+      // No-progress detection: a turn ran (sawStart) but the wiki did not
+      // change while input files remain. This is the signature of a failed
+      // turn that ended without `stopReason: "error"` (e.g. an empty provider
+      // response) — the agent_end listener above did not reject, so without
+      // this guard the UI would show "done" with 0 created and all files as
+      // leftover, silently masking a misconfigured/unreachable provider.
+      if (
+        sawStart &&
+        diff.created.length + diff.updated.length === 0 &&
+        leftover.length > 0
+      ) {
+        return err<void>(mainT("error.ingestNoProgress"));
+      }
+
       const summary: IngestSummary = {
         leftover,
         createdConcepts: diff.created,
@@ -786,7 +845,7 @@ export class AgentRepository {
       this.summaryListener?.(summary);
       return ok(undefined);
     } catch (error) {
-      return err<void>(`Ingest failed: ${errorMessage(error)}`);
+      return err<void>(errorMessage(error));
     }
   }
 
@@ -804,7 +863,7 @@ export class AgentRepository {
       }
       return ok(undefined);
     } catch (error) {
-      return err<void>(`Abort chat failed: ${errorMessage(error)}`);
+      return err<void>(errorMessage(error));
     }
   }
 
@@ -819,7 +878,7 @@ export class AgentRepository {
       await this.ingestSession.abort();
       return ok(undefined);
     } catch (error) {
-      return err<void>(`Abort failed: ${errorMessage(error)}`);
+      return err<void>(errorMessage(error));
     }
   }
 
@@ -899,17 +958,45 @@ function lastAssistantErrorMessage(
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i];
     if (message?.role === "assistant") {
-      return message.stopReason === "error" ? message.errorMessage : undefined;
+      if (message.stopReason !== "error") return undefined;
+      // Provider errors arrive as the OpenAI SDK's `APIError` message, which
+      // formats as `${status} ${body}`. When the response body itself begins
+      // with the HTTP status code (plain-text pages like "404 page not found"),
+      // this doubles the prefix ("404 404 page not found"). Collapse the
+      // redundant leading status so the user sees the real server message once.
+      return dedupeProviderErrorMessage(message.errorMessage ?? "");
     }
   }
   return undefined;
 }
 
+/**
+ * Collapse the OpenAI SDK's doubled status prefix in provider error messages.
+ *
+ * The SDK (`openai/core/error.js`, `APIError.makeMessage`) formats provider
+ * errors as `${status} ${msg}`. When `msg` is the raw response body and that
+ * body itself starts with the status code (common for plain-text error pages,
+ * e.g. "404 page not found"), the result is "404 404 page not found". This
+ * detects "<status> <status><rest>" and returns "<status><rest>" (the body).
+ * Messages that do not match the doubled pattern are returned unchanged, so
+ * normal errors like "401 Unauthorized" or "404 Not Found" are untouched.
+ */
+function dedupeProviderErrorMessage(message: string): string {
+  const match = /^(\d{3}) \1(?=\D)(.*)$/.exec(message);
+  return match ? `${match[1]}${match[2]}` : message;
+}
+
 /** Map raw agent messages to the renderer's ChatMessage list (strips the
- *  /wiki-query command prefix from user messages, drops empty non-assistant
- *  text). Shared by live-session and disk-backed reads. */
+ *  /wiki-query command prefix from user messages, drops empty finalized
+ *  assistant messages, and collapses consecutive duplicate user messages
+ *  left behind by retries). Shared by live-session and disk-backed reads. */
 function extractMessages(messages: ReadonlyArray<AgentMessageLike>): ChatMessage[] {
   const out: ChatMessage[] = [];
+  // Tracks the text of the most recently pushed user message so that a run of
+  // identical consecutive user messages (each retry re-prompts, appending a
+  // duplicate user entry) collapses to a single one in the UI. Reset whenever a
+  // non-user message is pushed.
+  let lastUserText: string | undefined;
   for (const message of messages) {
     const role = (message as { role?: string }).role;
     if (role !== "user" && role !== "assistant") continue;
@@ -917,7 +1004,22 @@ function extractMessages(messages: ReadonlyArray<AgentMessageLike>): ChatMessage
       (message as { content?: ReadonlyArray<{ type: string; text?: string }> }).content,
     );
     const clean = role === "user" ? stripQueryCommand(text) : text;
-    if (clean.trim() !== "" || role === "assistant") out.push({ role, text: clean });
+    // Drop empty user AND empty assistant messages. A finalized empty
+    // assistant message is always a failed/aborted turn artifact (during
+    // streaming the partial lives in `streamingAssistantText`, not in
+    // `state.messages`); keeping it would surface as empty bubbles and, after
+    // a restart, as the “multiple empty responses” bug. Dropping it here also
+    // self-heals sessions already corrupted by the old retry path.
+    if (clean.trim() === "") continue;
+    if (role === "user") {
+      if (clean === lastUserText && out.length > 0 && out[out.length - 1].role === "user") {
+        continue;
+      }
+      lastUserText = clean;
+    } else {
+      lastUserText = undefined;
+    }
+    out.push({ role, text: clean });
   }
   return out;
 }
@@ -1001,7 +1103,7 @@ async function fetchOllamaModels(baseUrl: string): Promise<readonly ModelOption[
   if (models.length === 0) {
     // Both fetches returned nothing — most likely the local Ollama server is
     // not running. Throw so the form shows an actionable error.
-    throw new Error("No Ollama models found (is the server running at " + baseUrl + "?)");
+    throw new Error(mainT("error.ollamaNoModels", { baseUrl }));
   }
   return models;
 }
@@ -1011,7 +1113,7 @@ async function fetchOpenAiCompatibleModels(baseUrl: string, apiKey?: string): Pr
   const normalized = ensureV1Suffix(baseUrl);
   const ids = await fetchModelList(`${normalized}/models`, apiKey);
   if (ids.length === 0) {
-    throw new Error("No models returned by the endpoint at " + normalized);
+    throw new Error(mainT("error.endpointNoModels", { url: normalized }));
   }
   return ids.map((id) => ({ id, name: id }));
 }

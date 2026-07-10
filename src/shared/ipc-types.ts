@@ -190,6 +190,12 @@ export interface AgentApi {
 
   // agent
   ask(question: string): Promise<Result<void>>;
+  /** Retry the last chat turn by re-prompting with the same question.
+   *  Non-destructive (no session branching): the failed assistant entry stays
+   *  on the append-only disk path but is hidden by `extractMessages` (empty
+   *  finalized assistants + consecutive duplicate user messages are dropped),
+   *  so the view stays clean after a restart. */
+  retryChat(question: string): Promise<Result<void>>;
   ingest(): Promise<Result<void>>;
   /** Abort only the current chat session's in-flight turn (background turns and ingest keep running). */
   abortChat(): Promise<Result<void>>;

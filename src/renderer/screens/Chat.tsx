@@ -5,6 +5,7 @@ import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import { chatErrorAtom, chatStreamingAtom, currentSessionAtom, messagesAtom } from "../store.ts";
 import { stripQueryCommand } from "../../shared/text.ts";
+import type { Result } from "../../shared/ipc-types.ts";
 import { Message } from "../components/Message.tsx";
 
 export function Chat(): JSX.Element {
@@ -15,6 +16,10 @@ export function Chat(): JSX.Element {
   const current = useAtomValue(currentSessionAtom);
   const setMessages = useSetAtom(messagesAtom);
   const [input, setInput] = useState("");
+  // Send/retry debounce for the brief window before `agent_start` flips
+  // `chatStreamingAtom` (we no longer set streaming optimistically, so a
+  // command that starts no turn cannot leave the composer stuck).
+  const [pending, setPending] = useState(false);
   const firstUser = messages.find((m) => m.role === "user")?.text;
   const title = (firstUser ? stripQueryCommand(firstUser) : "") || current?.name || t("chat.titleFallback");
   const streamRef = useRef<HTMLDivElement | null>(null);
@@ -44,62 +49,75 @@ export function Chat(): JSX.Element {
     if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
   }, [messages, streaming]);
 
-  async function send(): Promise<void> {
-    const question = input.trim();
-    if (!question || streaming) return;
-    setInput("");
-    setChatError(null);
-    setStreaming(true);
-    setMessages((prev) => [...prev, { role: "user", text: question }]);
+  // Shared turn runner: evaluates the Result of `ask`/`retryChat` and
+  // surfaces synchronous failures as the chat error banner. The
+  // `chatStreamingAtom` is NOT touched here — it is driven solely by the
+  // `agent_start`/`agent_end` events handled in App.tsx, so a command that
+  // starts no turn (e.g. /wiki-query with an empty wiki) does not leave the
+  // composer stuck in a streaming state.
+  async function runTurn(action: Promise<Result<void>>): Promise<void> {
     try {
-      const result = await api.ask(question);
-      if (!result.success) {
-        setStreaming(false);
-        setChatError(result.error.message);
-      }
-    } catch (error) {
-      setStreaming(false);
-      setChatError(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  // Streaming flag is cleared by the agent_end event, not here —
-  // abortChat() resolves only after the agent is idle.
-  async function stop(): Promise<void> {
-    if (!streaming) return;
-    try {
-      const result = await api.abortChat();
+      const result = await action;
       if (!result.success) setChatError(result.error.message);
     } catch (error) {
       setChatError(error instanceof Error ? error.message : String(error));
     }
   }
 
-  function retry(): void {
+  async function send(): Promise<void> {
+    const question = input.trim();
+    if (!question || pending) return;
+    setInput("");
+    setChatError(null);
+    setPending(true);
+    setMessages((prev) => [...prev, { role: "user", text: question }]);
+    try {
+      await runTurn(api.ask(question));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function stop(): Promise<void> {
+    if (!streaming) return;
+    try {
+      const result = await api.abortChat();
+      if (!result.success) {
+        setChatError(result.error.message);
+      } else {
+        // abortChat() resolves only after the agent is idle. agent_end does
+        // NOT fire for an abort of an already-idle session, so clear the
+        // streaming flag here to avoid a stuck Stop button.
+        setStreaming(false);
+      }
+    } catch (error) {
+      setChatError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function retry(): Promise<void> {
+    if (streaming || pending) return;
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     if (!lastUser) return;
     setChatError(null);
-    setStreaming(true);
-    // Remove any empty/incomplete assistant message from the previous attempt
+    setPending(true);
+    // Remove the last assistant message unconditionally (empty OR partial) so
+    // the new turn streams a fresh assistant bubble instead of appending to a
+    // failed one. The failed assistant stays on the session's append-only disk
+    // path but is dropped from the view by `extractMessages` (empty finalized
+    // assistants are discarded), and the duplicate user entry that re-prompting
+    // appends is collapsed there too — so the history stays clean after a
+    // restart without any destructive session mutation.
     setMessages((prev) => {
       const last = prev[prev.length - 1];
-      if (last && last.role === "assistant" && last.text.trim() === "") {
-        return prev.slice(0, -1);
-      }
+      if (last && last.role === "assistant") return prev.slice(0, -1);
       return prev;
     });
-    void (async () => {
-      try {
-        const result = await api.ask(lastUser.text);
-        if (!result.success) {
-          setStreaming(false);
-          setChatError(result.error.message);
-        }
-      } catch (error) {
-        setStreaming(false);
-        setChatError(error instanceof Error ? error.message : String(error));
-      }
-    })();
+    try {
+      await runTurn(api.retryChat(lastUser.text));
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
@@ -135,8 +153,8 @@ export function Chat(): JSX.Element {
               <div className="avatar error-avatar"><AlertTriangle size={14} /></div>
               <div className="bubble">
                 <div className="content error-bubble">
-                  <p>{chatError}</p>
-                  <button className="btn btn-sm btn-ghost" onClick={retry}>
+                  <p>{t("chat.errorPrefix")}: {chatError}</p>
+                  <button className="btn btn-sm btn-ghost" onClick={retry} disabled={streaming}>
                     <RefreshCw size={14} />
                     <span>{t("chat.retry")}</span>
                   </button>
@@ -173,7 +191,7 @@ export function Chat(): JSX.Element {
                 <Square size={16} />
               </button>
             ) : (
-              <button className="send" disabled={!input.trim()} onClick={() => void send()}>
+              <button className="send" disabled={!input.trim() || pending} onClick={() => void send()}>
                 <Send size={16} />
               </button>
             )}

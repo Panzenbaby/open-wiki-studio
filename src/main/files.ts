@@ -68,7 +68,7 @@ export async function listFolder(
     const nodes = await walk(workspaceDir(workspace, folder), workspaceDir(workspace, folder));
     return ok(nodes.sort((a, b) => a.relativePath.localeCompare(b.relativePath)));
   } catch (error) {
-    return err<readonly FileNode[]>(`Failed to list ${folder}: ${errorMessage(error)}`);
+    return err<readonly FileNode[]>(mainT("error.listFolder", { folder, detail: errorMessage(error) }));
   }
 }
 
@@ -79,7 +79,7 @@ export async function getPreview(
   // relativePath may be "wiki/foo.md" or just "foo.md"; resolve under workspace.
   const absolute = safeResolve(workspace, relativePath);
   if (!absolute) {
-    return err<FilePreview>(`Invalid path: ${relativePath}`, { path: relativePath });
+    return err<FilePreview>(mainT("error.invalidPath", { path: relativePath }), { path: relativePath });
   }
   try {
     const content = await readFile(absolute, "utf8");
@@ -109,7 +109,7 @@ export async function getPreview(
       content,
     });
   } catch (error) {
-    return err<FilePreview>(`Failed to read ${relativePath}: ${errorMessage(error)}`, {
+    return err<FilePreview>(mainT("error.readFile", { path: relativePath, detail: errorMessage(error) }), {
       path: relativePath,
     });
   }
@@ -137,7 +137,7 @@ export async function addInputFiles(
     }
     return ok(added);
   } catch (error) {
-    return err<readonly string[]>(`Failed to add input files: ${errorMessage(error)}`);
+    return err<readonly string[]>(mainT("error.addInputFiles", { detail: errorMessage(error) }));
   }
 }
 
@@ -154,20 +154,20 @@ export async function revealInFileManager(
   const base = workspaceDir(workspace, folder);
   const absolute = safeResolve(base, relativePath);
   if (!absolute) {
-    return err<void>(`Invalid path: ${relativePath}`, { path: relativePath });
+    return err<void>(mainT("error.invalidPath", { path: relativePath }), { path: relativePath });
   }
   try {
     if (isDirectory) {
       const error = await shell.openPath(absolute);
       if (error) {
-        return err<void>(`Failed to open folder: ${error}`, { path: absolute });
+        return err<void>(mainT("error.openFolder", { detail: errorMessage(error) }), { path: absolute });
       }
       return ok(undefined);
     }
     shell.showItemInFolder(absolute);
     return ok(undefined);
   } catch (error) {
-    return err<void>(`Failed to reveal ${relativePath}: ${errorMessage(error)}`, {
+    return err<void>(mainT("error.revealFile", { path: relativePath, detail: errorMessage(error) }), {
       path: absolute,
     });
   }

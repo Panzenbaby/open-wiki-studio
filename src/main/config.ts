@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { app } from "electron";
 import { ok, err, errorMessage } from "../shared/result.ts";
+import { mainT } from "./i18n.ts";
 import type { LlmConfig, Result, WorkspaceInfo } from "../shared/ipc-types.ts";
 
 const MAX_RECENT = 12;
@@ -88,7 +89,7 @@ export async function rememberWorkspace(
       await writeConfig(next);
       return ok(info);
     } catch (error) {
-      return err<WorkspaceInfo>(`Failed to remember workspace: ${errorMessage(error)}`);
+      return err<WorkspaceInfo>(mainT("error.rememberWorkspace", { detail: errorMessage(error) }));
     }
   });
 }
@@ -104,7 +105,7 @@ export async function setLlmConfig(config: LlmConfig): Promise<Result<void>> {
       await writeConfig({ ...current, llm: config });
       return ok(undefined);
     } catch (error) {
-      return err<void>(`Failed to save LLM config: ${errorMessage(error)}`);
+      return err<void>(mainT("error.saveLlmConfig", { detail: errorMessage(error) }));
     }
   });
 }
