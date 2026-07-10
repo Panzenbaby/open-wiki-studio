@@ -446,6 +446,50 @@ export class AgentRepository {
     }
   }
 
+  /**
+   * Load selectable models for a provider, given credentials/base URL.
+   *
+   * For anthropic/openai/google: store the API key (so `getAvailable()` can
+   * surface the built-in catalog) and return the catalog. For ollama: fetch
+   * local models from `{baseUrl}/v1/models` and cloud models from the public
+   * `https://ollama.com/v1/models`, applying the cloud suffix rule. For
+   * openai-compatible: fetch `{baseUrl}/v1/models` (optional Bearer key).
+   *
+   * Fetch failures degrade gracefully: Ollama returns whichever of local/cloud
+   * succeeded (cloud failure → local only); openai-compatible returns an error
+   * only if the fetch itself fails. See ADR 0001.
+   */
+  async loadModels(
+    provider: ProviderId,
+    apiKey?: string,
+    baseUrl?: string,
+  ): Promise<Result<readonly ModelOption[]>> {
+    try {
+      if (provider === "github-copilot") {
+        return err<readonly ModelOption[]>("Copilot uses loginCopilot(), not loadModels()");
+      }
+      if (provider === "ollama") {
+        const base = ensureV1Suffix(baseUrl ?? "http://localhost:11434/v1");
+        return ok(await fetchOllamaModels(base));
+      }
+      if (provider === "openai-compatible") {
+        if (!baseUrl) return err<readonly ModelOption[]>("Base URL required");
+        return ok(await fetchOpenAiCompatibleModels(baseUrl, apiKey));
+      }
+      // anthropic / openai / google — static built-in catalog, auth-gated.
+      if (apiKey) {
+        this.services.authStorage.set(provider, { type: "api_key", key: apiKey });
+      }
+      const models = this.services.modelRegistry
+        .getAvailable()
+        .filter((model) => model.provider === provider)
+        .map((model) => ({ id: model.id, name: model.name }));
+      return ok(models);
+    } catch (error) {
+      return err<readonly ModelOption[]>(`Failed to load models: ${errorMessage(error)}`);
+    }
+  }
+
   /** Run the Copilot OAuth device-code flow. `onPrompt` is auto-answered
    *  with "" so it uses github.com (no GHES). Blocks until the user authorizes
    *  in the browser; the credential is persisted by AuthStorage. Cancellable
@@ -885,4 +929,89 @@ function extractText(content: string | ReadonlyArray<{ type: string; text?: stri
     .filter((block) => block.type === "text" && typeof block.text === "string")
     .map((block) => block.text ?? "")
     .join("");
+}
+
+// ─── Model-list fetch helpers (Ollama / openai-compatible) ──────────────
+// See ADR 0001. All endpoints speak the OpenAI-compat /v1/models shape:
+// { data: [{ id: string, ... }] }. Cloud models get a runnable suffix so the
+// local Ollama server routes them to Ollama Cloud (requires `ollama signin`).
+
+/** Per-request timeout for model-list fetches. */
+const MODEL_FETCH_TIMEOUT_MS = 6000;
+/** Public Ollama Cloud model catalog (OpenAI-compat shape, no auth). */
+const OLLAMA_CLOUD_CATALOG_URL = "https://ollama.com/v1/models";
+
+/** Ensure a base URL ends with `/v1` so `{base}/models` resolves. */
+function ensureV1Suffix(baseUrl: string): string {
+  const trimmed = baseUrl.replace(/\/+$/, "");
+  return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`;
+}
+
+/** Runnable cloud model id per the suffix rule in ADR 0001. */
+function ollamaCloudId(id: string): string {
+  return id.includes(":") ? `${id}-cloud` : `${id}:cloud`;
+}
+
+interface OpenAiModelList {
+  readonly data?: ReadonlyArray<{ readonly id?: string }>;
+}
+
+async function fetchModelList(url: string, apiKey?: string): Promise<readonly string[]> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  const response = await fetch(url, {
+    headers,
+    signal: AbortSignal.timeout(MODEL_FETCH_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+  const json = (await response.json()) as OpenAiModelList;
+  if (!Array.isArray(json.data)) return [];
+  return json.data
+    .map((entry) => entry?.id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+}
+
+/**
+ * Fetch Ollama local + cloud models. Local fetch failure (server not running)
+ * and cloud fetch failure (no network) are swallowed independently: the
+ * dropdown gets whichever sources succeeded. Only if both fail does this
+ * throw, surfacing the local error (the more actionable one for Ollama).
+ */
+async function fetchOllamaModels(baseUrl: string): Promise<readonly ModelOption[]> {
+  const localIds = await fetchModelList(`${baseUrl}/models`).catch(() => [] as string[]);
+  const cloudIds = await fetchModelList(OLLAMA_CLOUD_CATALOG_URL).catch(() => [] as string[]);
+
+  const seen = new Set<string>();
+  const models: ModelOption[] = [];
+
+  for (const id of localIds) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    models.push({ id, name: id });
+  }
+  for (const id of cloudIds) {
+    const cloudId = ollamaCloudId(id);
+    if (seen.has(cloudId)) continue;
+    seen.add(cloudId);
+    models.push({ id: cloudId, name: `${id} (cloud)` });
+  }
+
+  if (models.length === 0) {
+    // Both fetches returned nothing — most likely the local Ollama server is
+    // not running. Throw so the form shows an actionable error.
+    throw new Error("No Ollama models found (is the server running at " + baseUrl + "?)");
+  }
+  return models;
+}
+
+/** Fetch models from an OpenAI-compatible endpoint (`{baseUrl}/v1/models`). */
+async function fetchOpenAiCompatibleModels(baseUrl: string, apiKey?: string): Promise<readonly ModelOption[]> {
+  const normalized = ensureV1Suffix(baseUrl);
+  const ids = await fetchModelList(`${normalized}/models`, apiKey);
+  if (ids.length === 0) {
+    throw new Error("No models returned by the endpoint at " + normalized);
+  }
+  return ids.map((id) => ({ id, name: id }));
 }

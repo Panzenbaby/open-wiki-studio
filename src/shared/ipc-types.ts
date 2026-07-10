@@ -147,6 +147,17 @@ export interface AgentApi {
   /** Provider models with auth configured. For Copilot a non-empty list doubles
    *  as the "already logged in" probe. */
   listAvailableModels(provider: ProviderId): Promise<Result<readonly ModelOption[]>>;
+  /**
+   * Load selectable models for a provider, given credentials/base URL.
+   *
+   * Side effect for API-key providers (anthropic/openai/google): stores the
+   * key in authStorage so the built-in catalog becomes available via
+   * `getAvailable()` before the final Save. For Ollama it fetches local
+   * (`{baseUrl}/v1/models`) + cloud (`https://ollama.com/v1/models`) models;
+   * for openai-compatible it fetches `{baseUrl}/v1/models`. GitHub Copilot
+   * is NOT handled here — use `loginCopilot()`.
+   */
+  loadModels(provider: ProviderId, apiKey?: string, baseUrl?: string): Promise<Result<readonly ModelOption[]>>;
   /** Run the Copilot device-code flow; device code/progress stream via
    *  `onCopilotLoginEvent`. Resolves with the account's available models. */
   loginCopilot(): Promise<Result<readonly ModelOption[]>>;

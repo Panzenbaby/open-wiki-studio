@@ -37,7 +37,7 @@ interface LlmConfigFormProps {
 export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   const t = useT();
   const [provider, setProvider] = useState<ProviderId>(props.initial?.provider ?? "anthropic");
-  const [modelId, setModelId] = useState(props.initial?.modelId ?? "claude-sonnet-4-5");
+  const [modelId, setModelId] = useState(props.initial?.modelId ?? "");
   const [apiKey, setApiKey] = useState(props.initial?.apiKey ?? "");
   const [baseUrl, setBaseUrl] = useState(props.initial?.baseUrl ?? "");
   const [busy, setBusy] = useState(false);
@@ -52,6 +52,15 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   const [copilotStatus, setCopilotStatus] = useState<CopilotStatus>("idle");
   const [copilotModels, setCopilotModels] = useState<readonly ModelOption[]>([]);
   const [copilotDeviceCode, setCopilotDeviceCode] = useState<{ userCode: string; verificationUri: string } | null>(null);
+
+  // ── Non-Copilot model-selection state (two-phase: credentials → dropdown) ─
+  // `modelsLoaded` gates the dropdown: false until a Load succeeds (manual or
+  // auto on reopen). Editing key/baseUrl resets it so the user re-loads with
+  // the new credentials.
+  const [models, setModels] = useState<readonly ModelOption[]>([]);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!props.initial) return;
@@ -98,12 +107,62 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider, isCopilot, copilotStatus]);
 
+  // Auto-load models for the *persisted* provider on mount/switch when its
+  // saved credentials are present, so reopening Settings shows the dropdown
+  // without an extra click. Other providers stay in phase 1 (Load button).
+  useEffect(() => {
+    if (isCopilot) return;
+    const saved = props.initial && props.initial.provider === provider ? props.initial : null;
+    if (!saved) {
+      setModels([]);
+      setModelsLoaded(false);
+      setLoadError(null);
+      return;
+    }
+    const hasCreds = !!saved.apiKey || !!saved.baseUrl || provider === "ollama";
+    if (!hasCreds) return;
+    let cancelled = false;
+    void (async () => {
+      setLoadingModels(true);
+      setLoadError(null);
+      const result = await api.loadModels(provider, saved.apiKey, saved.baseUrl);
+      if (cancelled) return;
+      setLoadingModels(false);
+      if (result.success) {
+        setModels(result.data);
+        setModelsLoaded(true);
+        if (!result.data.some((m) => m.id === modelId)) {
+          setModelId(result.data[0]?.id ?? modelId);
+        }
+      } else {
+        setModels([]);
+        setModelsLoaded(false);
+        setLoadError(result.error.message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider, isCopilot]);
+
   // Save gate: required-key providers need an apiKey; OAuth (Copilot) needs
-  // a completed login + selected model. Ollama/openai-compatible are exempt
-  // (placeholder key handled in the main process).
+  // a completed login + selected model; other providers need a loaded model
+  // list + a selected model.
   const missingRequiredKey = selected.keyMode === "required" && !apiKey.trim();
   const copilotMissingModel = isCopilot && (copilotStatus !== "logged-in" || !modelId.trim());
-  const canSave = !busy && !missingRequiredKey && !copilotMissingModel;
+  const nonCopilotMissingModel = !isCopilot && (!modelsLoaded || !modelId.trim());
+  const canSave =
+    !busy &&
+    !missingRequiredKey &&
+    (isCopilot ? !copilotMissingModel : !nonCopilotMissingModel);
+
+  // Load-models gate: required-key providers need an apiKey; base-URL
+  // providers need a base URL (Ollama has a default, so it's always ready).
+  const canLoadModels =
+    !loadingModels &&
+    (selected.keyMode !== "required" || !!apiKey.trim()) &&
+    (!selected.needsBaseUrl || !!baseUrl.trim());
 
   async function openInBrowser(url: string): Promise<void> {
     const result = await api.openExternal(url);
@@ -174,13 +233,77 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
     setModelId("");
   }
 
+  /**
+   * Switch provider and reset credentials/model selection for it: reuse the
+   * saved config when re-selecting the persisted provider, else start clean
+   * (Ollama gets its default base URL). Always clears the loaded model list
+   * so a stale dropdown from another provider never leaks.
+   */
+  function selectProvider(next: ProviderId): void {
+    setProvider(next);
+    if (props.initial && props.initial.provider === next) {
+      setApiKey(props.initial.apiKey ?? "");
+      setBaseUrl(props.initial.baseUrl ?? "");
+      setModelId(props.initial.modelId);
+    } else {
+      setApiKey("");
+      setBaseUrl(next === "ollama" ? "http://localhost:11434/v1" : "");
+      setModelId("");
+    }
+    setModels([]);
+    setModelsLoaded(false);
+    setLoadError(null);
+  }
+
+  /** Manually load models with the currently-entered credentials/base URL. */
+  async function loadModelsAction(): Promise<void> {
+    setLoadingModels(true);
+    setLoadError(null);
+    const result = await api.loadModels(provider, apiKey || undefined, baseUrl || undefined);
+    setLoadingModels(false);
+    if (!result.success) {
+      setToast({ message: `${t("llf.loadModelsFailed")}: ${result.error.message}`, kind: "error" });
+      setModels([]);
+      setModelsLoaded(false);
+      setLoadError(result.error.message);
+      return;
+    }
+    setModels(result.data);
+    setModelsLoaded(true);
+    if (!result.data.some((m) => m.id === modelId)) {
+      setModelId(result.data[0]?.id ?? "");
+    }
+  }
+
+  /** Editing credentials invalidates a previously-loaded model list. */
+  function onApiKeyChange(value: string): void {
+    setApiKey(value);
+    if (!isCopilot) {
+      setModels([]);
+      setModelsLoaded(false);
+      setLoadError(null);
+    }
+  }
+  function onBaseUrlChange(value: string): void {
+    setBaseUrl(value);
+    if (!isCopilot) {
+      setModels([]);
+      setModelsLoaded(false);
+      setLoadError(null);
+    }
+  }
+
   async function save(): Promise<void> {
     if (missingRequiredKey) {
       setToast({ message: t("llf.apiKeyRequired"), kind: "error" });
       return;
     }
-    if (copilotMissingModel) {
+    if (isCopilot && copilotMissingModel) {
       setToast({ message: t("copilot.noModels"), kind: "error" });
+      return;
+    }
+    if (!isCopilot && nonCopilotMissingModel) {
+      setToast({ message: t("llf.noModels"), kind: "error" });
       return;
     }
     setBusy(true);
@@ -208,7 +331,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
             <button
               key={p.id}
               className={`provider${p.id === provider ? " selected" : ""}`}
-              onClick={() => setProvider(p.id)}
+              onClick={() => selectProvider(p.id)}
             >
               <div>
                 <div className="p-name">{p.name}</div>
@@ -235,21 +358,20 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
         />
       ) : (
         <>
-          <div className="field" style={{ marginBottom: "var(--space-4)" }}>
-            <label>{t("llf.modelId")}</label>
-            <input className="input" value={modelId} onChange={(e) => setModelId(e.target.value)} placeholder="claude-sonnet-4-5" />
-            <span className="hint">{t("llf.modelIdHint")}</span>
-          </div>
-
           {selected.needsBaseUrl && (
             <div className="field" style={{ marginBottom: "var(--space-4)" }}>
               <label>{t("llf.baseUrl")}</label>
-              <input className="input" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="http://localhost:11434/v1" />
+              <input
+                className="input"
+                value={baseUrl}
+                onChange={(e) => onBaseUrlChange(e.target.value)}
+                placeholder="http://localhost:11434/v1"
+              />
             </div>
           )}
 
           {showKeyField && (
-            <div className="field" style={{ marginBottom: "var(--space-6)" }}>
+            <div className="field" style={{ marginBottom: "var(--space-4)" }}>
               <label>
                 {t("llf.apiKey")}
                 {selected.keyMode === "optional" && (
@@ -258,7 +380,44 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
                   </span>
                 )}
               </label>
-              <input className="input" type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-…" />
+              <input
+                className="input"
+                type="password"
+                value={apiKey}
+                onChange={(e) => onApiKeyChange(e.target.value)}
+                placeholder="sk-…"
+              />
+            </div>
+          )}
+
+          {!modelsLoaded && (
+            <div className="field" style={{ marginBottom: "var(--space-4)" }}>
+              <button
+                className="btn"
+                onClick={() => void loadModelsAction()}
+                disabled={!canLoadModels}
+                style={{ width: "100%", justifyContent: "center" }}
+              >
+                {loadingModels ? `${t("llf.loadModelsBusy")}${t("app.ellipsis")}` : t("llf.loadModels")}
+              </button>
+              {loadError && <span className="hint" style={{ color: "var(--error)" }}>{loadError}</span>}
+            </div>
+          )}
+
+          {modelsLoaded && (
+            <div className="field" style={{ marginBottom: "var(--space-6)" }}>
+              <label>{t("llf.selectModel")}</label>
+              {models.length > 0 ? (
+                <select className="input" value={modelId} onChange={(e) => setModelId(e.target.value)}>
+                  {models.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name || model.id}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="hint">{t("llf.noModels")}</div>
+              )}
             </div>
           )}
         </>

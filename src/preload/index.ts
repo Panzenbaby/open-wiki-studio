@@ -12,6 +12,7 @@ const api: AgentApi = {
 
   configureLlm: (config) => ipcRenderer.invoke("okf:configureLlm", config),
   listAvailableModels: (provider) => ipcRenderer.invoke("okf:listAvailableModels", provider),
+  loadModels: (provider, apiKey, baseUrl) => ipcRenderer.invoke("okf:loadModels", provider, apiKey, baseUrl),
   loginCopilot: () => ipcRenderer.invoke("okf:loginCopilot"),
   cancelCopilotLogin: () => ipcRenderer.invoke("okf:cancelCopilotLogin"),
   logoutCopilot: () => ipcRenderer.invoke("okf:logoutCopilot"),

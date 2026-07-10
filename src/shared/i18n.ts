@@ -42,6 +42,11 @@ export const messages: Record<Locale, Dict> = {
     "llf.apiKeyOptional": "optional",
     "llf.apiKeyRequired": "An API key is required for this provider.",
     "llf.saveFailed": "Could not save configuration",
+    "llf.loadModels": "Load models",
+    "llf.loadModelsBusy": "Loading models",
+    "llf.loadModelsFailed": "Could not load models",
+    "llf.noModels": "No models available. Check your key / endpoint and try again.",
+    "llf.selectModel": "Model",
 
     // Provider sub-descriptions shown in the provider selector grid.
     "llf.anthropic.sub": "Claude · anthropic-messages",
@@ -237,6 +242,11 @@ export const messages: Record<Locale, Dict> = {
     "llf.apiKeyOptional": "optional",
     "llf.apiKeyRequired": "Für diesen Anbieter ist ein API-Schlüssel erforderlich.",
     "llf.saveFailed": "Konfiguration konnte nicht gespeichert werden",
+    "llf.loadModels": "Modelle laden",
+    "llf.loadModelsBusy": "Lade Modelle",
+    "llf.loadModelsFailed": "Modelle konnten nicht geladen werden",
+    "llf.noModels": "Keine Modelle verfügbar. Schlüssel / Endpunkt prüfen und erneut versuchen.",
+    "llf.selectModel": "Modell",
 
     "llf.anthropic.sub": "Claude · anthropic-messages",
     "llf.openai.sub": "GPT · openai-responses",

@@ -29,6 +29,7 @@ const VALID_PROVIDERS: ReadonlyArray<ProviderId> = [
 const BRIDGE_CHANNELS = [
   "configureLlm",
   "listAvailableModels",
+  "loadModels",
   "loginCopilot",
   "cancelCopilotLogin",
   "logoutCopilot",
@@ -81,6 +82,12 @@ export class IpcBridge {
           return err(`Unknown provider: ${provider}`);
         }
         return repo.listAvailableModels(provider as ProviderId);
+      },
+      loadModels: async (provider: string, apiKey: string | undefined, baseUrl: string | undefined) => {
+        if (!VALID_PROVIDERS.includes(provider as ProviderId)) {
+          return err(`Unknown provider: ${provider}`);
+        }
+        return repo.loadModels(provider as ProviderId, apiKey, baseUrl);
       },
       loginCopilot: async () => repo.loginCopilot(),
       cancelCopilotLogin: async () => repo.cancelCopilotLogin(),
