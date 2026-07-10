@@ -4,10 +4,17 @@
 //   session file), so multiple sessions can stream answers in parallel. The
 //   pool keys live sessions by their session-file path; switching the "current"
 //   session does NOT tear down the others — their in-flight turns keep running.
+//   The pool itself is a deep module (`ChatSessionPool`) that owns creation +
+//   LRU residency + streaming-text tracking; this repo thins its session
+//   methods to delegations (public signatures unchanged, so ipc.ts/index.ts
+//   need no changes). See ADR 0005.
 // - a separate ephemeral in-memory AgentSession for /wiki-update so chat
 //   sessions stay clean.
 // - events forwarded to the renderer via listeners set from ipc.ts, tagged
-//   with the originating session path so the renderer can route them.
+//   with the originating session path so the renderer can route them. The
+//   pi->AgentEvent translator (`forwardAgentEvents`) is a module-level free
+//   function here, shared with the ingest path and injected into the pool as a
+//   dep so the pool does not import this module.
 // - ingest summary computed from a before/after wiki snapshot (wiki-scan.ts).
 import { app } from "electron";
 import { mkdirSync } from "node:fs";
@@ -16,8 +23,6 @@ import { join } from "node:path";
 import type {
   AgentSession,
   AgentSessionServices,
-  SessionManager,
-  SessionStartEvent,
 } from "@earendil-works/pi-coding-agent";
 
 type PiModule = typeof import("@earendil-works/pi-coding-agent");
@@ -34,6 +39,11 @@ import { diffSnapshots, listInputFiles, snapshotWiki } from "./wiki-scan.ts";
 import { ok, err, errorMessage } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
 import { ModelCatalog } from "./model-catalog.ts";
+import {
+  ChatSessionPool,
+  extractText,
+  type AgentMessageLike,
+} from "./chat-session-pool.ts";
 import type {
   AgentEvent,
   ChatMessage,
@@ -57,22 +67,6 @@ function appAgentDir(): string {
   return dir;
 }
 
-/**
- * One live chat session in the pool. Held alive (not disposed) while the user
- * may switch away and back, so an in-flight turn keeps streaming in the
- * background.
- */
-interface LiveChatSession {
-  readonly session: AgentSession;
-  readonly sessionManager: SessionManager;
-  chatUnsub: () => void;
-  readonly path: string;
-  /** Accumulated text of the in-progress assistant message while streaming.
-   *  The agent only stores the finalized message at `message_end`, so during
-   *  streaming this is the only place the partial answer lives. */
-  streamingAssistantText: string;
-}
-
 export class AgentRepository {
   private chatListener: ((event: AgentEvent) => void) | null = null;
   private ingestListener: ((event: AgentEvent) => void) | null = null;
@@ -80,30 +74,36 @@ export class AgentRepository {
   private copilotLoginListener: ((event: CopilotLoginEvent) => void) | null = null;
   private copilotAbort: AbortController | null = null;
   private ingestUnsub: (() => void) | null = null;
-  private pi: PiModule | null = null;
   private ingestModel: ResolvedModel | null = null;
   /** Deep module that owns model discovery + provider registration. Built
    *  from the same services as the repo; the repo keeps the policy of applying
    *  the resolved model to its session pool (agent state, not catalog state). */
   private readonly catalog: ModelCatalog;
-
-  /** Live chat sessions keyed by session-file path. Insertion order is the
-   *  LRU eviction order (see `touchLiveSession`). */
-  private readonly liveSessions = new Map<string, LiveChatSession>();
-  /** Path of the session currently displayed in the chat view. */
-  private currentPath: string | null = null;
-  /** Upper bound on concurrently resident live chat sessions — evict the
-   *  least-recently-used idle session (never the current one) beyond this. */
-  private static readonly MAX_LIVE_SESSIONS = 8;
+  /** Deep module that owns chat session creation + LRU residency + streaming
+   *  text tracking. The repo thins its session methods to delegations; public
+   *  signatures stay identical so ipc.ts/index.ts are unchanged. */
+  private readonly pool: ChatSessionPool;
 
   private constructor(
     private readonly workspace: string,
     private readonly services: AgentSessionServices,
+    private readonly pi: PiModule,
     private ingestSession: AgentSession,
   ) {
     this.catalog = new ModelCatalog({
       modelRegistry: services.modelRegistry,
       authStorage: services.authStorage,
+    });
+    // The pool is constructed here (after services + pi exist) using arrow deps
+    // that read repo state lazily — `chatListener`/`ingestModel` are null now
+    // but read at call time, after the listeners are wired from ipc.ts.
+    this.pool = new ChatSessionPool({
+      pi,
+      services,
+      workspace,
+      forwardEvents: forwardAgentEvents,
+      onChatEvent: (event) => this.chatListener?.(event),
+      getIngestModel: () => this.ingestModel,
     });
   }
 
@@ -131,8 +131,7 @@ export class AgentRepository {
       // Ingest runs in its own isolated ExtensionRuntime (see createIngestSession).
       const ingestSession = await createIngestSession(pi, services);
 
-      const repo = new AgentRepository(workspace, services, ingestSession);
-      repo.pi = pi;
+      const repo = new AgentRepository(workspace, services, pi, ingestSession);
       await repo.bindIngest();
 
       const sessions = await pi.SessionManager.list(workspace);
@@ -162,125 +161,15 @@ export class AgentRepository {
   }
 
   /**
-   * Subscribe to a session's events and forward the chat-relevant ones to
-   * `emit`, tagged with `path` so the renderer can route them to the correct
-   * session. Ingest uses `path: ""` (the renderer ignores it).
+   * Bind the ingest session's extensions and forward its events to the
+   * ingest listener. Ingest uses `path: ""` (the renderer ignores it).
+   * `forwardAgentEvents` is the shared pi->AgentEvent translator (also
+   * injected into the chat pool as a dep, so the pool does not import it).
    */
-  private forward(
-    session: AgentSession,
-    path: string,
-    emit: (event: AgentEvent) => void,
-  ): () => void {
-    return session.subscribe((event) => {
-      if (event.type === "agent_start") {
-        emit({ type: "agent_start", sessionId: session.sessionId, sessionPath: path });
-      } else if (
-        event.type === "message_update" &&
-        event.assistantMessageEvent.type === "text_delta"
-      ) {
-        emit({
-          type: "text_delta",
-          sessionId: session.sessionId,
-          sessionPath: path,
-          delta: event.assistantMessageEvent.delta,
-        });
-      } else if (event.type === "agent_end") {
-        // With auto-retry disabled, a failed turn ends here (stopReason
-        // "error") instead of via `auto_retry_end`. Pack the real error into
-        // the `agent_end` event so the renderer shows it immediately.
-        const lastError = lastAssistantErrorMessage(event.messages);
-        emit({
-          type: "agent_end",
-          sessionId: session.sessionId,
-          sessionPath: path,
-          aborted: lastAssistantAborted(event.messages),
-          lastError: lastError || undefined,
-        });
-      } else if (event.type === "auto_retry_end" && !event.success) {
-        // Defensive fallback in case auto-retry is re-enabled later.
-        emit({
-          type: "error",
-          sessionPath: path,
-          message: event.finalError ?? mainT("error.allRetriesFailed"),
-        });
-      }
-    });
-  }
-
   private async bindIngest(): Promise<void> {
     this.ingestUnsub?.();
     await this.ingestSession.bindExtensions({});
-    this.ingestUnsub = this.forward(this.ingestSession, "", (e) => this.ingestListener?.(e));
-  }
-
-  /**
-   * Create a live chat session for a SessionManager and add it to the pool.
-   * Reloading the resource loader builds a fresh extension runtime; other
-   * live sessions keep their already-captured runtime and stream undisturbed.
-   * The `sessionStartEvent` is forwarded to extensions so they see normal
-   * session_start lifecycle events.
-   */
-  private async createLiveChatSession(
-    sessionManager: SessionManager,
-    reason: "new" | "resume",
-    previousSessionFile?: string,
-  ): Promise<LiveChatSession> {
-    await this.services.resourceLoader.reload();
-    const sessionStartEvent: SessionStartEvent = {
-      type: "session_start",
-      reason,
-      previousSessionFile,
-    };
-    const { session } = await this.pi!.createAgentSessionFromServices({
-      services: this.services,
-      sessionManager,
-      sessionStartEvent,
-    });
-    await session.bindExtensions({});
-    const path = sessionManager.getSessionFile() ?? "";
-    if (this.ingestModel) {
-      try {
-        await session.setModel(this.ingestModel);
-      } catch (error) {
-        console.log(
-          `[open-wiki-studio] setModel failed for session ${path}: ${errorMessage(error)}`,
-        );
-      }
-    }
-    const live: LiveChatSession = {
-      session,
-      sessionManager,
-      chatUnsub: () => {},
-      path,
-      streamingAssistantText: "",
-    };
-    const eventUnsub = this.forward(session, path, (e) => this.chatListener?.(e));
-    // Track in-progress assistant text so getMessages can restore it when the
-    // user switches back to a still-streaming session.
-    const textUnsub = session.subscribe((event) => {
-      if (event.type === "message_update") {
-        const partial = (
-          event.assistantMessageEvent as {
-            partial?: {
-              content?: string | ReadonlyArray<{ type: string; text?: string }>;
-            };
-          }
-        ).partial;
-        live.streamingAssistantText = extractText(partial?.content);
-      } else if (
-        event.type === "message_end" &&
-        (event as { message?: { role?: string } }).message?.role === "assistant"
-      ) {
-        live.streamingAssistantText = "";
-      } else if (event.type === "agent_end") {
-        live.streamingAssistantText = "";
-      }
-    });
-    live.chatUnsub = () => {
-      eventUnsub();
-      textUnsub();
-    };
-    return live;
+    this.ingestUnsub = forwardAgentEvents(this.ingestSession, "", (e) => this.ingestListener?.(e));
   }
 
   /**
@@ -300,54 +189,11 @@ export class AgentRepository {
       /* ignore — best-effort teardown */
     }
     this.ingestSession = await createIngestSession(
-      this.pi!,
+      this.pi,
       this.services,
       this.ingestModel ?? undefined,
     );
     await this.bindIngest();
-  }
-
-  /** Abort and dispose a pooled live chat session, removing it from the pool. */
-  private dropLiveChatSession(path: string): void {
-    const live = this.liveSessions.get(path);
-    if (!live) return;
-    live.chatUnsub();
-    try {
-      live.session.dispose();
-    } catch {
-      /* ignore */
-    }
-    this.liveSessions.delete(path);
-    if (this.currentPath === path) this.currentPath = null;
-  }
-
-  /** Mark a pooled session as most-recently-used by re-inserting it at the back
-   *  of the LRU-ordered map. */
-  private touchLiveSession(path: string): void {
-    const live = this.liveSessions.get(path);
-    if (!live) return;
-    this.liveSessions.delete(path);
-    this.liveSessions.set(path, live);
-  }
-
-  /**
-   * Evict idle pooled sessions beyond `MAX_LIVE_SESSIONS`. Walks the map in
-   * LRU order and disposes the first idle, non-current session it finds,
-   * repeating until under the cap. Streaming and current sessions are never
-   * evicted.
-   */
-  private evictIdleSessions(): void {
-    while (this.liveSessions.size > AgentRepository.MAX_LIVE_SESSIONS) {
-      let evicted = false;
-      for (const [path, live] of this.liveSessions) {
-        if (path === this.currentPath) continue;
-        if (live.session.isStreaming) continue;
-        this.dropLiveChatSession(path);
-        evicted = true;
-        break;
-      }
-      if (!evicted) break;
-    }
   }
 
   // ─── LLM ────────────────────────────────────────────────────────
@@ -366,13 +212,9 @@ export class AgentRepository {
       if (model) {
         this.ingestModel = model;
         await this.ingestSession.setModel(model);
-        for (const live of this.liveSessions.values()) {
-          try {
-            await live.session.setModel(model);
-          } catch {
-            /* best-effort — a streaming session may reject reconfiguration */
-          }
-        }
+        // Apply to the whole chat pool (best-effort — streaming sessions may
+        // reject; the pool swallows per-session errors).
+        await this.pool.applyModelToAll(model);
       } else {
         // Model not found in registry — surface an error so the config form
         // can warn the user immediately. The previously configured model (if
@@ -475,13 +317,13 @@ export class AgentRepository {
   // ─── sessions ───────────────────────────────────────────────────
   async listSessions(): Promise<Result<readonly SessionInfo[]>> {
     try {
-      const sessions = await this.pi!.SessionManager.list(this.workspace);
+      const sessions = await this.pi.SessionManager.list(this.workspace);
       return ok(
         sessions.map((s) => ({
           path: s.path,
           name: stripQueryCommand(s.name ?? s.firstMessage ?? mainT("session.newDefault")),
           lastModified: s.modified.toISOString(),
-          streaming: this.liveSessions.get(s.path)?.session.isStreaming ?? false,
+          streaming: this.pool.isStreaming(s.path),
         })),
       );
     } catch (error) {
@@ -493,21 +335,14 @@ export class AgentRepository {
 
   async newSession(): Promise<Result<SessionInfo>> {
     try {
-      const previousSessionFile = this.currentPath ?? undefined;
-      const sessionManager = this.pi!.SessionManager.create(this.workspace);
-      const live = await this.createLiveChatSession(
-        sessionManager,
-        "new",
-        previousSessionFile,
-      );
-      this.liveSessions.set(live.path, live);
-      this.currentPath = live.path;
-      this.evictIdleSessions();
+      // The pool owns creation + residency; `previousSessionFile` is the session
+      // the user is leaving (forwarded to extensions as the session_start event).
+      const live = await this.pool.newSession(this.pool.getCurrentPath() ?? undefined);
       return ok({
         path: live.path,
         name: mainT("session.newDefault"),
         lastModified: new Date().toISOString(),
-        streaming: false,
+        streaming: live.session.isStreaming,
       });
     } catch (error) {
       return err<SessionInfo>(
@@ -517,10 +352,10 @@ export class AgentRepository {
   }
 
   async deleteSession(path: string): Promise<Result<void>> {
-    if (path === this.currentPath) {
+    if (path === this.pool.getCurrentPath()) {
       return err<void>(mainT("error.cannotDeleteActiveSession"), { path });
     }
-    this.dropLiveChatSession(path);
+    this.pool.drop(path);
     try {
       await unlink(path);
       return ok(undefined);
@@ -534,36 +369,18 @@ export class AgentRepository {
 
   async openSession(path: string): Promise<Result<SessionInfo>> {
     try {
-      const existing = this.liveSessions.get(path);
-      if (existing) {
-        this.currentPath = path;
-        this.touchLiveSession(path);
-        const sessions = await this.pi!.SessionManager.list(this.workspace);
-        const info = sessions.find((s) => s.path === path);
-        return ok({
-          path,
-          name: stripQueryCommand(info?.name ?? info?.firstMessage ?? mainT("session.newDefault")),
-          lastModified: (info?.modified ?? new Date()).toISOString(),
-          streaming: existing.session.isStreaming,
-        });
-      }
-      const previousSessionFile = this.currentPath ?? undefined;
-      const sessionManager = this.pi!.SessionManager.open(path);
-      const live = await this.createLiveChatSession(
-        sessionManager,
-        "resume",
-        previousSessionFile,
-      );
-      this.liveSessions.set(live.path, live);
-      this.currentPath = live.path;
-      this.evictIdleSessions();
-      const sessions = await this.pi!.SessionManager.list(this.workspace);
+      // The pool handles the reuse-vs-create split: if `path` is already pooled
+      // it is touched + made current (no creation); otherwise it is opened +
+      // registered + evicted. `previousSessionFile` is the session being left.
+      const previousSessionFile = this.pool.getCurrentPath() ?? undefined;
+      const live = await this.pool.openSession(path, previousSessionFile);
+      const sessions = await this.pi.SessionManager.list(this.workspace);
       const info = sessions.find((s) => s.path === path);
       return ok({
         path,
         name: stripQueryCommand(info?.name ?? info?.firstMessage ?? mainT("session.newDefault")),
         lastModified: (info?.modified ?? new Date()).toISOString(),
-        streaming: false,
+        streaming: live.session.isStreaming,
       });
     } catch (error) {
       return err<SessionInfo>(
@@ -574,10 +391,10 @@ export class AgentRepository {
 
   async getMessages(path: string): Promise<Result<readonly ChatMessage[]>> {
     try {
-      const live = this.liveSessions.get(path);
+      const live = this.pool.get(path);
       const messages: ReadonlyArray<AgentMessageLike> = live
         ? live.session.messages
-        : this.pi!.SessionManager.open(path).buildSessionContext().messages;
+        : this.pi.SessionManager.open(path).buildSessionContext().messages;
       const out = extractMessages(messages);
       // Append in-progress answer for sessions still streaming — the
       // finalized message only hits session.messages at message_end.
@@ -596,9 +413,10 @@ export class AgentRepository {
   async ask(question: string): Promise<Result<void>> {
     // `ask`/`ingest` only capture *synchronous* failures of `prompt()` (unknown
     // command, disposed session). Turn-level errors surface as `error` events
-    // on the stream (handled in `forward()`), NOT through this return value.
+    // on the stream (handled in `forwardAgentEvents`), NOT through this return
+    // value.
     try {
-      const live = this.currentPath ? this.liveSessions.get(this.currentPath) : undefined;
+      const live = this.pool.getCurrent();
       if (!live) {
         return err<void>(mainT("error.noActiveSession"));
       }
@@ -621,7 +439,7 @@ export class AgentRepository {
    */
   async retryChat(question: string): Promise<Result<void>> {
     try {
-      const live = this.currentPath ? this.liveSessions.get(this.currentPath) : undefined;
+      const live = this.pool.getCurrent();
       if (!live) {
         return err<void>(mainT("error.noActiveSession"));
       }
@@ -750,10 +568,8 @@ export class AgentRepository {
    */
   async abortChat(): Promise<Result<void>> {
     try {
-      if (this.currentPath) {
-        const live = this.liveSessions.get(this.currentPath);
-        if (live) await live.session.abort();
-      }
+      const live = this.pool.getCurrent();
+      if (live) await live.session.abort();
       return ok(undefined);
     } catch (error) {
       return err<void>(errorMessage(error));
@@ -764,10 +580,8 @@ export class AgentRepository {
     try {
       // Abort the current chat turn (background turns keep running) and any
       // in-flight ingest turn.
-      if (this.currentPath) {
-        const live = this.liveSessions.get(this.currentPath);
-        if (live) await live.session.abort();
-      }
+      const live = this.pool.getCurrent();
+      if (live) await live.session.abort();
       await this.ingestSession.abort();
       return ok(undefined);
     } catch (error) {
@@ -777,9 +591,7 @@ export class AgentRepository {
 
   async dispose(): Promise<void> {
     this.ingestUnsub?.();
-    for (const path of [...this.liveSessions.keys()]) {
-      this.dropLiveChatSession(path);
-    }
+    this.pool.disposeAll();
     try {
       this.ingestSession.dispose();
     } catch {
@@ -813,11 +625,56 @@ async function createIngestSession(
   ).session;
 }
 
-/** Minimal structural shape of an agent message used for extraction. */
-type AgentMessageLike = {
-  role?: string;
-  content?: string | ReadonlyArray<{ type: string; text?: string }>;
-};
+/**
+ * Subscribe to a session's events and forward the chat-relevant ones to
+ * `emit`, tagged with `path` so the renderer can route them to the correct
+ * session. Ingest uses `path: ""` (the renderer ignores it).
+ *
+ * This is a module-level free function (not a method) so it can be shared
+ * between the ingest path (called directly by `bindIngest`) and the chat pool
+ * (injected as the `forwardEvents` dep). The pool receives it as a dep rather
+ * than importing it, so the pool does not depend on this module (no cycle).
+ */
+export function forwardAgentEvents(
+  session: AgentSession,
+  path: string,
+  emit: (event: AgentEvent) => void,
+): () => void {
+  return session.subscribe((event) => {
+    if (event.type === "agent_start") {
+      emit({ type: "agent_start", sessionId: session.sessionId, sessionPath: path });
+    } else if (
+      event.type === "message_update" &&
+      event.assistantMessageEvent.type === "text_delta"
+    ) {
+      emit({
+        type: "text_delta",
+        sessionId: session.sessionId,
+        sessionPath: path,
+        delta: event.assistantMessageEvent.delta,
+      });
+    } else if (event.type === "agent_end") {
+      // With auto-retry disabled, a failed turn ends here (stopReason
+      // "error") instead of via `auto_retry_end`. Pack the real error into
+      // the `agent_end` event so the renderer shows it immediately.
+      const lastError = lastAssistantErrorMessage(event.messages);
+      emit({
+        type: "agent_end",
+        sessionId: session.sessionId,
+        sessionPath: path,
+        aborted: lastAssistantAborted(event.messages),
+        lastError: lastError || undefined,
+      });
+    } else if (event.type === "auto_retry_end" && !event.success) {
+      // Defensive fallback in case auto-retry is re-enabled later.
+      emit({
+        type: "error",
+        sessionPath: path,
+        message: event.finalError ?? mainT("error.allRetriesFailed"),
+      });
+    }
+  });
+}
 
 /**
  * Whether the last assistant message in an `agent_end` event was aborted
@@ -868,7 +725,9 @@ function dedupeProviderErrorMessage(message: string): string {
 /** Map raw agent messages to the renderer's ChatMessage list: strips the
  *  /wiki-query command prefix from user messages, drops empty finalized
  *  assistant messages, and collapses consecutive duplicate user messages
- *  left behind by retries. */
+ *  left behind by retries. `extractText` + `AgentMessageLike` are imported
+ *  from the chat-session-pool module (the pool owns them; this avoids a
+ *  pool->agent import cycle). */
 function extractMessages(messages: ReadonlyArray<AgentMessageLike>): ChatMessage[] {
   const out: ChatMessage[] = [];
   // Tracks the text of the most recently pushed user message so a run of
@@ -899,13 +758,4 @@ function extractMessages(messages: ReadonlyArray<AgentMessageLike>): ChatMessage
     out.push({ role, text: clean });
   }
   return out;
-}
-
-function extractText(content: string | ReadonlyArray<{ type: string; text?: string }> | undefined): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .filter((block) => block.type === "text" && typeof block.text === "string")
-    .map((block) => block.text ?? "")
-    .join("");
 }
