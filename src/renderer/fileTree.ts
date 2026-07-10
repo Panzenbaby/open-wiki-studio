@@ -94,8 +94,7 @@ export function buildFileTree(files: readonly FileNode[]): TreeNode {
 
 /**
  * Returns the set of directory paths that are ancestors of the given file
- * path (i.e. all parent folders). Useful to auto-expand the tree down to a
- * newly selected file.
+ * path. Useful to auto-expand the tree down to a newly selected file.
  */
 export function ancestorDirs(filePath: string): string[] {
   const segments = filePath.split(sep);

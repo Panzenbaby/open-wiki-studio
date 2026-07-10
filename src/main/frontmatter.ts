@@ -1,8 +1,5 @@
 // Minimal YAML frontmatter parser (OKF subset) for previews in the app.
 // Mirrors pi-okf-wiki/frontmatter.ts; kept local to avoid jiti in main.
-import type { ConceptInfo } from "../shared/ipc-types.ts";
-import { mainT } from "./i18n.ts";
-
 const FENCE = "---";
 
 export interface ParsedDocument {
@@ -91,16 +88,3 @@ function asStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((item): item is string => typeof item === "string") : [];
 }
 
-export function toConceptInfo(
-  frontmatter: ParsedDocument["frontmatter"],
-  conceptId: string,
-  fallbackName: string,
-): ConceptInfo | undefined {
-  if (!frontmatter) return undefined;
-  return {
-    conceptId,
-    title: frontmatter.title ?? frontmatter.type ?? fallbackName,
-    description: frontmatter.description ?? "",
-    type: frontmatter.type ?? mainT("concept.untyped"),
-  };
-}

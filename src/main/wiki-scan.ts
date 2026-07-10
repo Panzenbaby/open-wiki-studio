@@ -1,6 +1,6 @@
 // Lightweight wiki scanning for the ingest summary (before/after diff +
-// leftover detection). Uses only node:fs so it bundles cleanly into the
-// main process without jiti. Mirrors the semantics of pi-okf-wiki/wiki.ts.
+// leftover detection). Uses only node:fs so it bundles cleanly into the main
+// process without jiti. Mirrors the semantics of pi-okf-wiki/wiki.ts.
 import { createHash } from "node:crypto";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";

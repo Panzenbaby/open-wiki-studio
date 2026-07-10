@@ -55,9 +55,8 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   const [copilotDeviceCode, setCopilotDeviceCode] = useState<{ userCode: string; verificationUri: string } | null>(null);
 
   // ── Non-Copilot model-selection state (two-phase: credentials → dropdown) ─
-  // `modelsLoaded` gates the dropdown: false until a Load succeeds (manual or
-  // auto on reopen). Editing key/baseUrl resets it so the user re-loads with
-  // the new credentials.
+  // `modelsLoaded` gates the dropdown until a Load succeeds. Editing key/baseUrl
+  // resets it so the user re-loads with the new credentials.
   const [models, setModels] = useState<readonly ModelOption[]>([]);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -75,12 +74,9 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   const showKeyField = selected.keyMode !== "none";
   const isCopilot = selected.oauth === true;
 
-  // Probe auth status when Copilot is selected: non-empty model list =
-  // already logged in (dropdown + logout); empty = show login button.
-  // State is intentionally NOT reset when switching away: a login may still
-  // be in flight, and tearing it down would leave the user stuck. The probe
-  // also skips while logging in, so switching back mid-login restores the
-  // live device-code UI.
+  // Probe auth status when Copilot is selected: a non-empty model list =
+  // already logged in (dropdown + logout); empty = show login button. State is
+  // NOT reset when switching away (a login may still be in flight).
   useEffect(() => {
     if (!isCopilot) return;
     if (copilotStatus === "logging-in") return;
@@ -108,9 +104,9 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider, isCopilot, copilotStatus]);
 
-  // Auto-load models for the *persisted* provider on mount/switch when its
+  // Auto-load models for the persisted provider on mount/switch when its
   // saved credentials are present, so reopening Settings shows the dropdown
-  // without an extra click. Other providers stay in phase 1 (Load button).
+  // without an extra click.
   useEffect(() => {
     if (isCopilot) return;
     const saved = props.initial && props.initial.provider === provider ? props.initial : null;
@@ -147,8 +143,8 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider, isCopilot]);
 
-  // Save gate: required-key providers need an apiKey; OAuth (Copilot) needs
-  // a completed login + selected model; other providers need a loaded model
+  // Save gate: required-key providers need an apiKey; OAuth (Copilot) needs a
+  // completed login + selected model; other providers need a loaded model
   // list + a selected model.
   const missingRequiredKey = selected.keyMode === "required" && !apiKey.trim();
   const copilotMissingModel = isCopilot && (copilotStatus !== "logged-in" || !modelId.trim());
@@ -183,8 +179,8 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
     setBusy(true);
     setCopilotStatus("logging-in");
     setCopilotDeviceCode(null);
-    // Forward device-code events; library progress text is English-only, so
-    // the UI shows a localized label instead.
+  // Forward device-code events; library progress text is English-only, so the
+  // UI shows a localized label instead.
     const off = api.onCopilotLoginEvent((event: CopilotLoginEvent) => {
       if (event.type === "device_code") {
         setCopilotDeviceCode({ userCode: event.userCode, verificationUri: event.verificationUri });
@@ -217,9 +213,9 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   }
 
   async function cancelCopilotLogin(): Promise<void> {
-    // loginCopilot() resolves with cause "cancelled" and resets state/busy
-    // in its finally block. Don't touch busy here — Cancel stays responsive
-    // while the abort propagates.
+    // loginCopilot() resolves with cause "cancelled" and resets state/busy in
+    // its finally block. Don't touch busy here — Cancel stays responsive while
+    // the abort propagates.
     await api.cancelCopilotLogin();
   }
 
@@ -320,9 +316,8 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
       setToast({ message: `${t("llf.saveFailed")}: ${result.error.message}`, kind: "error" });
       return;
     }
-    // Keep the renderer's notion of "an LLM is configured" in sync after
-    // any successful save (FirstRun and Settings share this form). The
-    // atom otherwise only refreshes at workspace-open via getAppSelf.
+    // Keep the renderer's notion of "an LLM is configured" in sync after any
+    // successful save (FirstRun and Settings share this form).
     setLlmConfigured(true);
     props.onSaved();
   }

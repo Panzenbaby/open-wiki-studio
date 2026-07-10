@@ -57,10 +57,6 @@ async function walk(dir: string, root: string): Promise<readonly { relativePath:
   return out;
 }
 
-function isConcept(relativePath: string): boolean {
-  return isMarkdown(relativePath);
-}
-
 /**
  * Normalise a link target to a conceptId (path without `wiki/` prefix and
  * without `.md`). Returns null for external/non-concept refs.
@@ -84,8 +80,8 @@ function extractLinks(body: string): readonly string[] {
     const id = toConceptId(match[2]!);
     if (id) refs.add(id);
   }
-  // bare concept paths (also catches links already wrapped in markdown
-  // — deduped via the Set). matchAll ignores lastIndex, so no reset needed.
+  // bare concept paths (also catches links already wrapped in markdown —
+  // deduped via the Set).
   for (const match of body.matchAll(CONCEPT_RE)) {
     const id = toConceptId(match[0]);
     if (id) refs.add(id);
@@ -133,7 +129,7 @@ export async function buildWikiGraph(workspace: string): Promise<Result<WikiGrap
       return ok({ nodes: [], edges: [] });
     }
     const files = await walk(wikiDir, wikiDir);
-    const conceptFiles = files.filter((f) => isConcept(f.relativePath));
+    const conceptFiles = files.filter((f) => isMarkdown(f.relativePath));
 
     const raws: RawConcept[] = [];
     for (const file of conceptFiles) {

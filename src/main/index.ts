@@ -87,14 +87,13 @@ function registerGlobalHandlers(): void {
 
   ipcMain.handle("okf:getLlmConfig", async () => ok(await getLlmConfig()));
 
-  // App self-info is workspace-independent (global LLM config + platform).
-  // Registered globally so the renderer can call it at bootstrap, before
-  // any workspace is active.
+// App self-info is workspace-independent. Registered globally so the renderer
+  // can call it at bootstrap, before any workspace is active.
   ipcMain.handle("okf:getAppSelf", async () => {
     const llm = await getLlmConfig();
-    // Providers without an API key in config.json: ollama/
-    // openai-compatible use a placeholder or custom endpoint; copilot uses
-    // an OAuth credential in auth.json, so config.json carries provider+modelId.
+    // Providers without an API key in config.json: ollama/openai-compatible use
+    // a placeholder or custom endpoint; copilot uses an OAuth credential in
+    // auth.json, so config.json carries provider+modelId.
     const noKeyProviders: ReadonlyArray<ProviderId> = [
       "ollama",
       "openai-compatible",
@@ -107,8 +106,7 @@ function registerGlobalHandlers(): void {
     return ok({ version: "0.1.0", hasLlmConfig, platform: process.platform });
   });
 
-  // Opens the Copilot OAuth verification URL in the default browser.
-  // Registered globally (workspace-independent).
+  // Opens the Copilot OAuth verification URL in the default browser (global).
   ipcMain.handle("okf:openExternal", async (_event, url: string) => {
     try {
       if (typeof url !== "string" || url === "") {
@@ -142,9 +140,8 @@ function registerGlobalHandlers(): void {
   });
 
   ipcMain.handle("okf:openWorkspace", async (_event, path: string) => {
-    // The renderer can pass any string here; validate that it resolves to
-    // an existing directory before activating. Refusing early gives a clear
-    // error instead of a cryptic failure deep inside AgentRepository.create.
+    // The renderer can pass any string here; validate it resolves to an
+    // existing directory before activating. Refusing early gives a clear error.
     if (typeof path !== "string" || path === "") {
       return err<WorkspaceInfo>(mainT("error.invalidWorkspacePath"));
     }
@@ -230,9 +227,9 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", (event) => {
   if (!state.repo) return;
-  // `before-quit` is not awaitable by default: prevent the quit, dispose
-  // the agent cleanly, then quit again. Without this, Electron may exit
-  // before `dispose()` finishes flushing session state.
+  // `before-quit` is not awaitable by default: prevent the quit, dispose the
+  // agent cleanly, then quit again. Without this, Electron may exit before
+  // `dispose()` finishes flushing session state.
   event.preventDefault();
   const repo = state.repo;
   state.repo = null;

@@ -55,8 +55,8 @@ export function Browser(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folder]);
 
-  // Auto-expand all ancestor folders of the currently selected file so the
-  // selection stays visible after a refresh or folder switch.
+  // Auto-expand all ancestor folders of the selected file so it stays
+  // visible after a refresh or folder switch.
   useEffect(() => {
     if (!selected) return;
     // selected is `${folder}/${relativePath}`; strip the folder prefix.

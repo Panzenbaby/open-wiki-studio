@@ -4,9 +4,6 @@
 //   session file), so multiple sessions can stream answers in parallel. The
 //   pool keys live sessions by their session-file path; switching the "current"
 //   session does NOT tear down the others — their in-flight turns keep running.
-//   This works because `services.resourceLoader.reload()` builds a FRESH
-//   extension runtime per session without invalidating runtimes already
-//   captured by other live sessions (the ingest session uses the same trick).
 // - a separate ephemeral in-memory AgentSession for /wiki-update so chat
 //   sessions stay clean.
 // - events forwarded to the renderer via listeners set from ipc.ts, tagged
@@ -26,8 +23,8 @@ import type {
 type PiModule = typeof import("@earendil-works/pi-coding-agent");
 
 /**
- * Model resolved from the registry. Stored on the repo so a recreated ingest
- * session can re-apply the same model without re-resolving (which would drop
+ * Model resolved from the registry, kept on the repo so a recreated ingest
+ * session re-applies the same model without re-resolving (which would drop
  * dynamically registered providers like ollama/openai-compatible).
  */
 type ResolvedModel = ReturnType<AgentSessionServices["modelRegistry"]["getAll"]>[number];
@@ -50,10 +47,8 @@ import type {
 import { stripQueryCommand } from "../shared/text.ts";
 
 /**
- * Dedicated, isolated agent directory for the app (NOT the user's ~/.pi/agent).
- * Keeps auth/models/settings/extensions scoped per-app so the bundled
- * pi-okf-wiki is the only extension loaded — no collision with the user's
- * global or project-local Pi extensions.
+ * Dedicated agent directory for the app (NOT the user's ~/.pi/agent), so the
+ * bundled pi-okf-wiki is the only extension loaded.
  */
 function appAgentDir(): string {
   const dir = join(app.getPath("userData"), "agent");
@@ -63,8 +58,8 @@ function appAgentDir(): string {
 
 /**
  * One live chat session in the pool. Held alive (not disposed) while the user
- * may switch away and back, so an in-flight agent turn keeps streaming in the
- * background. Its own `chatUnsub` detaches the event forwarder on teardown.
+ * may switch away and back, so an in-flight turn keeps streaming in the
+ * background.
  */
 interface LiveChatSession {
   readonly session: AgentSession;
@@ -72,10 +67,8 @@ interface LiveChatSession {
   chatUnsub: () => void;
   readonly path: string;
   /** Accumulated text of the in-progress assistant message while streaming.
-   *  The agent only stores the finalized assistant message in `state.messages`
-   *  at `message_end`, so during streaming this is the only place the partial
-   *  answer lives — `getMessages` merges it back in so switching away and back
-   *  does not lose the already-streamed text. */
+   *  The agent only stores the finalized message at `message_end`, so during
+   *  streaming this is the only place the partial answer lives. */
   streamingAssistantText: string;
 }
 
@@ -90,14 +83,12 @@ export class AgentRepository {
   private ingestModel: ResolvedModel | null = null;
 
   /** Live chat sessions keyed by session-file path. Insertion order is the
-   *  LRU eviction order: re-inserting a key (see `touchLiveSession`) moves it
-   *  to the back as most-recently-used. */
+   *  LRU eviction order (see `touchLiveSession`). */
   private readonly liveSessions = new Map<string, LiveChatSession>();
   /** Path of the session currently displayed in the chat view. */
   private currentPath: string | null = null;
-  /** Upper bound on concurrently resident live chat sessions. Background
-   *  turns are valuable but not infinitely so — evict the least-recently-used
-   *  idle session (never the current one) beyond this cap. */
+  /** Upper bound on concurrently resident live chat sessions — evict the
+   *  least-recently-used idle session (never the current one) beyond this. */
   private static readonly MAX_LIVE_SESSIONS = 8;
 
   private constructor(
@@ -116,19 +107,18 @@ export class AgentRepository {
         agentDir,
         resourceLoaderOptions: {
           additionalExtensionPaths: [extPath],
-          // Isolate the app: only load our bundled pi-okf-wiki. Skip the
-          // user's global (~/.pi/agent) and project-local (<workspace>/.pi/extensions)
-          // extensions to avoid command-name collisions (e.g. duplicate /wiki-query).
+          // Isolate the app: only load our bundled pi-okf-wiki, skipping the
+          // user's global and project-local extensions to avoid command-name
+          // collisions (e.g. duplicate /wiki-query).
           noExtensions: true,
         },
       });
 
-      // Disable auto-retry — surfaces failures immediately so the user can
-      // retry manually via the chat retry button.
+      // Disable auto-retry so failures surface immediately and the user can
+      // retry via the chat retry button.
       services.settingsManager.setRetryEnabled(false);
 
-      // Ingest runs in its own isolated ExtensionRuntime — see
-      // `createIngestSession` for the rationale.
+      // Ingest runs in its own isolated ExtensionRuntime (see createIngestSession).
       const ingestSession = await createIngestSession(pi, services);
 
       const repo = new AgentRepository(workspace, services, ingestSession);
@@ -164,7 +154,7 @@ export class AgentRepository {
   /**
    * Subscribe to a session's events and forward the chat-relevant ones to
    * `emit`, tagged with `path` so the renderer can route them to the correct
-   * session's UI state. Ingest uses `path: ""` (the renderer ignores it).
+   * session. Ingest uses `path: ""` (the renderer ignores it).
    */
   private forward(
     session: AgentSession,
@@ -187,8 +177,7 @@ export class AgentRepository {
       } else if (event.type === "agent_end") {
         // With auto-retry disabled, a failed turn ends here (stopReason
         // "error") instead of via `auto_retry_end`. Pack the real error into
-        // the `agent_end` event so the renderer shows it immediately instead
-        // of flashing a generic "no response" banner first.
+        // the `agent_end` event so the renderer shows it immediately.
         const lastError = lastAssistantErrorMessage(event.messages);
         emit({
           type: "agent_end",
@@ -198,8 +187,7 @@ export class AgentRepository {
           lastError: lastError || undefined,
         });
       } else if (event.type === "auto_retry_end" && !event.success) {
-        // Auto-retry is disabled (setRetryEnabled(false)); this is a defensive
-        // fallback in case retry is re-enabled in the future.
+        // Defensive fallback in case auto-retry is re-enabled later.
         emit({
           type: "error",
           sessionPath: path,
@@ -217,13 +205,10 @@ export class AgentRepository {
 
   /**
    * Create a live chat session for a SessionManager and add it to the pool.
-   *
-   * Reloading the resource loader builds a fresh `extensionsResult` with a
-   * new extension runtime; the new session captures it. Reload does NOT
-   * invalidate runtimes already captured by other live sessions, so they keep
-   * streaming undisturbed (proven by the coexisting ingest session). The
-   * `sessionStartEvent` is forwarded to extensions so they see normal
-   * session_start lifecycle events, matching the previous runtime behaviour.
+   * Reloading the resource loader builds a fresh extension runtime; other
+   * live sessions keep their already-captured runtime and stream undisturbed.
+   * The `sessionStartEvent` is forwarded to extensions so they see normal
+   * session_start lifecycle events.
    */
   private async createLiveChatSession(
     sessionManager: SessionManager,
@@ -291,12 +276,10 @@ export class AgentRepository {
   /**
    * Tear down the current ingest session and create a fresh one.
    *
-   * The ingest session is otherwise long-lived (in-memory, reused across
-   * ingests), so the agent accumulates prior turns. After the wiki is deleted
-   * externally, the agent still "remembers" the concepts it created and will
-   * NOT rebuild them — even though /wiki-update reports the (now empty) disk
-   * state in its prompt. Starting each ingest in a clean session forces the
-   * agent to reason purely from the current disk state.
+   * After the wiki is deleted externally, the long-lived ingest session still
+   * "remembers" the concepts it created and will not rebuild them. Starting
+   * each ingest in a clean session forces the agent to reason purely from the
+   * current disk state.
    */
   private async resetIngestSession(): Promise<void> {
     this.ingestUnsub?.();
@@ -328,10 +311,8 @@ export class AgentRepository {
     if (this.currentPath === path) this.currentPath = null;
   }
 
-  /**
-   * Mark a pooled session as most-recently-used by re-inserting it at the
-   * back of the LRU-ordered map. Insertion order is the eviction order.
-   */
+  /** Mark a pooled session as most-recently-used by re-inserting it at the back
+   *  of the LRU-ordered map. */
   private touchLiveSession(path: string): void {
     const live = this.liveSessions.get(path);
     if (!live) return;
@@ -341,11 +322,9 @@ export class AgentRepository {
 
   /**
    * Evict idle pooled sessions beyond `MAX_LIVE_SESSIONS`. Walks the map in
-   * insertion (least-recently-used) order and disposes the first idle,
-   * non-current session it finds, repeating until under the cap. Streaming
-   * sessions and the current session are never evicted — a streaming turn's
-   * event forwarder must stay attached to finish, and the current session
-   * is what the user is looking at.
+   * LRU order and disposes the first idle, non-current session it finds,
+   * repeating until under the cap. Streaming and current sessions are never
+   * evicted.
    */
   private evictIdleSessions(): void {
     while (this.liveSessions.size > AgentRepository.MAX_LIVE_SESSIONS) {
@@ -379,12 +358,11 @@ export class AgentRepository {
         mr.registerProvider(providerName, {
           name: config.provider === "ollama" ? "Ollama" : "OpenAI-compatible",
           baseUrl,
-          // registerProvider requires an apiKey when defining models (validator rejects
-          // empty string); for providers that don't need one, pass a placeholder.
+          // registerProvider requires an apiKey; for providers that don't need
+          // one, pass a placeholder.
           apiKey: config.apiKey || (config.provider === "ollama" ? "ollama" : "not-needed"),
-          // "openai-completions" is a KnownApi in pi-ai (the OpenAI chat
-          // completions wire protocol) and is the protocol Ollama +
-          // OpenAI-compatible endpoints speak.
+          // "openai-completions" is the OpenAI chat completions wire protocol,
+          // spoken by Ollama and OpenAI-compatible endpoints.
           api: "openai-completions",
           models: [
             {
@@ -402,8 +380,8 @@ export class AgentRepository {
         auth.set(config.provider, { type: "api_key", key: config.apiKey });
       }
 
-      // Note: no refresh() here — it reloads models from disk and would drop
-      // the dynamically registered providers (ollama/openai-compatible) above.
+      // No refresh() here — it reloads models from disk and would drop the
+      // dynamically registered providers above.
       const model =
         mr.getAll().find((m) => m.provider === providerName && m.id === config.modelId) ??
         mr.getAll().find((m) => m.id === config.modelId);
@@ -418,10 +396,9 @@ export class AgentRepository {
           }
         }
       } else {
-        // Model not found in registry — surface as an error so the
-        // config form can warn the user immediately, instead of letting the
-        // misconfiguration explode silently at the next ingest/chat turn.
-        // The previously configured model (if any) stays active.
+        // Model not found in registry — surface an error so the config form
+        // can warn the user immediately. The previously configured model (if
+        // any) stays active.
         return err<void>(
           mainT("error.modelNotFound", {
             provider: config.provider,
@@ -436,9 +413,8 @@ export class AgentRepository {
   }
 
   // ─── GitHub Copilot OAuth ────────────────────────────────────────
-  /** For Copilot this doubles as the "already logged in" probe: a non-empty
-   *  result means an OAuth credential is stored, so the form shows the
-   *  model dropdown instead of the login button. */
+  /** For Copilot a non-empty result doubles as the "already logged in" probe:
+   *  the form shows the model dropdown instead of the login button. */
   listAvailableModels(provider: ProviderId): Result<readonly ModelOption[]> {
     try {
       const models = this.services.modelRegistry
@@ -456,15 +432,15 @@ export class AgentRepository {
   /**
    * Load selectable models for a provider, given credentials/base URL.
    *
-   * For anthropic/openai/google: store the API key (so `getAvailable()` can
-   * surface the built-in catalog) and return the catalog. For ollama: fetch
-   * local models from `{baseUrl}/v1/models` and cloud models from the public
-   * `https://ollama.com/v1/models`, applying the cloud suffix rule. For
-   * openai-compatible: fetch `{baseUrl}/v1/models` (optional Bearer key).
+   * For anthropic/openai/google: store the API key so `getAvailable()` can
+   * surface the built-in catalog. For ollama: fetch local models from
+   * `{baseUrl}/v1/models` and cloud models from `https://ollama.com/v1/models`,
+   * applying the cloud suffix rule. For openai-compatible: fetch
+   * `{baseUrl}/v1/models` (optional Bearer key).
    *
    * Fetch failures degrade gracefully: Ollama returns whichever of local/cloud
-   * succeeded (cloud failure → local only); openai-compatible returns an error
-   * only if the fetch itself fails. See ADR 0001.
+   * succeeded; openai-compatible returns an error only if the fetch itself
+   * fails. See ADR 0001.
    */
   async loadModels(
     provider: ProviderId,
@@ -497,10 +473,9 @@ export class AgentRepository {
     }
   }
 
-  /** Run the Copilot OAuth device-code flow. `onPrompt` is auto-answered
-   *  with "" so it uses github.com (no GHES). Blocks until the user authorizes
-   *  in the browser; the credential is persisted by AuthStorage. Cancellable
-   *  via `cancelCopilotLogin()`, which sets `cause: "cancelled"` on abort. */
+  /** Run the Copilot OAuth device-code flow. `onPrompt` is auto-answered with
+   *  "" (github.com, no GHES). Blocks until the user authorizes; credential is
+   *  persisted by AuthStorage. Cancellable via `cancelCopilotLogin()`. */
   async loginCopilot(): Promise<Result<readonly ModelOption[]>> {
     this.copilotAbort?.abort();
     this.copilotAbort = new AbortController();
@@ -527,8 +502,8 @@ export class AgentRepository {
       return this.listAvailableModels("github-copilot");
     } catch (error) {
       this.copilotAbort = null;
-      // Abort (cancel) vs. real failure — the renderer shows a neutral
-      // notice instead of an error toast on `cause: "cancelled"`.
+      // Abort (cancel) vs. real failure — the renderer shows a neutral notice
+      // instead of an error toast on `cause: "cancelled"`.
       if (signal.aborted) {
         return err<readonly ModelOption[]>(
           "Login cancelled",
@@ -665,8 +640,8 @@ export class AgentRepository {
         ? live.session.messages
         : this.pi!.SessionManager.open(path).buildSessionContext().messages;
       const out = extractMessages(messages);
-      // Append in-progress answer for sessions still streaming —
-      // the finalized message only hits session.messages at message_end.
+      // Append in-progress answer for sessions still streaming — the
+      // finalized message only hits session.messages at message_end.
       if (live && live.session.isStreaming && live.streamingAssistantText.trim() !== "") {
         out.push({ role: "assistant", text: live.streamingAssistantText });
       }
@@ -680,12 +655,9 @@ export class AgentRepository {
 
   // ─── agent actions ──────────────────────────────────────────────
   async ask(question: string): Promise<Result<void>> {
-    // Note on Result<void> semantics: `ask`/`ingest` only capture
-    // *synchronous* failures of `prompt()` (e.g. the command is unknown, the
-    // session is disposed). The agent runs asynchronously after `prompt`
-    // resolves; turn-level errors surface as `error` events on the event
-    // stream (handled in `forward()`), NOT through this return value. Callers
-    // must not assume `ok` means the agent finished successfully.
+    // `ask`/`ingest` only capture *synchronous* failures of `prompt()` (unknown
+    // command, disposed session). Turn-level errors surface as `error` events
+    // on the stream (handled in `forward()`), NOT through this return value.
     try {
       const live = this.currentPath ? this.liveSessions.get(this.currentPath) : undefined;
       if (!live) {
@@ -701,18 +673,12 @@ export class AgentRepository {
   /**
    * Retry the last chat turn by re-prompting with the same question.
    *
-   * This is intentionally NON-destructive: it does NOT branch the session.
-   * Branching (`navigateTree` to the parent of the last user message) was tried
-   * and rejected because Pi sessions do not persist the leaf pointer across
-   * restarts (`_buildIndex` resets it to the last entry) and `getBranch()`
-   * returns root→leaf order, so a branch-based retry targeted the OLDEST user
-   * message and wiped the conversation, leaving an empty session on restart.
-   *
-   * Re-prompting appends a fresh user+assistant pair (the previous failed
-   * assistant stays on the linear path as an empty `stopReason: "error"`
-   * entry). `extractMessages` drops those empty finalized assistants and
-   * collapses the resulting consecutive duplicate user messages, so the UI
-   * stays clean after restart without any destructive session mutation.
+   * Intentionally NON-destructive (no session branching): Pi sessions do not
+   * persist the leaf pointer across restarts, so a branch-based retry targeted
+   * the wrong message and wiped the conversation. Re-prompting appends a fresh
+   * user+assistant pair; `extractMessages` drops the empty failed assistant
+   * and collapses consecutive duplicate user messages, so the UI stays clean
+   * after restart without destructive session mutation.
    */
   async retryChat(question: string): Promise<Result<void>> {
     try {
@@ -729,34 +695,26 @@ export class AgentRepository {
 
   async ingest(): Promise<Result<void>> {
     try {
-      // Start every ingest in a fresh session so the agent has no stale
-      // memory of a wiki that may have been deleted externally. See
-      // resetIngestSession for the rationale.
+      // Start every ingest in a fresh session so the agent has no stale memory
+      // of a wiki that may have been deleted externally.
       await this.resetIngestSession();
 
       const before = await snapshotWiki(this.workspace);
 
       // /wiki-update hands non-conformant input files to the agent via
-      // `pi.sendUserMessage(...)`, which is fire-and-forget: the command
-      // handler returns immediately and `prompt("/wiki-update")` resolves
-      // BEFORE the agent turn finishes. The actual concept writing +
-      // input→archive moving happens during that turn and is finalized in
-      // the `agent_end` extension handler (finalizePendingUpdate), which runs
-      // BEFORE session event listeners receive `agent_end`. So we must wait
-      // for that turn to complete before snapshotting — otherwise the
-      // after-snapshot shows no new concepts and `leftover` still lists the
-      // input files (which get moved only on agent_end), making the IngestView
-      // claim the files were not processed.
+      // `pi.sendUserMessage(...)`, which is fire-and-forget: `prompt()` resolves
+      // BEFORE the agent turn finishes. The concept writing + input→archive
+      // moving happens during that turn and is finalized in the `agent_end`
+      // extension handler (finalizePendingUpdate), which runs BEFORE session
+      // event listeners receive `agent_end`. So we must wait for the turn to
+      // complete before snapshotting — otherwise the after-snapshot shows no
+      // new concepts and `leftover` still lists the input files.
       //
-      // For conformant-only (or empty) input no turn is started, so we must
-      // not wait forever: if no `agent_start` arrives within a grace window
-      // after the command returns, the run needed no turn and the state is
-      // already final.
-      //
-      // The wait is structured as a race so a mid-turn failure (`error`
-      // event) or a stuck turn (hard timeout) rejects instead of hanging
-      // the IngestView on "running" forever.
-      const TURN_GRACE_MS = 3000; // wait this long for agent_start after prompt
+      // For conformant-only (or empty) input no turn starts, so if no
+      // `agent_start` arrives within a grace window the state is already final.
+      // The wait is a race so a mid-turn failure or a stuck turn (hard timeout)
+      // rejects instead of hanging IngestView on "running" forever.
+      const TURN_GRACE_MS = 3000; // wait for agent_start after prompt
       const TURN_TIMEOUT_MS = 5 * 60 * 1000; // hard cap for a single turn
 
       let sawStart = false;
@@ -792,8 +750,7 @@ export class AgentRepository {
       try {
         await this.ingestSession.prompt("/wiki-update");
         // Race agent_start against a grace window. sendUserMessage is async,
-        // so agent_start may fire a few ticks after the command handler
-        // returns; if it doesn't fire at all, no turn was needed.
+        // so agent_start may fire a few ticks after the command handler returns.
         const noTurn = new Promise<false>((resolve) =>
           setTimeout(() => resolve(false), TURN_GRACE_MS),
         );
@@ -821,10 +778,9 @@ export class AgentRepository {
       const diff = diffSnapshots(before, after);
       const leftover = await listInputFiles(this.workspace);
 
-      // No-progress detection: a turn ran (sawStart) but the wiki did not
-      // change while input files remain. This is the signature of a failed
-      // turn that ended without `stopReason: "error"` (e.g. an empty provider
-      // response) — the agent_end listener above did not reject, so without
+      // No-progress detection: a turn ran (sawStart) but the wiki did not change
+      // while input files remain — the signature of a failed turn that ended
+      // without `stopReason: "error"` (e.g. an empty provider response). Without
       // this guard the UI would show "done" with 0 created and all files as
       // leftover, silently masking a misconfigured/unreachable provider.
       if (
@@ -851,9 +807,7 @@ export class AgentRepository {
 
   /**
    * Abort only the current chat session's in-flight turn. Background turns
-   * keep streaming (that is the point of parallel sessions) and the ingest
-   * session is left untouched. Idempotent: calling abort() on an already-idle
-   * session is harmless.
+   * keep streaming and the ingest session is left untouched. Idempotent.
    */
   async abortChat(): Promise<Result<void>> {
     try {
@@ -869,8 +823,8 @@ export class AgentRepository {
 
   async abort(): Promise<Result<void>> {
     try {
-      // Abort the current chat turn (background turns are left running — that
-      // is the point of parallel sessions) and any in-flight ingest turn.
+      // Abort the current chat turn (background turns keep running) and any
+      // in-flight ingest turn.
       if (this.currentPath) {
         const live = this.liveSessions.get(this.currentPath);
         if (live) await live.session.abort();
@@ -898,18 +852,12 @@ export class AgentRepository {
 /**
  * Create a fresh, isolated ingest session.
  *
- * The ingest session gets its OWN ExtensionRuntime, unaffected by the chat
- * sessions' lifecycles. All sessions share the same `services` (and thus the
- * same cached `extensionsResult.runtime`), so without the reload here the
- * ingest session would reuse a chat session's runtime. When that chat session
- * is later disposed, `dispose()` invalidates that shared runtime, and
- * `pi.sendUserMessage` inside /wiki-update would throw "stale ctx" — silently
- * breaking the ingest.
- *
- * Reloading builds a fresh `extensionsResult` with a new runtime; the chat
- * sessions keep their already-captured runtime references, and the ingest
- * session captures the fresh one — fully isolated. The optional `model` is
- * applied at creation so a recreated ingest session keeps the configured LLM.
+ * The ingest session gets its OWN ExtensionRuntime. Without the reload here it
+ * would reuse a chat session's runtime; when that chat session is later
+ * disposed, `dispose()` invalidates the shared runtime and `pi.sendUserMessage`
+ * inside /wiki-update would throw "stale ctx". Reloading builds a fresh runtime
+ * the chat sessions do not share. The optional `model` is applied at creation
+ * so a recreated ingest session keeps the configured LLM.
  */
 async function createIngestSession(
   pi: PiModule,
@@ -933,10 +881,8 @@ type AgentMessageLike = {
 };
 
 /**
- * Whether the last assistant message in an `agent_end` event was aborted.
- * The Pi agent finalizes an aborted turn with a final AssistantMessage whose
- * `stopReason === "aborted"`, so the renderer can distinguish a deliberate
- * stop from a normal/failed completion and skip the "no response" error.
+ * Whether the last assistant message in an `agent_end` event was aborted
+ * (`stopReason === "aborted"`), so the renderer skips the "no response" error.
  */
 function lastAssistantAborted(messages: ReadonlyArray<{ role?: string; stopReason?: string }>): boolean {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -947,10 +893,9 @@ function lastAssistantAborted(messages: ReadonlyArray<{ role?: string; stopReaso
 }
 
 /**
- * The error message of the last assistant message in an `agent_end` event,
- * when the turn failed (`stopReason === "error"`). Returns `undefined` for
- * normal/aborted turns. Used to surface the real failure (instead of the
- * generic "no response") now that automatic retry is disabled.
+ * The error message of the last assistant message in an `agent_end` event
+ * when the turn failed (`stopReason === "error"`); `undefined` for
+ * normal/aborted turns.
  */
 function lastAssistantErrorMessage(
   messages: ReadonlyArray<{ role?: string; stopReason?: string; errorMessage?: string }>,
@@ -959,11 +904,10 @@ function lastAssistantErrorMessage(
     const message = messages[i];
     if (message?.role === "assistant") {
       if (message.stopReason !== "error") return undefined;
-      // Provider errors arrive as the OpenAI SDK's `APIError` message, which
-      // formats as `${status} ${body}`. When the response body itself begins
-      // with the HTTP status code (plain-text pages like "404 page not found"),
-      // this doubles the prefix ("404 404 page not found"). Collapse the
-      // redundant leading status so the user sees the real server message once.
+      // Provider errors arrive as the OpenAI SDK's `APIError` message,
+      // formatted as `${status} ${body}`. When the body itself begins with the
+      // status code (e.g. "404 page not found"), this doubles the prefix.
+      // Collapse the redundant leading status.
       return dedupeProviderErrorMessage(message.errorMessage ?? "");
     }
   }
@@ -972,30 +916,25 @@ function lastAssistantErrorMessage(
 
 /**
  * Collapse the OpenAI SDK's doubled status prefix in provider error messages.
- *
- * The SDK (`openai/core/error.js`, `APIError.makeMessage`) formats provider
- * errors as `${status} ${msg}`. When `msg` is the raw response body and that
- * body itself starts with the status code (common for plain-text error pages,
- * e.g. "404 page not found"), the result is "404 404 page not found". This
- * detects "<status> <status><rest>" and returns "<status><rest>" (the body).
- * Messages that do not match the doubled pattern are returned unchanged, so
- * normal errors like "401 Unauthorized" or "404 Not Found" are untouched.
+ * `APIError.makeMessage` formats errors as `${status} ${msg}`; when `msg` is
+ * the raw body and starts with the status code (e.g. "404 page not found"),
+ * the result is "404 404 page not found". This detects "<status> <status><rest>"
+ * and returns "<status><rest>". Non-matching messages are unchanged.
  */
 function dedupeProviderErrorMessage(message: string): string {
   const match = /^(\d{3}) \1(?=\D)(.*)$/.exec(message);
   return match ? `${match[1]}${match[2]}` : message;
 }
 
-/** Map raw agent messages to the renderer's ChatMessage list (strips the
+/** Map raw agent messages to the renderer's ChatMessage list: strips the
  *  /wiki-query command prefix from user messages, drops empty finalized
  *  assistant messages, and collapses consecutive duplicate user messages
- *  left behind by retries). Shared by live-session and disk-backed reads. */
+ *  left behind by retries. */
 function extractMessages(messages: ReadonlyArray<AgentMessageLike>): ChatMessage[] {
   const out: ChatMessage[] = [];
-  // Tracks the text of the most recently pushed user message so that a run of
+  // Tracks the text of the most recently pushed user message so a run of
   // identical consecutive user messages (each retry re-prompts, appending a
-  // duplicate user entry) collapses to a single one in the UI. Reset whenever a
-  // non-user message is pushed.
+  // duplicate) collapses to a single one. Reset by any non-user message.
   let lastUserText: string | undefined;
   for (const message of messages) {
     const role = (message as { role?: string }).role;
@@ -1005,11 +944,10 @@ function extractMessages(messages: ReadonlyArray<AgentMessageLike>): ChatMessage
     );
     const clean = role === "user" ? stripQueryCommand(text) : text;
     // Drop empty user AND empty assistant messages. A finalized empty
-    // assistant message is always a failed/aborted turn artifact (during
-    // streaming the partial lives in `streamingAssistantText`, not in
-    // `state.messages`); keeping it would surface as empty bubbles and, after
-    // a restart, as the “multiple empty responses” bug. Dropping it here also
-    // self-heals sessions already corrupted by the old retry path.
+    // assistant is always a failed/aborted turn artifact (during streaming the
+    // partial lives in `streamingAssistantText`); keeping it would surface as
+    // empty bubbles. Dropping it also self-heals sessions corrupted by the old
+    // retry path.
     if (clean.trim() === "") continue;
     if (role === "user") {
       if (clean === lastUserText && out.length > 0 && out[out.length - 1].role === "user") {
@@ -1076,10 +1014,9 @@ async function fetchModelList(url: string, apiKey?: string): Promise<readonly st
 }
 
 /**
- * Fetch Ollama local + cloud models. Local fetch failure (server not running)
- * and cloud fetch failure (no network) are swallowed independently: the
- * dropdown gets whichever sources succeeded. Only if both fail does this
- * throw, surfacing the local error (the more actionable one for Ollama).
+ * Fetch Ollama local + cloud models. Local and cloud fetch failures are
+ * swallowed independently: the dropdown gets whichever sources succeeded.
+ * Only if both fail does this throw, surfacing the local error.
  */
 async function fetchOllamaModels(baseUrl: string): Promise<readonly ModelOption[]> {
   const localIds = await fetchModelList(`${baseUrl}/models`).catch(() => [] as string[]);

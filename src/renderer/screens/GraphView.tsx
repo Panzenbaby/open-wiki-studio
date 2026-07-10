@@ -62,7 +62,6 @@ export function GraphView(): JSX.Element {
   const graphRef = useRef<ForceGraphMethods<GraphScreenNode, GraphScreenLink> | undefined>(undefined);
   const [size, setSize] = useState<{ width: number; height: number }>({ width: 800, height: 600 });
 
-  // Load graph data once on mount.
   useEffect(() => {
     let cancelled = false;
     void (async () => {

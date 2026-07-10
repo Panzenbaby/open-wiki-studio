@@ -22,7 +22,7 @@ interface ContextMenuProps {
 /**
  * Lightweight custom right-click menu. Renders a full-screen transparent
  * backdrop to catch outside clicks/Escape, plus a positioned menu near the
- * cursor. Menu is clamped to the viewport so it never overflows.
+ * cursor, clamped to the viewport.
  */
 export function ContextMenu(props: ContextMenuProps): JSX.Element | null {
   const { position, items, onClose } = props;

@@ -4,9 +4,6 @@
 import { atom, useAtomValue } from "jotai";
 import { t, type Locale, type I18nParams } from "../shared/i18n.ts";
 
-export type { Locale, I18nParams };
-export { messages } from "../shared/i18n.ts";
-
 export const localeAtom = atom<Locale>(detectLocale());
 
 function detectLocale(): Locale {

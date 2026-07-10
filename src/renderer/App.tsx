@@ -43,13 +43,10 @@ export function App(): JSX.Element {
   const setStreamingSessions = useSetAtom(streamingSessionsAtom);
   const store = useStore();
 
-  // Set the document title to the localized app name.
   useEffect(() => {
     document.title = t("app.name");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locale]);
-
-  // Bootstrap: list recent workspaces + detect platform; start at the picker.
 
   useEffect(() => {
     void (async () => {
@@ -88,18 +85,17 @@ export function App(): JSX.Element {
           next.delete(event.sessionPath);
           return next;
         });
-        // Keep session list fresh so sidebar names + streaming dots stay current.
+        // Keep the session list fresh so sidebar names + streaming dots stay current.
         bumpTurnEnded((n) => n + 1);
         if (isCurrent) {
           setChatStreaming(false);
           if (event.lastError) {
             // The turn failed (stopReason "error") — show the real error
-            // immediately instead of the generic "no response" banner.
+            // instead of the generic "no response" banner.
             setChatError(event.lastError);
           } else if (!event.aborted) {
-            // A deliberately aborted turn (Stop button) must not surface a red
-            // "no response" error banner — the user chose to stop. Only flag a
-            // missing response for non-aborted turns that produced nothing.
+            // A deliberately aborted turn (Stop button) must not surface a
+            // "no response" error — the user chose to stop.
             const messages = store.get(messagesAtom);
             const last = messages[messages.length - 1];
             if (!last || last.role !== "assistant" || last.text.trim() === "") {
@@ -135,10 +131,7 @@ export function App(): JSX.Element {
       } else if (event.type === "agent_end") {
         if (event.lastError) {
           // Turn failed (stopReason "error") — surface the real error and
-          // reset to idle instead of showing a misleading "done". This is
-          // the redundant path to the IPC return value from repo.ingest();
-          // both carry the same failure so the user never sees a silent
-          // "done" when the provider was unreachable/misconfigured.
+          // reset to idle instead of showing a misleading "done".
           setIngestState("idle");
           setIngestError(event.lastError);
         } else {
@@ -151,10 +144,9 @@ export function App(): JSX.Element {
     });
     const offSummary = api.onIngestSummary((summary) => {
       setIngestSummary(summary);
-      // The summary is sent by the main process only after the ingest fully
-      // completes (including any agent turn). It is the reliable completion
-      // signal for conformant-only runs, which trigger NO agent_start/agent_end
-      // events — without this, those runs would stay stuck on "running".
+      // The summary is sent only after the ingest fully completes (including
+      // any agent turn). It is the reliable completion signal for
+      // conformant-only runs, which trigger NO agent_start/agent_end events.
       setIngestState("done");
     });
     return () => {

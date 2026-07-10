@@ -1,8 +1,7 @@
 // Remark plugin: auto-link bare wiki/concept paths in assistant text so that
 // references the agent wrote as plain text (e.g. "Quelle: wiki/foo/bar.md")
-// become real markdown links -> rendered as clickable chips by Message.tsx.
-// Existing markdown links and inline code are left untouched (they are already
-// separate mdast nodes), and text inside a link node is skipped.
+// become real markdown links rendered as clickable chips by Message.tsx.
+// Existing markdown links and inline code are left untouched.
 
 interface MdastNode {
   type: string;

@@ -19,9 +19,8 @@ function configPath(): string {
 }
 
 // Serialize config reads+writes. Without this, two concurrent
-// `setLlmConfig` / `rememberWorkspace` calls interleave their
-// read-modify-write cycles and the last writer wins, silently dropping one
-// update. A simple promise chain is enough — config access is low-frequency.
+// `setLlmConfig` / `rememberWorkspace` calls interleave their read-modify-
+// write cycles and the last writer wins, silently dropping one update.
 let configChain: Promise<unknown> = Promise.resolve();
 function withConfigLock<T>(work: () => Promise<T>): Promise<T> {
   const run = configChain.then(work, work);
@@ -67,10 +66,6 @@ function toInfo(folderPath: string): WorkspaceInfo {
 export async function listRecentWorkspaces(): Promise<Result<readonly WorkspaceInfo[]>> {
   const config = await readConfig();
   return ok(config.recentWorkspaces);
-}
-
-export async function getLastWorkspace(): Promise<string | undefined> {
-  return (await readConfig()).lastWorkspace;
 }
 
 export async function rememberWorkspace(

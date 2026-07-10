@@ -49,12 +49,11 @@ export function Chat(): JSX.Element {
     if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
   }, [messages, streaming]);
 
-  // Shared turn runner: evaluates the Result of `ask`/`retryChat` and
-  // surfaces synchronous failures as the chat error banner. The
-  // `chatStreamingAtom` is NOT touched here — it is driven solely by the
-  // `agent_start`/`agent_end` events handled in App.tsx, so a command that
-  // starts no turn (e.g. /wiki-query with an empty wiki) does not leave the
-  // composer stuck in a streaming state.
+  // Shared turn runner: evaluates the Result of `ask`/`retryChat` and surfaces
+  // synchronous failures as the chat error banner. `chatStreamingAtom` is
+  // NOT touched here — it is driven solely by the `agent_start`/`agent_end`
+  // events handled in App.tsx, so a command that starts no turn does not leave
+  // the composer stuck.
   async function runTurn(action: Promise<Result<void>>): Promise<void> {
     try {
       const result = await action;
@@ -85,9 +84,9 @@ export function Chat(): JSX.Element {
       if (!result.success) {
         setChatError(result.error.message);
       } else {
-        // abortChat() resolves only after the agent is idle. agent_end does
-        // NOT fire for an abort of an already-idle session, so clear the
-        // streaming flag here to avoid a stuck Stop button.
+      // abortChat() resolves only after the agent is idle. agent_end does NOT
+      // fire for an abort of an already-idle session, so clear the streaming
+      // flag here to avoid a stuck Stop button.
         setStreaming(false);
       }
     } catch (error) {
@@ -102,12 +101,11 @@ export function Chat(): JSX.Element {
     setChatError(null);
     setPending(true);
     // Remove the last assistant message unconditionally (empty OR partial) so
-    // the new turn streams a fresh assistant bubble instead of appending to a
-    // failed one. The failed assistant stays on the session's append-only disk
-    // path but is dropped from the view by `extractMessages` (empty finalized
-    // assistants are discarded), and the duplicate user entry that re-prompting
-    // appends is collapsed there too — so the history stays clean after a
-    // restart without any destructive session mutation.
+    // the new turn streams a fresh assistant bubble. The failed assistant
+    // stays on the append-only disk path but is dropped by `extractMessages`,
+    // and the duplicate user entry from re-prompting is collapsed there too —
+    // so the history stays clean after a restart without destructive session
+    // mutation.
     setMessages((prev) => {
       const last = prev[prev.length - 1];
       if (last && last.role === "assistant") return prev.slice(0, -1);

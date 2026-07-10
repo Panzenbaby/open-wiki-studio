@@ -117,7 +117,7 @@ export function AppShell(): JSX.Element {
   }
 
   // Switch session (centralized for sidebar + dashboard). Preserves streaming
-  // state on the composer for sessions with an in-flight background turn.
+  // state for sessions with an in-flight background turn.
   async function openSession(path: string): Promise<void> {
     const opened = await api.openSession(path);
     if (!opened.success) return;
@@ -132,7 +132,7 @@ export function AppShell(): JSX.Element {
     setChatError(null);
   }
 
-  // Start a fresh session. A new session never has an in-flight turn.
+  // Start a fresh session — it never has an in-flight turn.
   async function startNewSession(): Promise<void> {
     const created = await api.newSession();
     if (!created.success) return;
@@ -143,11 +143,10 @@ export function AppShell(): JSX.Element {
     await refreshSessions();
   }
 
-  // Kick off /wiki-update from any entry point (dashboard button, ingest bar,
-  // ingest view). Resets the ingest state machine so the previous run's
-  // stream/summary/"done" state does not linger while the new run starts,
-  // navigates to the ingest view, and surfaces IPC-level errors (turn-level
-  // errors arrive via the ingest event stream and are handled in App.tsx).
+  // Kick off /wiki-update from any entry point. Resets the ingest state machine
+  // so the previous run's state does not linger, navigates to the ingest view,
+  // and surfaces IPC-level errors (turn-level errors arrive via the ingest
+  // event stream and are handled in App.tsx).
   async function runIngest(): Promise<void> {
     setView("ingest");
     setIngestSummary(null);
@@ -170,7 +169,7 @@ export function AppShell(): JSX.Element {
         if (opened.success) {
           setCurrentSession(opened.data);
           await loadMessages(opened.data.path);
-          // No turn is running at startup, but keep the flag honest.
+          // No turn is running at startup.
           setChatStreaming(false);
           setChatError(null);
         }
@@ -192,9 +191,7 @@ useEffect(() => {
   }, [ingestSummary]);
 
   // Refresh folder counts whenever the user returns to the dashboard so
-  // changes made in the Browser (adding/removing input files) are reflected.
-  // Without this, counts stay stale after adding files and the dashboard's
-  // "input pending" hero / Run /wiki-update button would not appear.
+  // changes made in the Browser are reflected.
   useEffect(() => {
     if (view === "dashboard") void refreshCounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -206,7 +203,7 @@ useEffect(() => {
   }, [messages.length]);
 
   // Refresh the session list whenever a chat turn ends so the
-  // most-recently-active session (updated lastModified) bubbles to the top.
+  // most-recently-active session bubbles to the top.
   useEffect(() => {
     if (turnEnded === 0) return;
     void refreshSessions();
@@ -226,11 +223,10 @@ useEffect(() => {
 
   const handleDeleteSession = async (path: string): Promise<void> => {
     const isCurrent = currentSession?.path === path;
-    // If we're deleting the active session, switch the runtime to a fresh
-    // session FIRST — the repository refuses to delete the session it is
-    // currently bound to (unlinking it would leave the runtime in a bad
-    // state). Switching before deleting keeps the file valid until the
-    // runtime has moved on.
+    // If deleting the active session, switch the runtime to a fresh session
+    // FIRST — the repository refuses to delete the session it is bound to.
+    // Switching before deleting keeps the file valid until the runtime has
+    // moved on.
     if (isCurrent) {
       const created = await api.newSession();
       if (created.success) {
@@ -245,8 +241,8 @@ useEffect(() => {
     }
     const result = await api.deleteSession(path);
     if (!result.success) {
-      // Delete failed; if we switched away for this, the user is now on a
-      // fresh empty session, which is an acceptable state. Refresh anyway.
+      // Delete failed; if we switched away, the user is now on a fresh empty
+      // session, which is acceptable. Refresh anyway.
       await refreshSessions();
       return;
     }

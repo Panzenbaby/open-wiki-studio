@@ -21,9 +21,9 @@ function workspaceDir(workspace: string, folder: Folder): string {
 
 /**
  * Resolve `relativePath` under `baseDir` and guard against traversal. Returns
- * null when the resolved path escapes `baseDir` (e.g. `../../etc/passwd`) or
- * when `relativePath` is absolute. The renderer is local/trusted, but IPC
- * handlers are reachable from any renderer frame, so we validate defensively.
+ * null when the resolved path escapes `baseDir` or `relativePath` is absolute.
+ * The renderer is trusted, but IPC handlers are reachable from any renderer
+ * frame, so we validate defensively.
  */
 function safeResolve(baseDir: string, relativePath: string): string | null {
   if (relativePath === "" || isAbsolute(relativePath)) return null;
