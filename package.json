@@ -1,11 +1,41 @@
 {
   "name": "open-wiki-studio",
   "version": "0.1.0",
-  "description": "Local desktop app that wraps a Pi agent running the pi-open-wiki extension.",
+  "description": "Local desktop app (Windows, macOS, Linux) that turns your documents into a queryable Markdown wiki. An on-device AI agent reads your files, writes linked OKF concepts, and answers chat questions with citations back to the source concepts. Everything stays local except the LLM calls you connect.",
   "type": "module",
   "license": "MIT",
   "main": "./out/main/index.js",
-  "author": "Panzenbaby",
+  "author": {
+    "name": "Panzenbaby",
+    "url": "https://github.com/Panzenbaby"
+  },
+  "homepage": "https://github.com/Panzenbaby/open-wiki-studio",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Panzenbaby/open-wiki-studio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Panzenbaby/open-wiki-studio/issues"
+  },
+  "keywords": [
+    "wiki",
+    "knowledge-base",
+    "knowledge-graph",
+    "llm",
+    "ai",
+    "rag",
+    "markdown",
+    "okf",
+    "open-knowledge-format",
+    "electron",
+    "desktop",
+    "local-first",
+    "pi-coding-agent"
+  ],
+  "engines": {
+    "node": ">=22.19.0",
+    "npm": ">=10"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -14,6 +44,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "package": "npm run package:mac && npm run package:win && npm run package:linux",
+    "release:patch": "npm version patch -m \"chore(release): %s\"",
+    "release:minor": "npm version minor -m \"chore(release): %s\"",
+    "release:major": "npm version major -m \"chore(release): %s\"",
     "package:mac": "electron-vite build && electron-builder --mac --arm64 --x64",
     "package:win": "electron-vite build && electron-builder --win --arm64 --x64",
     "package:linux": "electron-vite build && electron-builder --linux --arm64 --x64"
@@ -40,11 +73,21 @@
     "typebox": "*",
     "typescript": "^5.5.4",
     "vite": "^5.3.3",
-    "vitest": "^4.1.10"
+    "vitest": "^3.2.4"
   },
   "build": {
-    "appId": "dev.panzenbaby.openwikistudio",
+    "appId": "de.panzenlabs.openwikistudio",
     "productName": "Open Wiki Studio",
+    "copyright": "Copyright © 2026 Panzenbaby",
+    "directories": {
+      "output": "release"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Panzenbaby",
+      "repo": "open-wiki-studio",
+      "releaseType": "release"
+    },
     "icon": "build/icon",
     "files": [
       "out/**/*",

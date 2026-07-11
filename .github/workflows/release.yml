@@ -1,0 +1,70 @@
+name: Release
+
+# Triggers:
+#  1) push of a version tag like `v0.1.0`  ->  tests + build + GitHub Release
+#  2) manual run from the Actions tab (workflow_dispatch)
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+# Required: electron-builder creates the GitHub Release and uploads assets
+# using the automatic GITHUB_TOKEN (passed to it as GH_TOKEN below).
+permissions:
+  contents: write
+
+jobs:
+  # --- 1. Tests gate the build -------------------------------------------
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Static type-check (tsc --noEmit)
+      - run: npm run check
+
+      # Unit tests (vitest run, exits non-zero on failure)
+      - run: npm test
+
+  # --- 2. Build per platform + publish to the GitHub Release ------------
+  # `npm run package` chains all three `package:<os>` scripts, but a single
+  # runner cannot produce a native mac dmg + Windows NSIS + Linux AppImage.
+  # So we fan out to one runner per OS and call the matching package script.
+  # electron-builder publishes each platform's installer (and latest*.yml)
+  # directly to the GitHub Release bound to the pushed tag, using GH_TOKEN.
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            script: package:mac
+          - os: windows-latest
+            script: package:win
+          - os: ubuntu-latest
+            script: package:linux
+    runs-on: ${{ matrix.os }}
+    env:
+      # electron-builder reads GH_TOKEN to authenticate against the GitHub
+      # API. The automatic GITHUB_TOKEN has contents:write (see above), which
+      # is enough to create the release and upload assets — no PAT needed.
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run ${{ matrix.script }}

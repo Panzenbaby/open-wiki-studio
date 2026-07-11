@@ -8,6 +8,13 @@
 
 </div>
 
+<p align="center">
+  <picture>
+    <source srcset="docs/assets/hero-banner.webp" type="image/webp">
+    <img src="docs/assets/hero-banner.png" alt="Open Wiki Studio — turn your documents into a queryable Markdown wiki" width="100%">
+  </picture>
+</p>
+
 # Open Wiki Studio
 
 Open Wiki Studio is a local desktop app (Windows, macOS, Linux) that turns
@@ -20,6 +27,29 @@ Everything stays local except the calls to the language model (LLM) you
 connect. The wiki is plain Markdown following the
 [OKF (Open Knowledge Format)](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
 spec, so your knowledge base is portable and not locked into this app.
+
+<p align="center"><sub>A quick tour — click any frame to enlarge.</sub></p>
+
+<table>
+  <tr>
+    <td align="center"><a href="docs/screenshots/01-workspace-picker.webp"><img src="docs/screenshots/01-workspace-picker.thumb.webp" width="150" alt="Workspace picker"></a></td>
+    <td align="center"><a href="docs/screenshots/02-llm-provider-settings.webp"><img src="docs/screenshots/02-llm-provider-settings.thumb.webp" width="150" alt="LLM provider settings"></a></td>
+    <td align="center"><a href="docs/screenshots/03-dashboard-pre-ingest.webp"><img src="docs/screenshots/03-dashboard-pre-ingest.thumb.webp" width="150" alt="Dashboard before ingest"></a></td>
+    <td align="center"><a href="docs/screenshots/04-ingest-done.webp"><img src="docs/screenshots/04-ingest-done.thumb.webp" width="150" alt="Wiki update complete"></a></td>
+    <td align="center"><a href="docs/screenshots/05-wiki-concepts.webp"><img src="docs/screenshots/05-wiki-concepts.thumb.webp" width="150" alt="Wiki concepts"></a></td>
+    <td align="center"><a href="docs/screenshots/06-wiki-graph.webp"><img src="docs/screenshots/06-wiki-graph.thumb.webp" width="150" alt="Knowledge graph"></a></td>
+    <td align="center"><a href="docs/screenshots/07-chat.webp"><img src="docs/screenshots/07-chat.thumb.webp" width="150" alt="Chat with citations"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Select workspace</sub></td>
+    <td align="center"><sub>Setup LLM</sub></td>
+    <td align="center"><sub>Dashboard</sub></td>
+    <td align="center"><sub>Wiki update</sub></td>
+    <td align="center"><sub>View wiki</sub></td>
+    <td align="center"><sub>View graph</sub></td>
+    <td align="center"><sub>Ask questions</sub></td>
+  </tr>
+</table>
 
 ---
 
