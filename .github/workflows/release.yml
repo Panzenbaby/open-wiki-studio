@@ -120,12 +120,28 @@ jobs:
           $root.Add($cert)
           $root.Close()
 
-      - name: Build & publish
+      # Build & publish, split per platform so each job only defines the env
+      # vars its signing path needs. CRITICAL: on mac, CSC_LINK / CSC_KEY_PASSWORD
+      # must stay UNDEFINED (not empty string) — electron-builder treats `""` as
+      # "a link is set" (getCscLink returns "" which is != null), enters its
+      # createKeychain path with an empty link, resolves it to the workspace dir
+      # and fails with "not a file". With CSC_LINK undefined, getCscLink returns
+      # undefined and electron-builder uses the CSC_NAME keychain identity that
+      # the "Import & trust mac signing identity" step installed above.
+      - name: Build & publish (mac)
+        if: matrix.os == 'macos-latest'
         env:
-          # mac: pick the imported identity by name; win/linux: empty (unused).
-          CSC_NAME: ${{ matrix.os == 'macos-latest' && 'Open Wiki Studio' || '' }}
-          # windows: hand the self-signed p12 + password to electron-builder
-          # (it drives signtool). Other platforms: empty (short-circuited).
-          CSC_LINK: ${{ matrix.os == 'windows-latest' && secrets.WIN_CSC_LINK || '' }}
-          CSC_KEY_PASSWORD: ${{ matrix.os == 'windows-latest' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
+          CSC_NAME: Open Wiki Studio
+        run: npm run ${{ matrix.script }}
+
+      - name: Build & publish (windows)
+        if: matrix.os == 'windows-latest'
+        env:
+          # electron-builder drives signtool directly from the p12.
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: npm run ${{ matrix.script }}
+
+      - name: Build & publish (linux)
+        if: matrix.os == 'ubuntu-latest'
         run: npm run ${{ matrix.script }}
