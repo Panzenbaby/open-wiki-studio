@@ -670,3 +670,4 @@ button.folder-card:focus-visible { outline: 2px solid var(--accent); outline-off
 .modal-body { color: var(--fg-2); font-size: var(--text-sm); line-height: 1.5; }
 .modal-body p { margin: 0; }
 .modal-footer { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-2); }
+.settings-version { margin: var(--space-4) 0 0; text-align: center; font-size: var(--text-xs); }

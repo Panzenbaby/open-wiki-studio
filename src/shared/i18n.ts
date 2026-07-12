@@ -100,6 +100,7 @@ export const messages: Record<Locale, Dict> = {
     "settings.save": "Save",
     "settings.loading": "Loading configuration…",
     "settings.cancel": "Cancel",
+    "settings.version": "Version {version}",
 
     // ── dashboard ─────────────────────────────────────────────────
     "dashboard.kicker": "Workspace · {name}",
@@ -354,6 +355,7 @@ export const messages: Record<Locale, Dict> = {
     "settings.save": "Speichern",
     "settings.loading": "Lade Konfiguration…",
     "settings.cancel": "Abbrechen",
+    "settings.version": "Version {version}",
 
     // ── dashboard ─────────────────────────────────────────────────
     "dashboard.kicker": "Workspace · {name}",

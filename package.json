@@ -1,6 +1,6 @@
 {
   "name": "open-wiki-studio",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local desktop app (Windows, macOS, Linux) that turns your documents into a queryable Markdown wiki. An on-device AI agent reads your files, writes linked OKF concepts, and answers chat questions with citations back to the source concepts. Everything stays local except the LLM calls you connect.",
   "type": "module",
   "license": "MIT",
