@@ -123,7 +123,8 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "signingHashAlgorithms": ["sha256"]
     },
     "linux": {
       "target": "AppImage",
