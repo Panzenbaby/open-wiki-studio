@@ -5,6 +5,7 @@ import { bindAgentEvents } from "./agent-events.ts";
 import {
   platformAtom,
   recentWorkspacesAtom,
+  currentVersionAtom,
   screenAtom,
 } from "./store.ts";
 import { useT, localeAtom } from "./i18n.ts";
@@ -20,6 +21,7 @@ export function App(): JSX.Element {
   const [screen, setScreen] = useAtom(screenAtom);
   const setRecent = useSetAtom(recentWorkspacesAtom);
   const setPlatform = useSetAtom(platformAtom);
+  const setCurrentVersion = useSetAtom(currentVersionAtom);
   const store = useStore();
 
   useEffect(() => {
@@ -32,10 +34,13 @@ export function App(): JSX.Element {
       const recent = await api.listRecentWorkspaces();
       if (recent.success) setRecent(recent.data);
       const self = await api.getAppSelf();
-      if (self.success) setPlatform(self.data.platform);
+      if (self.success) {
+        setPlatform(self.data.platform);
+        setCurrentVersion(self.data.version);
+      }
       setScreen("picker");
     })();
-  }, [setRecent, setScreen, setPlatform]);
+  }, [setRecent, setScreen, setPlatform, setCurrentVersion]);
 
   useEffect(() => bindAgentEvents(api, store, locale), [store, locale]);
 

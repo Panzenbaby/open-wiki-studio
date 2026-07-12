@@ -53,6 +53,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.80.3",
+    "electron-updater": "^6.8.9",
     "jotai": "^2.10.0",
     "lucide-react": "^1.23.0",
     "pi-okf-wiki": "github:Panzenbaby/pi-okf-wiki#0.1.4",
@@ -124,7 +125,9 @@
     "win": {
       "target": "nsis",
       "icon": "build/icon.ico",
-      "signingHashAlgorithms": ["sha256"]
+      "signingHashAlgorithms": [
+        "sha256"
+      ]
     },
     "linux": {
       "target": "AppImage",

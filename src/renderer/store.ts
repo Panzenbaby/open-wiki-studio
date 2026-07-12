@@ -4,6 +4,8 @@ import type {
   ChatMessage,
   IngestSummary,
   SessionInfo,
+  UpdateInfo,
+  UpdateStatus,
   WorkspaceInfo,
 } from "../shared/ipc-types.ts";
 
@@ -22,6 +24,8 @@ export const recentWorkspacesAtom = atom<readonly WorkspaceInfo[]>([]);
 export const llmConfiguredAtom = atom<boolean>(false);
 /** Electron process.platform (darwin/win32/linux/…), for OS-adaptive UI. */
 export const platformAtom = atom<string>("");
+/** App version reported by the main process (`app.getVersion()`). */
+export const currentVersionAtom = atom<string>("");
 export const toastAtom = atom<{ message: string; kind: "info" | "error" } | null>(null);
 
 // folder counts (dashboard)
@@ -61,3 +65,10 @@ export const ingestErrorAtom = atom<string | null>(null);
 export const browserFolderAtom = atom<"input" | "wiki" | "archive">("wiki");
 export const browserModeAtom = atom<BrowserMode>("files");
 export const selectedFileAtom = atom<string | null>(null);
+
+// auto-update — state machine fed by `UpdateEvent`s from the main process.
+// `lastAvailableInfoAtom` is internal bookkeeping so a download error can
+// revert the badge to the pulsing "available" state (with its version info).
+export const updateStateAtom = atom<UpdateStatus>({ status: "idle" });
+const lastAvailableInfoAtom = atom<UpdateInfo | null>(null);
+export { lastAvailableInfoAtom };

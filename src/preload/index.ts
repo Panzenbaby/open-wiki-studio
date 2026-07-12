@@ -1,7 +1,7 @@
 // Preload: exposes a strictly-typed AgentApi to the renderer via contextBridge.
 // Event methods subscribe to the streaming channels from the main process.
 import { contextBridge, ipcRenderer } from "electron";
-import type { AgentApi, AgentEvent, CopilotLoginEvent, IngestSummary } from "../shared/ipc-types.ts";
+import type { AgentApi, AgentEvent, CopilotLoginEvent, IngestSummary, UpdateEvent } from "../shared/ipc-types.ts";
 
 const api: AgentApi = {
   getAppSelf: () => ipcRenderer.invoke("okf:getAppSelf"),
@@ -17,6 +17,10 @@ const api: AgentApi = {
   cancelCopilotLogin: () => ipcRenderer.invoke("okf:cancelCopilotLogin"),
   logoutCopilot: () => ipcRenderer.invoke("okf:logoutCopilot"),
   openExternal: (url) => ipcRenderer.invoke("okf:openExternal", url),
+
+  // auto-update
+  downloadUpdate: () => ipcRenderer.invoke("okf:downloadUpdate"),
+  installUpdateNow: () => ipcRenderer.invoke("okf:installUpdateNow"),
 
   listFolder: (folder) => ipcRenderer.invoke("okf:listFolder", folder),
   getPreview: (relativePath) => ipcRenderer.invoke("okf:getPreview", relativePath),
@@ -56,6 +60,11 @@ const api: AgentApi = {
     const handler = (_event: unknown, payload: CopilotLoginEvent) => listener(payload);
     ipcRenderer.on("okf:copilot-login-event", handler);
     return () => ipcRenderer.removeListener("okf:copilot-login-event", handler);
+  },
+  onUpdateEvent: (listener) => {
+    const handler = (_event: unknown, payload: UpdateEvent) => listener(payload);
+    ipcRenderer.on("okf:update-event", handler);
+    return () => ipcRenderer.removeListener("okf:update-event", handler);
   },
 };
 

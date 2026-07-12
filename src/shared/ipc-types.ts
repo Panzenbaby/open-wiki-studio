@@ -133,6 +133,31 @@ export interface WikiGraph {
   readonly edges: readonly GraphEdge[];
 }
 
+// ─── App auto-update ────────────────────────────────────────────────
+// The renderer drives the update UI from a small state machine fed by
+// `UpdateEvent`s streamed from the main-process `UpdateRepository` (which
+// wraps electron-updater — the external SDK never leaks past the repository).
+/** Available update metadata (AppModel — the electron-updater DTO stays in
+ *  the repository). `releaseNotesUrl` points at the GitHub Release page. */
+export interface UpdateInfo {
+  readonly version: string;
+  readonly releaseNotesUrl: string;
+}
+
+/** Renderer state machine for the update badge in the app bar. */
+export type UpdateStatus =
+  | { readonly status: "idle" }
+  | { readonly status: "available"; readonly info: UpdateInfo }
+  | { readonly status: "downloading"; readonly info: UpdateInfo; readonly percent: number }
+  | { readonly status: "ready"; readonly info: UpdateInfo };
+
+/** Events streamed from main → renderer over the `okf:update-event` channel. */
+export type UpdateEvent =
+  | { readonly type: "available"; readonly info: UpdateInfo }
+  | { readonly type: "progress"; readonly percent: number }
+  | { readonly type: "downloaded"; readonly info: UpdateInfo }
+  | { readonly type: "error"; readonly message: string };
+
 // ─── IPC contract ────────────────────────────────────────────────────
 export interface AgentApi {
   // workspace & app
@@ -169,6 +194,15 @@ export interface AgentApi {
   // external
   /** Open a URL in the default browser (Copilot verification URL). */
   openExternal(url: string): Promise<Result<void>>;
+
+  // auto-update
+  /** Start downloading the update whose availability was signalled via
+   *  `onUpdateEvent`. Progress + completion arrive as `UpdateEvent`s. */
+  downloadUpdate(): Promise<Result<void>>;
+  /** Quit the app and install the already-downloaded update immediately. */
+  installUpdateNow(): Promise<Result<void>>;
+  /** Subscribe to the update event stream. Returns an unsubscribe function. */
+  onUpdateEvent(listener: (event: UpdateEvent) => void): () => void;
 
   // files
   listFolder(folder: Folder): Promise<Result<readonly FileNode[]>>;

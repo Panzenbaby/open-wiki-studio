@@ -635,3 +635,38 @@ button.folder-card:focus-visible { outline: 2px solid var(--accent); outline-off
 .legend-list { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-2); }
 .legend-item { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--fg-2); }
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* ─── auto-update badge + progress ring + modal ─────────────────────── */
+.update-badge { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.update-badge.available { color: var(--danger); animation: update-pulse 1.4s var(--ease-standard) infinite; }
+.update-badge.ready { color: var(--success); }
+.update-badge.available:hover { color: var(--danger); }
+@keyframes update-pulse {
+  0%   { transform: scale(0.8); opacity: 0.55; }
+  50%  { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(0.8); opacity: 0.55; }
+}
+.update-ring { display: inline-flex; align-items: center; justify-content: center; margin-inline: var(--space-1); }
+.update-ring svg { display: block; }
+
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 70;
+  background: color-mix(in oklab, var(--bg), #000 55%);
+  backdrop-filter: var(--glass-blur);
+  display: grid; place-items: center;
+  opacity: 0; animation: modal-fade var(--motion-fast) var(--ease-standard) forwards;
+}
+@keyframes modal-fade { to { opacity: 1; } }
+.modal-card {
+  width: min(440px, calc(100% - var(--space-8) * 2));
+  background: color-mix(in oklab, var(--bg), #000 22%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--elev-raised);
+  display: flex; flex-direction: column; gap: var(--space-4);
+}
+.modal-title { font-size: var(--text-base); font-weight: 600; color: var(--fg); margin: 0; }
+.modal-body { color: var(--fg-2); font-size: var(--text-sm); line-height: 1.5; }
+.modal-body p { margin: 0; }
+.modal-footer { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-2); }

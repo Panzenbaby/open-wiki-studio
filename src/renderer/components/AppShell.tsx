@@ -32,6 +32,7 @@ import { Browser } from "../screens/Browser.tsx";
 import { IngestView } from "../screens/IngestView.tsx";
 import { Settings } from "../screens/Settings.tsx";
 import { IngestBar } from "./IngestBar.tsx";
+import { UpdateBadge } from "./UpdateBadge.tsx";
 
 export function AppShell(): JSX.Element {
   const t = useT();
@@ -310,6 +311,7 @@ useEffect(() => {
         {navBtn("chat", t("nav.chat"))}
         {navBtn("browser", t("nav.files"))}
         <button className="iconbtn" onClick={() => setView("settings")} title={t("nav.settings")}><SettingsIcon size={16} /></button>
+        <UpdateBadge />
       </header>
       <div className="body">
         {view === "chat" && (

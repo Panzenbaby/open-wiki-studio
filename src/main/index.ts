@@ -12,9 +12,10 @@ import {
   listRecentWorkspaces,
   rememberWorkspace,
 } from "./config.ts";
+import { createUpdateRepository, type UpdateRepository } from "./update-repository.ts";
 import { ok, err, errorMessage } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
-import type { ProviderId, Result, WorkspaceInfo } from "../shared/ipc-types.ts";
+import type { ProviderId, Result, UpdateEvent, WorkspaceInfo } from "../shared/ipc-types.ts";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
@@ -36,9 +37,10 @@ interface AppState {
   repo: AgentRepository | null;
   bridge: IpcBridge | null;
   workspace: string | null;
+  updater: UpdateRepository | null;
 }
 
-const state: AppState = { window: null, repo: null, bridge: null, workspace: null };
+const state: AppState = { window: null, repo: null, bridge: null, workspace: null, updater: null };
 
 // Surface any startup failure instead of dying silently.
 function fatal(message: string, error?: unknown): void {
@@ -103,7 +105,7 @@ function registerGlobalHandlers(): void {
       !!llm &&
       !!llm.modelId &&
       (!!llm.apiKey || noKeyProviders.includes(llm.provider));
-    return ok({ version: "0.1.0", hasLlmConfig, platform: process.platform });
+    return ok({ version: app.getVersion(), hasLlmConfig, platform: process.platform });
   });
 
   // Opens the Copilot OAuth verification URL in the default browser (global).
@@ -154,6 +156,20 @@ function registerGlobalHandlers(): void {
       return err<WorkspaceInfo>(mainT("error.workspaceNotFound", { path }), { path });
     }
     return activateWorkspace(path);
+  });
+
+  // ─── auto-update (workspace-independent, global) ───────────────────
+  // The renderer triggers downloads / installs via these handlers; status
+  // arrives as `UpdateEvent`s on the `okf:update-event` channel. The silent
+  // start-check is kicked off in `app.whenReady()` below.
+  ipcMain.handle("okf:downloadUpdate", async () => {
+    if (!state.updater) return err(mainT("update.downloadFailed"));
+    return state.updater.downloadUpdate();
+  });
+
+  ipcMain.handle("okf:installUpdateNow", async () => {
+    if (!state.updater) return err(mainT("update.installFailed"));
+    return state.updater.installUpdateNow();
   });
 }
 
@@ -210,6 +226,22 @@ app.whenReady().then(async () => {
     fatal(mainT("error.windowCreate"), error);
     return;
   }
+
+  // Auto-update: create the repository (no-op in dev) and forward its event
+  // stream to the renderer. The start-check is fire-and-forget — failures are
+  // swallowed silently inside the repository (transient network errors must
+  // not block or nag on every launch). Only runs in a packaged build.
+  try {
+    state.updater = await createUpdateRepository();
+    const win = state.window;
+    state.updater.setListener((event: UpdateEvent) => {
+      if (win && !win.isDestroyed()) win.webContents.send("okf:update-event", event);
+    });
+    void state.updater.checkForUpdates();
+  } catch (error) {
+    log("updater init failed (ignored):", errorMessage(error));
+  }
+
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       state.window = await createWindow();
