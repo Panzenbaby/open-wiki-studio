@@ -21,6 +21,7 @@ const api: AgentApi = {
   // auto-update
   downloadUpdate: () => ipcRenderer.invoke("okf:downloadUpdate"),
   installUpdateNow: () => ipcRenderer.invoke("okf:installUpdateNow"),
+  getUpdateStatus: () => ipcRenderer.invoke("okf:getUpdateStatus"),
 
   listFolder: (folder) => ipcRenderer.invoke("okf:listFolder", folder),
   getPreview: (relativePath) => ipcRenderer.invoke("okf:getPreview", relativePath),

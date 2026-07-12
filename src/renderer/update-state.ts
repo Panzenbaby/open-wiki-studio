@@ -17,6 +17,10 @@ export interface UpdateReducerOutput {
   readonly lastAvailable: UpdateInfo | null;
   /** Whether the component should show the download-failed toast. */
   readonly errorToast: boolean;
+  /** Raw reason text (from the SDK error event) when `errorToast` is true,
+   *  so the toast can surface the actual cause (e.g. signature mismatch)
+   *  instead of a generic message. `null` when no error is being surfaced. */
+  readonly errorMessage: string | null;
 }
 
 export function applyUpdateEvent(
@@ -26,27 +30,28 @@ export function applyUpdateEvent(
 ): UpdateReducerOutput {
   switch (event.type) {
     case "available":
-      return { state: { status: "available", info: event.info }, lastAvailable: event.info, errorToast: false };
+      return { state: { status: "available", info: event.info }, lastAvailable: event.info, errorToast: false, errorMessage: null };
 
     case "progress": {
       const info = prevLastAvailable ?? infoOf(prev);
-      if (!info) return { state: prev, lastAvailable: prevLastAvailable, errorToast: false };
-      return { state: { status: "downloading", info, percent: event.percent }, lastAvailable: prevLastAvailable, errorToast: false };
+      if (!info) return { state: prev, lastAvailable: prevLastAvailable, errorToast: false, errorMessage: null };
+      return { state: { status: "downloading", info, percent: event.percent }, lastAvailable: prevLastAvailable, errorToast: false, errorMessage: null };
     }
 
     case "downloaded":
-      return { state: { status: "ready", info: event.info }, lastAvailable: event.info, errorToast: false };
+      return { state: { status: "ready", info: event.info }, lastAvailable: event.info, errorToast: false, errorMessage: null };
 
     case "error": {
       // Only surface errors that occur during the download flow; silent
       // otherwise (check-phase failures are swallowed in the repository).
       const wasDownloading = prev.status === "downloading" || prev.status === "available";
-      if (!wasDownloading) return { state: prev, lastAvailable: prevLastAvailable, errorToast: false };
+      if (!wasDownloading) return { state: prev, lastAvailable: prevLastAvailable, errorToast: false, errorMessage: null };
       const info = prevLastAvailable ?? infoOf(prev);
       return {
         state: info ? { status: "available", info } : { status: "idle" },
         lastAvailable: info,
         errorToast: info !== null,
+        errorMessage: info !== null ? event.message : null,
       };
     }
   }

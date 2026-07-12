@@ -6,7 +6,7 @@
 //   downloading  → circular progress ring (percent)
 //   ready        → static badge (click → "restart now / next launch" dialog;
 //                  the dialog also auto-opens the moment the download finishes)
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAtomValue, useSetAtom, useStore } from "jotai";
 import { ArrowDownCircle } from "lucide-react";
 import { api } from "../ipc.ts";
@@ -31,24 +31,49 @@ export function UpdateBadge(): JSX.Element | null {
   const store = useStore();
   const [dialog, setDialog] = useState<Dialog>(null);
 
+  // `useT()` returns a new function every render, so it must NOT be an effect
+  // dependency (it would re-subscribe on every render and, with the replay
+  // pull below, loop). Read the latest `t` through a ref instead.
+  const tRef = useRef(t);
+  tRef.current = t;
+
   // Subscribe to the update event stream for the lifetime of the app bar.
   // Read fresh state per event from the store — a closure over `state` would
   // freeze the initial `idle` value (deps can't include state without
   // re-subscribing on every change and dropping in-flight events). The store
   // is a stable Jotai instance, so the subscription stays registered once
   // while always reducing against the latest state.
+  //
+  // Startup race: the silent start-check in the main process may forward
+  // `update-available` BEFORE this component mounts and registers its
+  // `ipcRenderer.on` listener — Electron drops messages sent before a
+  // listener exists, so the badge would never appear. Subscribe FIRST, then
+  // replay the cached event from main via `getUpdateStatus`. Applying the
+  // replay is idempotent against a duplicate live delivery (the reducer maps
+  // a repeated `available` onto the same state). Deps are stable (store and
+  // the Jotai setter are stable; `t` is read via ref), so this runs once.
   useEffect(() => {
-    return api.onUpdateEvent((event: UpdateEvent) => {
+    const applyEvent = (event: UpdateEvent) => {
       const prev = store.get(updateStateAtom);
       const prevLastAvailable = store.get(lastAvailableInfoAtom);
       const out = applyUpdateEvent(prev, prevLastAvailable, event);
       store.set(updateStateAtom, out.state);
       store.set(lastAvailableInfoAtom, out.lastAvailable);
       if (out.errorToast) {
-        setToast({ message: t("update.downloadFailed"), kind: "error" });
+        // Surface the actual SDK reason (e.g. an Authenticode signature
+        // mismatch) via a translated template whose {reason} param carries
+        // the dynamic message — same i18n pattern as `error.openUrl`.
+        const reason = out.errorMessage ?? tRef.current("update.downloadFailed");
+        setToast({ message: tRef.current("update.downloadFailedReason", { reason }), kind: "error" });
       }
+    };
+
+    const unsubscribe = api.onUpdateEvent(applyEvent);
+    void api.getUpdateStatus().then((event) => {
+      if (event) applyEvent(event);
     });
-  }, [store, setToast, t]);
+    return unsubscribe;
+  }, [store, setToast]);
 
   // Auto-open the "ready" dialog the moment the download completes.
   useEffect(() => {

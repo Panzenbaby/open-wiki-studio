@@ -38,9 +38,16 @@ interface AppState {
   bridge: IpcBridge | null;
   workspace: string | null;
   updater: UpdateRepository | null;
+  /** Most recent `UpdateEvent` emitted by the updater. Cached so the renderer
+   *  can replay it on mount via `okf:getUpdateStatus` — the silent start-check
+   *  in `whenReady` may fire `update-available` before the renderer has
+   *  subscribed to `okf:update-event`, in which case that message is dropped
+   *  (Electron discards messages sent before an `ipcRenderer.on` listener is
+   *  registered). The replay closes that startup race. */
+  lastUpdateEvent: UpdateEvent | null;
 }
 
-const state: AppState = { window: null, repo: null, bridge: null, workspace: null, updater: null };
+const state: AppState = { window: null, repo: null, bridge: null, workspace: null, updater: null, lastUpdateEvent: null };
 
 // Surface any startup failure instead of dying silently.
 function fatal(message: string, error?: unknown): void {
@@ -171,6 +178,12 @@ function registerGlobalHandlers(): void {
     if (!state.updater) return err(mainT("update.installFailed"));
     return state.updater.installUpdateNow();
   });
+
+  // Replay the most recent update event so the renderer can recover the
+  // start-check result even if it subscribed after the event was forwarded.
+  ipcMain.handle("okf:getUpdateStatus", async (): Promise<UpdateEvent | null> => {
+    return state.lastUpdateEvent;
+  });
 }
 
 async function createWindow(): Promise<BrowserWindow> {
@@ -235,6 +248,7 @@ app.whenReady().then(async () => {
     state.updater = await createUpdateRepository();
     const win = state.window;
     state.updater.setListener((event: UpdateEvent) => {
+      state.lastUpdateEvent = event;
       if (win && !win.isDestroyed()) win.webContents.send("okf:update-event", event);
     });
     void state.updater.checkForUpdates();

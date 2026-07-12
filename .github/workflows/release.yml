@@ -89,36 +89,11 @@ jobs:
           # Trust the self-signed cert for code signing (passwordless sudo on runners).
           sudo security add-trusted-cert -d -r trustRoot -p codeSign /tmp/ows.crt
 
-      # --- windows only: import & trust the self-signed Authenticode cert -
-      # electron-builder reads CSC_LINK/CSC_KEY_PASSWORD on Windows too and
-      # signs the NSIS installer + unpacked binaries via signtool. The cert
-      # is self-signed, so the signature is valid Authenticode but Windows
-      # SmartScreen still warns "Unknown publisher" until reputation builds
-      # up (OV/EV certs would fix this, but cost ~100-200 USD/yr).
-      - name: Import & trust windows signing certificate
-        if: matrix.os == 'windows-latest'
-        env:
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $p12 = [Convert]::FromBase64String($env:WIN_CSC_LINK)
-          $p12Path = Join-Path $env:RUNNER_TEMP "ows-win.p12"
-          [IO.File]::WriteAllBytes($p12Path, $p12)
-
-          $pwd = ConvertTo-SecureString -String $env:WIN_CSC_KEY_PASSWORD -AsPlainText -Force
-          # Import into the CurrentUser Personal store so signtool can locate
-          # the private key, and into Trusted Root so the self-signed chain
-          # builds cleanly on the runner.
-          Import-PfxCertificate -FilePath $p12Path `
-            -CertStoreLocation Cert:\CurrentUser\My -Password $pwd | Out-Null
-
-          $cert = Get-PfxCertificate -FilePath $p12Path
-          $root = New-Object System.Security.Cryptography.X509Certificates.X509Store("Root", "CurrentUser")
-          $root.Open("ReadWrite")
-          $root.Add($cert)
-          $root.Close()
+      # No windows pre-import step and no windows signing: Windows builds are
+      # shipped UNSIGNED (see the "Build & publish (windows)" step below for
+      # the rationale — self-signed Authenticode breaks electron-updater's
+      # post-download signature verification while providing no SmartScreen
+      # benefit). Nothing to import or trust on the runner for windows.
 
       # Build & publish, split per platform so each job only defines the env
       # vars its signing path needs. CRITICAL: on mac, CSC_LINK / CSC_KEY_PASSWORD
@@ -136,10 +111,20 @@ jobs:
 
       - name: Build & publish (windows)
         if: matrix.os == 'windows-latest'
-        env:
-          # electron-builder drives signtool directly from the p12.
-          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        # Windows builds are intentionally UNSIGNED. A previous version signed
+        # the NSIS installer with a self-signed Authenticode cert (CN=Open Wiki
+        # Studio). That provided no SmartScreen benefit (self-signed still
+        # shows "Unknown publisher") but it DID break electron-updater: with
+        # `publisherName` baked into the installed app's app-update.yml,
+        # `NsisUpdater.verifySignature` runs `Get-AuthenticodeSignature` on the
+        # downloaded update, which returns `NotTrusted` for a self-signed cert
+        # not in the user's Trusted Root → `ERR_UPDATER_INVALID_SIGNATURE` →
+        # the update is rejected after download. Unsigned builds leave
+        # `publisherName` unset, so electron-updater SKIPS signature
+        # verification and the update installs. Same SmartScreen experience,
+        # working auto-update. (Existing signed v0.1.0/v0.1.1 installs still
+        # need a one-time manual update to this unsigned build — their baked
+        # `publisherName` cannot be changed remotely.)
         run: npm run ${{ matrix.script }}
 
       - name: Build & publish (linux)

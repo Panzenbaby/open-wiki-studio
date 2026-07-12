@@ -10,6 +10,12 @@
 // when the app is packaged — in dev the repository is created `enabled: false`
 // with a no-op engine, so update checks never run against the dev build).
 import { app } from "electron";
+// Default import: electron-updater is CommonJS, and in the ESM main bundle a
+// named `import { autoUpdater }` fails at runtime ("Named export not found")
+// because Node's cjs-module-lexer doesn't expose `autoUpdater` as a named
+// ESM export. The default import yields `module.exports`, from which we
+// destructure `autoUpdater` at the call site.
+import electronUpdater from "electron-updater";
 import { ok, err, errorMessage } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
 import type {
@@ -205,9 +211,9 @@ function buildReleaseNotesUrl(version: string): string {
 /**
  * Creates the `UpdateRepository` for the running app. In dev (`!app.isPackaged`)
  * the repository is disabled with a no-op engine, so no update checks run.
- * In a packaged build the real `electron-updater` autoUpdater is loaded lazily
- * (keeps the dev bundle clean and avoids initialising the updater outside a
- * signed, packaged app where it would throw).
+ * In a packaged build the real `electron-updater` autoUpdater (static import —
+ * a dynamic `import()` of the CJS module returned an undefined named export in
+ * the bundled main) is wrapped in the repository.
  */
 export async function createUpdateRepository(): Promise<UpdateRepository> {
   if (!app.isPackaged) {
@@ -217,7 +223,10 @@ export async function createUpdateRepository(): Promise<UpdateRepository> {
       enabled: false,
     });
   }
-  const { autoUpdater } = await import("electron-updater");
+  const { autoUpdater } = electronUpdater;
+  if (autoUpdater == null) {
+    throw new Error("electron-updater autoUpdater is not available");
+  }
   const engine = autoUpdater as unknown as UpdateEngine;
   return new UpdateRepository({ engine, releaseNotesUrl: buildReleaseNotesUrl, enabled: true });
 }

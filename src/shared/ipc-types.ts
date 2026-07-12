@@ -201,8 +201,15 @@ export interface AgentApi {
   downloadUpdate(): Promise<Result<void>>;
   /** Quit the app and install the already-downloaded update immediately. */
   installUpdateNow(): Promise<Result<void>>;
-  /** Subscribe to the update event stream. Returns an unsubscribe function. */
+  /** Subscribe to the update event stream. Returns an unsubscribe function.
+   *  Subscribe BEFORE calling `getUpdateStatus` so no event between
+   *  subscribe and the replay pull is lost. */
   onUpdateEvent(listener: (event: UpdateEvent) => void): () => void;
+  /** Replay the most recent `UpdateEvent` cached in the main process, or
+   *  `null` when none has fired yet. Used on renderer mount to recover the
+   *  start-check result that may have been emitted before the renderer
+   *  subscribed to `onUpdateEvent` (startup race). */
+  getUpdateStatus(): Promise<UpdateEvent | null>;
 
   // files
   listFolder(folder: Folder): Promise<Result<readonly FileNode[]>>;
