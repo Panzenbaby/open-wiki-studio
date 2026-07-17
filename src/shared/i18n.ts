@@ -27,6 +27,11 @@ export const messages: Record<Locale, Dict> = {
     "picker.recent": "Recently opened",
     "picker.openFailed": "Could not open workspace",
     "picker.pickFailed": "Could not choose folder",
+    "picker.forget": "Remove from list",
+    "picker.confirmForget":
+      "Remove this workspace from the recent list? The folder itself stays untouched.",
+    "picker.forgetFailed": "Could not remove workspace",
+    "picker.missing": "Folder no longer exists",
 
     // ── first run ─────────────────────────────────────────────────
     "firstrun.title": "Connect an LLM",
@@ -213,6 +218,7 @@ export const messages: Record<Locale, Dict> = {
     "error.revealFile": "Failed to reveal {path}: {detail}",
     "error.buildWikiGraph": "Failed to build wiki graph: {detail}",
     "error.rememberWorkspace": "Failed to remember workspace: {detail}",
+    "error.forgetWorkspace": "Failed to remove workspace: {detail}",
     "error.saveLlmConfig": "Failed to save LLM config: {detail}",
     "error.invalidPath": "Invalid path: {path}",
     "error.openFolder": "Failed to open folder: {detail}",
@@ -280,6 +286,11 @@ export const messages: Record<Locale, Dict> = {
     "picker.recent": "Zuletzt geöffnet",
     "picker.openFailed": "Workspace konnte nicht geöffnet werden",
     "picker.pickFailed": "Ordner konnte nicht gewählt werden",
+    "picker.forget": "Aus Liste entfernen",
+    "picker.confirmForget":
+      "Diesen Workspace aus der Liste entfernen? Der Ordner selbst bleibt unangetastet.",
+    "picker.forgetFailed": "Workspace konnte nicht entfernt werden",
+    "picker.missing": "Ordner existiert nicht mehr",
 
     // ── first run ─────────────────────────────────────────────────
     "firstrun.title": "LLM verbinden",
@@ -470,6 +481,7 @@ export const messages: Record<Locale, Dict> = {
     "error.revealFile": "{path} konnte nicht angezeigt werden: {detail}",
     "error.buildWikiGraph": "Wiki-Graph konnte nicht erstellt werden: {detail}",
     "error.rememberWorkspace": "Workspace konnte nicht gespeichert werden: {detail}",
+    "error.forgetWorkspace": "Workspace konnte nicht entfernt werden: {detail}",
     "error.saveLlmConfig": "LLM-Konfiguration konnte nicht gespeichert werden: {detail}",
     "error.invalidPath": "Ungültiger Pfad: {path}",
     "error.openFolder": "Ordner konnte nicht geöffnet werden: {detail}",

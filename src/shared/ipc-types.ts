@@ -17,6 +17,9 @@ export interface WorkspaceInfo {
   readonly path: string;
   readonly name: string;
   readonly lastOpened: string; // ISO 8601
+  /** True when the linked folder no longer exists on disk. Annotated by the
+   *  main process at list time so the picker can show a hint next to the entry. */
+  readonly missing?: boolean;
 }
 
 export interface AppSelfInfo {
@@ -166,6 +169,9 @@ export interface AgentApi {
   listRecentWorkspaces(): Promise<Result<readonly WorkspaceInfo[]>>;
   openWorkspace(path: string): Promise<Result<WorkspaceInfo>>;
   pickWorkspace(): Promise<Result<WorkspaceInfo | null>>;
+  /** Remove a workspace from the recent list (the folder on disk stays
+   *  untouched). Returns `void`; never throws. */
+  forgetWorkspace(path: string): Promise<Result<void>>;
 
   // llm
   configureLlm(config: LlmConfig): Promise<Result<void>>;

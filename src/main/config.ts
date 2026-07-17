@@ -1,5 +1,5 @@
 // App config persisted in Electron userData: recent workspaces + last opened.
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { app } from "electron";
 import { ok, err, errorMessage } from "../shared/result.ts";
@@ -65,7 +65,47 @@ function toInfo(folderPath: string): WorkspaceInfo {
 
 export async function listRecentWorkspaces(): Promise<Result<readonly WorkspaceInfo[]>> {
   const config = await readConfig();
-  return ok(config.recentWorkspaces);
+  // Annotate each entry with whether the linked folder still exists on disk
+  // so the picker can show a hint next to stale entries. Computed at list
+  // time (the picker refreshes this on startup) — never persisted.
+  const annotated = await Promise.all(
+    config.recentWorkspaces.map(async (w): Promise<WorkspaceInfo> => {
+      try {
+        const info = await stat(w.path);
+        return { ...w, missing: !info.isDirectory() };
+      } catch {
+        return { ...w, missing: true };
+      }
+    }),
+  );
+  return ok(annotated);
+}
+
+/** Remove a workspace from the recent list without touching its folder on
+ *  disk. Clears `lastWorkspace` when it matches, so the app does not try to
+ *  re-activate a forgotten path on the next launch. */
+export async function forgetWorkspace(
+  folderPath: string,
+): Promise<Result<void>> {
+  return withConfigLock(async () => {
+    try {
+      const config = await readConfig();
+      const next: ConfigShape = {
+        recentWorkspaces: config.recentWorkspaces.filter(
+          (w) => w.path !== folderPath,
+        ),
+        lastWorkspace:
+          config.lastWorkspace === folderPath
+            ? undefined
+            : config.lastWorkspace,
+        llm: config.llm,
+      };
+      await writeConfig(next);
+      return ok(undefined);
+    } catch (error) {
+      return err<void>(mainT("error.forgetWorkspace", { detail: errorMessage(error) }));
+    }
+  });
 }
 
 export async function rememberWorkspace(

@@ -533,9 +533,13 @@ button.folder-card:focus-visible { outline: 2px solid var(--accent); outline-off
 .rs-item .rs-title { font-size: var(--text-sm); font-weight: 600; }
 .rs-item .rs-prev { font-size: var(--text-xs); color: var(--fg-2); }
 .rs-item .rs-time { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
-.session-delete-dash { opacity: 0; padding: 4px; border-radius: var(--radius-sm); color: var(--muted); transition: opacity var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
+.session-delete-dash { opacity: 0; padding: 4px; border: 0; background: transparent; border-radius: var(--radius-sm); color: var(--muted); transition: opacity var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
 .rs-item:hover .session-delete-dash { opacity: 1; }
 .session-delete-dash:hover { color: var(--danger); background: color-mix(in oklab, var(--danger), transparent 88%); }
+.rs-item.rs-item-missing { cursor: default; border-color: color-mix(in oklab, var(--warn), transparent 60%); }
+.rs-item.rs-item-missing:hover { border-color: color-mix(in oklab, var(--warn), transparent 60%); background: transparent; }
+.rs-item.rs-item-missing .rs-title { color: var(--fg-2); }
+.rs-item.rs-item-missing .session-delete-dash { opacity: 1; }
 
 /* ---------- annotations (IA sketch) ---------- */
 .anno { position: absolute; font-family: var(--font-mono); font-size: 11px; color: var(--accent); background: color-mix(in oklab, var(--accent), transparent 82%); border: 1px dashed color-mix(in oklab, var(--accent), transparent 50%); border-radius: var(--radius-sm); padding: 3px 7px; white-space: nowrap; z-index: 5; pointer-events: none; }

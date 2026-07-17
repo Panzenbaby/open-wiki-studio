@@ -68,7 +68,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
-    "electron": "^31.0.0",
+    "electron": "^31.7.7",
     "electron-builder": "^24.13.3",
     "electron-vite": "^2.3.0",
     "typebox": "*",
@@ -119,7 +119,10 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "build/icon.icns"
     },
     "win": {
@@ -134,5 +137,8 @@
       "category": "Office",
       "icon": "build/icon.png"
     }
+  },
+  "allowScripts": {
+    "electron@31.7.7": true
   }
 }

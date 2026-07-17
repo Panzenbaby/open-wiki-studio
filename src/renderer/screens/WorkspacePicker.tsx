@@ -1,4 +1,5 @@
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtom, useSetAtom } from "jotai";
+import { AlertTriangle, Trash2 } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import {
@@ -11,7 +12,7 @@ import {
 
 export function WorkspacePicker(): JSX.Element {
   const t = useT();
-  const recent = useAtomValue(recentWorkspacesAtom);
+  const [recent, setRecent] = useAtom(recentWorkspacesAtom);
   const setWorkspace = useSetAtom(workspaceAtom);
   const setLlmConfigured = useSetAtom(llmConfiguredAtom);
   const [, setScreen] = useAtom(screenAtom);
@@ -24,6 +25,10 @@ export function WorkspacePicker(): JSX.Element {
       return;
     }
     setWorkspace(result.data);
+    // The opened workspace bubbles to the top of the recent list (rememberWorkspace
+    // updates lastOpened); refresh so the list reflects the new order on the
+    // next picker visit.
+    void refreshRecent();
     const self = await api.getAppSelf();
     if (self.success) setLlmConfigured(self.data.hasLlmConfig);
     setScreen(self.success && self.data.hasLlmConfig ? "app" : "first-run");
@@ -37,9 +42,29 @@ export function WorkspacePicker(): JSX.Element {
     }
     if (!result.data) return;
     setWorkspace(result.data);
+    // A freshly picked workspace is added to the recent list by rememberWorkspace;
+    // refresh so it appears immediately instead of only after an app restart.
+    void refreshRecent();
     const self = await api.getAppSelf();
     if (self.success) setLlmConfigured(self.data.hasLlmConfig);
     setScreen(self.success && self.data.hasLlmConfig ? "app" : "first-run");
+  }
+
+  async function refreshRecent(): Promise<void> {
+    const refreshed = await api.listRecentWorkspaces();
+    if (refreshed.success) setRecent(refreshed.data);
+  }
+
+  // Remove a workspace from the recent list. Only the stored reference is
+  // dropped — the folder on disk stays untouched.
+  async function forget(path: string): Promise<void> {
+    if (!window.confirm(t("picker.confirmForget"))) return;
+    const result = await api.forgetWorkspace(path);
+    if (!result.success) {
+      setToast({ message: `${t("picker.forgetFailed")}: ${result.error.message}`, kind: "error" });
+      return;
+    }
+    await refreshRecent();
   }
 
   return (
@@ -62,15 +87,52 @@ export function WorkspacePicker(): JSX.Element {
           <>
             <div className="side-title" style={{ marginBottom: "var(--space-3)" }}>{t("picker.recent")}</div>
             <div className="recent-sessions">
-              {recent.map((w) => (
-                <button key={w.path} className="rs-item" style={{ border: "none", width: "100%", textAlign: "left", background: "transparent" }} onClick={() => void activate(w.path)}>
-                  <div>
-                    <div className="rs-title">{w.name}</div>
-                    <div className="rs-prev mono">{w.path}</div>
+              {recent.map((w) => {
+                const missing = w.missing === true;
+                return (
+                  <div key={w.path} className={`rs-item${missing ? " rs-item-missing" : ""}`}>
+                    <button
+                      type="button"
+                      className="rs-open"
+                      disabled={missing}
+                      onClick={() => void activate(w.path)}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "var(--space-4)",
+                        border: "none",
+                        background: "transparent",
+                        textAlign: "left",
+                        padding: 0,
+                        cursor: missing ? "default" : "pointer",
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="rs-title">{w.name}</div>
+                        <div className="rs-prev mono">{w.path}</div>
+                        {missing && (
+                          <div className="rs-missing" style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", marginTop: "var(--space-1)", color: "var(--warn)", fontSize: "var(--text-xs)" }}>
+                            <AlertTriangle size={12} />
+                            <span>{t("picker.missing")}</span>
+                          </div>
+                        )}
+                      </div>
+                      <span className="rs-time">{new Date(w.lastOpened).toLocaleDateString()}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="session-delete-dash"
+                      title={t("picker.forget")}
+                      aria-label={t("picker.forget")}
+                      onClick={() => void forget(w.path)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
-                  <span className="rs-time">{new Date(w.lastOpened).toLocaleDateString()}</span>
-                </button>
-              ))}
+                );
+              })}
             </div>
           </>
         )}

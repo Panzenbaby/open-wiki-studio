@@ -9,6 +9,7 @@ const api: AgentApi = {
   listRecentWorkspaces: () => ipcRenderer.invoke("okf:listRecentWorkspaces"),
   openWorkspace: (path) => ipcRenderer.invoke("okf:openWorkspace", path),
   pickWorkspace: () => ipcRenderer.invoke("okf:pickWorkspace"),
+  forgetWorkspace: (path) => ipcRenderer.invoke("okf:forgetWorkspace", path),
 
   configureLlm: (config) => ipcRenderer.invoke("okf:configureLlm", config),
   listAvailableModels: (provider) => ipcRenderer.invoke("okf:listAvailableModels", provider),

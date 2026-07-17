@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { AgentRepository } from "./agent.ts";
 import { IpcBridge } from "./ipc.ts";
 import {
+  forgetWorkspace,
   getLlmConfig,
   listRecentWorkspaces,
   rememberWorkspace,
@@ -163,6 +164,16 @@ function registerGlobalHandlers(): void {
       return err<WorkspaceInfo>(mainT("error.workspaceNotFound", { path }), { path });
     }
     return activateWorkspace(path);
+  });
+
+  // Remove a workspace from the recent list. Only the stored reference is
+  // dropped — the folder on disk stays untouched. Registered globally so the
+  // picker can call it before any workspace is active.
+  ipcMain.handle("okf:forgetWorkspace", async (_event, path: string) => {
+    if (typeof path !== "string" || path === "") {
+      return err(mainT("error.invalidWorkspacePath"));
+    }
+    return forgetWorkspace(path);
   });
 
   // ─── auto-update (workspace-independent, global) ───────────────────
