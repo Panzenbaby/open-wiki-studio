@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { ExternalLink, FileText, Folder as FolderIcon, Plus, Share2 } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
-import { browserFolderAtom, browserModeAtom, platformAtom, selectedFileAtom } from "../store.ts";
+import { reportAddFilesResult } from "../add-files.ts";
+import { addFilesSummaryAtom, browserFolderAtom, browserModeAtom, platformAtom, selectedFileAtom, toastAtom } from "../store.ts";
 import { MarkdownView } from "../components/MarkdownView.tsx";
 import { FileTree } from "../components/FileTree.tsx";
 import { ContextMenu, type ContextMenuItem, type ContextMenuPosition } from "../components/ContextMenu.tsx";
@@ -31,6 +32,8 @@ interface CtxState {
 
 export function Browser(): JSX.Element {
   const t = useT();
+  const setToast = useSetAtom(toastAtom);
+  const setAddFilesSummary = useSetAtom(addFilesSummaryAtom);
   const platform = useAtomValue(platformAtom);
   const [folder, setFolder] = useAtom(browserFolderAtom);
   const [mode, setMode] = useAtom(browserModeAtom);
@@ -47,7 +50,8 @@ export function Browser(): JSX.Element {
 
   async function addFiles(): Promise<void> {
     const result = await api.addInputFilesDialog();
-    if (result.success && result.data.length > 0) await refreshList();
+    const summary = reportAddFilesResult(result, { setToast, setSummary: setAddFilesSummary, t });
+    if (summary && summary.added.length > 0) await refreshList();
   }
 
   useEffect(() => {

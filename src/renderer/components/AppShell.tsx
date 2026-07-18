@@ -3,7 +3,9 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Menu as MenuIcon, Settings as SettingsIcon, X as CloseIcon } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
+import { reportAddFilesResult } from "../add-files.ts";
 import {
+  addFilesSummaryAtom,
   browserFolderAtom,
   browserModeAtom,
   chatErrorAtom,
@@ -24,7 +26,7 @@ import {
   viewAtom,
   workspaceAtom,
 } from "../store.ts";
-import type { SessionInfo } from "../../shared/ipc-types.ts";
+import type { AddFilesSummary, SessionInfo } from "../../shared/ipc-types.ts";
 import { Sidebar } from "./Sidebar.tsx";
 import { Dashboard } from "../screens/Dashboard.tsx";
 import { Chat } from "../screens/Chat.tsx";
@@ -32,6 +34,7 @@ import { Browser } from "../screens/Browser.tsx";
 import { IngestView } from "../screens/IngestView.tsx";
 import { Settings } from "../screens/Settings.tsx";
 import { IngestBar } from "./IngestBar.tsx";
+import { Modal } from "./Modal.tsx";
 import { UpdateBadge } from "./UpdateBadge.tsx";
 
 export function AppShell(): JSX.Element {
@@ -58,12 +61,16 @@ export function AppShell(): JSX.Element {
   const turnEnded = useAtomValue(chatTurnEndedAtom);
   const [sidebarOpen, setSidebarOpen] = useAtom(sidebarOpenAtom);
   const setToast = useSetAtom(toastAtom);
+  const setAddFilesSummary = useSetAtom(addFilesSummaryAtom);
+  const addFilesSummary = useAtomValue(addFilesSummaryAtom);
   const [dragOver, setDragOver] = useState<boolean>(false);
 
   /**
-   * Drop external files anywhere in the app → copy them into `input/`.
-   * Reuses the existing `addInputFiles` IPC handler. Always targets `input/`,
-   * regardless of which view is currently active.
+   * Drop external files/folders anywhere in the app → copy them into `input/`.
+   * Reuses the existing `addInputFiles` IPC handler, which now recurses into
+   * directories. Always targets `input/`, regardless of the active view.
+   * Result reporting (toast vs. summary modal) is shared with the Browser
+   * screen's "Add" button via `reportAddFilesResult`.
    */
   async function handleDropFiles(fileList: FileList | null): Promise<void> {
     if (!fileList || fileList.length === 0) return;
@@ -74,12 +81,8 @@ export function AppShell(): JSX.Element {
     }
     if (paths.length === 0) return;
     const result = await api.addInputFiles(paths);
-    if (result.success) {
-      setToast({ message: t("browser.dropAdded", { n: result.data.length }), kind: "info" });
-      await refreshCounts();
-    } else {
-      setToast({ message: result.error.message, kind: "error" });
-    }
+    reportAddFilesResult(result, { setToast, setSummary: setAddFilesSummary, t });
+    await refreshCounts();
   }
 
   async function refreshCounts(): Promise<void> {
@@ -337,6 +340,78 @@ useEffect(() => {
       {(ingestState !== "idle" || view === "dashboard") && (
         <IngestBar onRun={runIngest} onView={view !== "ingest" ? () => setView("ingest") : undefined} />
       )}
+      {addFilesSummary && (
+        <AddFilesSummaryModal
+          summary={addFilesSummary}
+          onClose={() => setAddFilesSummary(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Manual-acknowledge summary of an add-files run that had failures or was a
+ *  pure no-op (everything skipped). Lists added/skipped/failed paths so the
+ *  user can inspect what went wrong before dismissing. */
+function AddFilesSummaryModal({
+  summary,
+  onClose,
+}: {
+  summary: AddFilesSummary;
+  onClose: () => void;
+}): JSX.Element {
+  const t = useT();
+  const { added, skipped, failed } = summary;
+  return (
+    <Modal
+      title={t("addFiles.summaryTitle")}
+      onClose={onClose}
+      footer={
+        <button className="btn btn-primary" onClick={onClose}>
+          {t("addFiles.close")}
+        </button>
+      }
+    >
+      <SummarySection title={t("addFiles.sectionAdded")} items={added.map((path) => ({ path }))} tone="ok" />
+      <SummarySection
+        title={t("addFiles.sectionSkipped")}
+        items={skipped}
+        tone="muted"
+      />
+      <SummarySection
+        title={t("addFiles.sectionFailed")}
+        items={failed.map((entry) => ({ path: entry.path, reason: entry.error }))}
+        tone="err"
+      />
+    </Modal>
+  );
+}
+
+function SummarySection({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: readonly { path: string; reason?: string }[];
+  tone: "ok" | "muted" | "err";
+}): JSX.Element | null {
+  if (items.length === 0) return null;
+  return (
+    <div className="addfiles-section">
+      <h3 className={`mono${tone === "err" ? " err" : tone === "muted" ? " muted" : ""}`}>
+        {title} ({items.length})
+      </h3>
+      <ul>
+        {items.map((entry, index) => (
+          // Index suffix guards against duplicate paths (e.g. two different
+          // sources colliding on the same dest both land in skipped).
+          <li key={`${entry.path}#${index}`} className="mono">
+            {entry.path}
+            {entry.reason && <span className="reason"> — {entry.reason}</span>}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

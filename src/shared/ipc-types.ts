@@ -62,6 +62,21 @@ export type CopilotLoginEvent =
 // ─── Filesystem (input/wiki/archive) ─────────────────────────────────
 export type Folder = "input" | "wiki" | "archive";
 
+/** Outcome of copying dropped/picked files (and folders) into `input/`.
+ *  Paths are POSIX-style, relative to `input/`.
+ *  - `added`:   successfully copied.
+ *  - `skipped`: destination already existed — left untouched (no overwrite).
+ *  - `failed`:  copy raised an error; `error` carries the OS error message.
+ *
+ *  Exception: a top-level source that could not even be `lstat`'d (it vanished
+ *  or is unreadable) is recorded in `failed` with its **raw source path**,
+ *  because it never reached a destination and has no input-relative path. */
+export interface AddFilesSummary {
+  readonly added: readonly string[];
+  readonly skipped: readonly { path: string; reason: string }[];
+  readonly failed: readonly { path: string; error: string }[];
+}
+
 export interface FileNode {
   readonly relativePath: string; // posix, with extension
   readonly name: string;
@@ -220,8 +235,8 @@ export interface AgentApi {
   // files
   listFolder(folder: Folder): Promise<Result<readonly FileNode[]>>;
   getPreview(relativePath: string): Promise<Result<FilePreview>>;
-  addInputFiles(filePaths: readonly string[]): Promise<Result<readonly string[]>>;
-  addInputFilesDialog(): Promise<Result<readonly string[]>>;
+  addInputFiles(filePaths: readonly string[]): Promise<Result<AddFilesSummary>>;
+  addInputFilesDialog(): Promise<Result<AddFilesSummary>>;
   /** Reveal a file/folder in the OS file manager (Finder / Explorer / file manager). */
   revealInFileManager(folder: Folder, relativePath: string, isDirectory: boolean): Promise<Result<void>>;
 

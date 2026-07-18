@@ -1,6 +1,7 @@
 // Jotai atoms + derived state for the renderer.
 import { atom } from "jotai";
 import type {
+  AddFilesSummary,
   ChatMessage,
   IngestSummary,
   SessionInfo,
@@ -27,6 +28,11 @@ export const platformAtom = atom<string>("");
 /** App version reported by the main process (`app.getVersion()`). */
 export const currentVersionAtom = atom<string>("");
 export const toastAtom = atom<{ message: string; kind: "info" | "error" } | null>(null);
+
+/** Summary of the last add-files operation that needs a manual-acknowledge
+ *  modal (failures, or a pure no-op where everything was skipped). Rendered as
+ *  a Modal by AppShell; cleared on close. */
+export const addFilesSummaryAtom = atom<AddFilesSummary | null>(null);
 
 // folder counts (dashboard)
 export const countsAtom = atom<{ input: number; wiki: number; archive: number }>({

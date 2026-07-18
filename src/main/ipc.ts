@@ -100,7 +100,7 @@ export class IpcBridge {
         const win = BrowserWindow.fromWebContents(webContents);
         const opts: Electron.OpenDialogOptions = {
           title: mainT("dialog.addFiles"),
-          properties: ["openFile", "multiSelections"],
+          properties: ["openFile", "openDirectory", "multiSelections"],
         };
         const result = win
           ? await dialog.showOpenDialog(win, opts)

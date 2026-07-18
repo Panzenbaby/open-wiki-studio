@@ -674,4 +674,15 @@ button.folder-card:focus-visible { outline: 2px solid var(--accent); outline-off
 .modal-body { color: var(--fg-2); font-size: var(--text-sm); line-height: 1.5; }
 .modal-body p { margin: 0; }
 .modal-footer { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-2); }
+/* Add-files summary modal sections (AddFilesSummaryModal in AppShell). */
+.addfiles-section { margin-top: var(--space-3); }
+.addfiles-section h3 {
+  margin: 0 0 var(--space-1); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--fg-2);
+}
+.addfiles-section h3.err { color: var(--danger); }
+.addfiles-section h3.muted { color: color-mix(in oklab, var(--fg-2) 70%, transparent); }
+.addfiles-section ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-1); max-height: 12em; overflow: auto; }
+.addfiles-section li { font-size: var(--text-xs); color: var(--fg-2); word-break: break-all; }
+.addfiles-section li .reason { color: var(--fg-3, color-mix(in oklab, var(--fg-2) 70%, transparent)); }
 .settings-version { margin: var(--space-4) 0 0; text-align: center; font-size: var(--text-xs); }
