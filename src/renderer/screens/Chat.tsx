@@ -69,6 +69,7 @@ export function Chat(): JSX.Element {
     setInput("");
     setChatError(null);
     setPending(true);
+    pinnedRef.current = true;
     setMessages((prev) => [...prev, { role: "user", text: question }]);
     try {
       await runTurn(api.ask(question));
@@ -100,6 +101,7 @@ export function Chat(): JSX.Element {
     if (!lastUser) return;
     setChatError(null);
     setPending(true);
+    pinnedRef.current = true;
     // Remove the last assistant message unconditionally (empty OR partial) so
     // the new turn streams a fresh assistant bubble. The failed assistant
     // stays on the append-only disk path but is dropped by `extractMessages`,
