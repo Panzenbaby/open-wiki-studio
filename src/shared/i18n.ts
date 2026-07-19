@@ -111,7 +111,7 @@ export const messages: Record<Locale, Dict> = {
     "dashboard.kicker": "Workspace · {name}",
     "dashboard.title": "Knowledge base \u201c{name}\u201d",
     "dashboard.summary":
-      "{wiki} concepts · {input} pending · {archive} archived originals.",
+      "{wiki} concepts · {input} pending.",
     "dashboard.newQuestion": "New question",
     "dashboard.inputWaiting": "{n} files waiting in input/",
     "dashboard.ingestHint":
@@ -126,15 +126,11 @@ export const messages: Record<Locale, Dict> = {
     // ── folder cards ──────────────────────────────────────────────
     "folder.input.name": "Input",
     "folder.wiki.name": "Wiki",
-    "folder.archive.name": "Archive",
     "folder.input.count": "{n} files · pending",
     "folder.input.desc": "New, not yet ingested documents.",
     "folder.wiki.count": "{n} concepts",
     "folder.wiki.desc":
       "The OKF knowledge bundle: markdown concepts in wiki/.",
-    "folder.archive.count": "{n} originals",
-    "folder.archive.desc":
-      "Originals after ingest, once their concept exists in the wiki.",
     "folder.pending": "{n} pending",
 
     // ── chat ──────────────────────────────────────────────────────
@@ -388,7 +384,7 @@ export const messages: Record<Locale, Dict> = {
     "dashboard.kicker": "Workspace · {name}",
     "dashboard.title": "Wissensbasis \u201e{name}\u201c",
     "dashboard.summary":
-      "{wiki} Concepts · {input} ausstehend · {archive} archivierte Originale.",
+      "{wiki} Concepts · {input} ausstehend.",
     "dashboard.newQuestion": "Neue Frage",
     "dashboard.inputWaiting": "{n} Dateien warten in input/",
     "dashboard.ingestHint":
@@ -403,15 +399,11 @@ export const messages: Record<Locale, Dict> = {
     // ── folder cards ──────────────────────────────────────────────
     "folder.input.name": "Input",
     "folder.wiki.name": "Wiki",
-    "folder.archive.name": "Archive",
     "folder.input.count": "{n} Dateien · ausstehend",
     "folder.input.desc": "Neue, noch nicht ingested Dokumente.",
     "folder.wiki.count": "{n} Concepts",
     "folder.wiki.desc":
       "Der OKF-Wissensbundel: markdown concepts in wiki/.",
-    "folder.archive.count": "{n} Originale",
-    "folder.archive.desc":
-      "Originale nach Ingest, sobald ihr Concept im Wiki existiert.",
     "folder.pending": "{n} ausstehend",
 
     // ── chat ──────────────────────────────────────────────────────

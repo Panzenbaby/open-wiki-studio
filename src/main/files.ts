@@ -2,8 +2,9 @@
 //
 // Concept reading (wiki .md: conceptId derivation, frontmatter metadata) is
 // delegated to ConceptStore. This module keeps the non-concern parts:
-//   - listFolder: listing input/wiki/archive as FileNode (with size — a broader
-//     shape than concepts, any file type)
+//   - listFolder: listing input/wiki as FileNode (with size — a broader
+//     shape than concepts, any file type). The OKF archive lives under
+//     wiki/archive/ and shows up in the wiki listing.
 //   - getPreview: single-file preview — wiki .md delegates to the store; text
 //     and binary stay here
 //   - addInputFiles / revealInFileManager: input-folder writes + OS integration
@@ -26,18 +27,12 @@ import type {
 /** Resolve a `Folder` to its physical base directory under `workspace`.
  *
  *  `input` and `wiki` are top-level siblings (`workspace/input`,
- *  `workspace/wiki`). `archive` is a VIRTUAL folder: physically located at
- *  `workspace/wiki/archive` (pi-okf-wiki 0.2.0 moved the archive into the OKF
- *  bundle). Keeping the `Folder` type unchanged (`"input" | "wiki" | "archive"`)
- *  and centralizing the translation here means every folder-path resolution
- *  in the app agrees on where archive lives — callers never sprinkle
- *  `if (folder === "archive")` themselves.
- *
- *  This is the SINGLE place that knows archive is virtual. Used by
- *  `listFolder` (walk root) and `revealInFileManager` (base dir), both of
- *  which already operate on a `Folder`. */
+ *  `workspace/wiki`). The OKF archive lives under `workspace/wiki/archive/`
+ *  (since pi-okf-wiki 0.2.0) and is browsed as the `archive/` subdirectory of
+ *  the wiki folder — it has no `Folder` entry of its own. Centralizing the
+ *  translation here means every folder-path resolution in the app agrees on
+ *  where each folder lives. */
 export function workspaceDir(workspace: string, folder: Folder): string {
-  if (folder === "archive") return join(workspace, "wiki", "archive");
   return join(workspace, folder);
 }
 
@@ -55,10 +50,15 @@ function safeResolve(baseDir: string, relativePath: string): string | null {
   return resolved;
 }
 
-/** Is `relativePath` a wiki markdown file (starts with `wiki/`)? The store
- *  handles only those; everything else (input/archive/text/binary) is read
- *  directly here. */
+/** Is `relativePath` a wiki markdown concept (starts with `wiki/` and ends
+ *  with `.md`, but NOT under the `wiki/archive/` subtree)? The store handles
+ *  only concept files; everything else (input/text/binary, and ALL archive
+ *  originals — `.md.orig` by convention, but defensively any file under
+ *  `wiki/archive/`, including a stray `.md`) is read directly here. The
+ *  archive-subtree guard mirrors the ConceptStore walk's skip so a misplaced
+ *  `.md` inside the archive can never be treated as a concept. */
 function isWikiMarkdown(relativePath: string): boolean {
+  if (relativePath.startsWith("wiki/archive/")) return false;
   return relativePath.startsWith("wiki/") && relativePath.endsWith(".md");
 }
 
@@ -105,19 +105,23 @@ export async function getPreview(
   workspace: string,
   relativePath: string,
 ): Promise<Result<FilePreview>> {
-  // The renderer sends the VIRTUAL selection key (`${folder}/${rel}`). Archive
-  // is virtual: `archive/<rel>` physically lives at `wiki/archive/<rel>`.
-  // Resolve archive selections against the archive BASE dir (not the workspace
-  // root) so `safeResolve` confines the preview to `wiki/archive/` — an
-  // `archive/../../etc/passwd` selection can never read a file outside the
-  // archive, even if that file exists in the workspace. `input`/`wiki` keep
-  // resolving against the workspace root as before. `relativePath` itself
-  // (virtual form) is used for all extension/kind checks below — its suffix is
-  // the same as the physical file's, and `isWikiMarkdown` keys off the `wiki/`
-  // prefix which archive paths do not have.
-  const isArchive = relativePath.startsWith("archive/");
-  const base = isArchive ? workspaceDir(workspace, "archive") : workspace;
-  const stripped = isArchive ? relativePath.slice("archive/".length) : relativePath;
+  // The renderer sends the selection key (`${folder}/${rel}`). The OKF
+  // archive lives at `wiki/archive/<rel>` and is browsed as a subdirectory of
+  // the wiki folder. Detect that prefix and confine archive previews to the
+  // archive base (`workspace/wiki/archive/`) specifically — a
+  // `wiki/archive/../../etc/passwd` (or `wiki/archive/../secret.md`)
+  // selection can never read a file outside the archive, even if that file
+  // exists in the workspace. The prefix check is case-insensitive so a
+  // `wiki/Archive/…` link (e.g. from LLM output on a case-insensitive FS like
+  // macOS APFS / Windows NTFS) is still confined to the archive base rather
+  // than falling through to the looser workspace-root resolution. Other paths
+  // keep resolving against the workspace root as before. `relativePath` itself
+  // is used for all extension/kind checks below — its suffix is the same as
+  // the physical file's.
+  const ARCHIVE_PREFIX = "wiki/archive/";
+  const isArchive = relativePath.toLowerCase().startsWith(ARCHIVE_PREFIX);
+  const base = isArchive ? join(workspace, "wiki", "archive") : workspace;
+  const stripped = isArchive ? relativePath.slice(ARCHIVE_PREFIX.length) : relativePath;
   const absolute = safeResolve(base, stripped);
   if (!absolute) {
     return err<FilePreview>(mainT("error.invalidPath", { path: relativePath }), { path: relativePath });
@@ -126,9 +130,11 @@ export async function getPreview(
   // Wiki markdown: delegate concept reading (conceptId, frontmatter metadata,
   // body) to the store. Reserved files (index/log) come back with kind !==
   // "concept" and no ConceptInfo, matching the previous RESERVED behaviour.
-  // Archived `.md.orig` files are under `archive/` (no `wiki/` prefix) so
-  // `isWikiMarkdown` excludes them — they are archived originals, not
-  // concepts, and must NOT get concept metadata.
+  // Archive originals live under `wiki/archive/` so `isWikiMarkdown` excludes
+  // them (prefix guard) — they are archived originals, not concepts, and must
+  // NOT get concept metadata. By convention archive markdown is stored as
+  // `.md.orig`; the prefix guard is defensive so even a stray `.md` placed
+  // under the archive is never treated as a concept.
   if (isWikiMarkdown(relativePath)) {
     const store = new ConceptStore(workspace);
     const concept = await store.readConcept(relativePath);

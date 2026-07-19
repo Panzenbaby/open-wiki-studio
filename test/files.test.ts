@@ -165,12 +165,14 @@ describe("addInputFiles", () => {
   });
 });
 
-// Tests for the pi-okf-wiki 0.2.0 archive layout: the `archive` Folder is
-// VIRTUAL — physically at `workspace/wiki/archive/` — while the renderer's
-// selection key stays `archive/<rel>`. Covers listFolder (lists the virtual
-// location), getPreview translation (`archive/<rel>` → `wiki/archive/<rel>`),
-// `.md.orig` rendered as markdown (no concept metadata), and binary
-// originals returning a `binary` placeholder instead of utf8 garbage.
+// Tests for the pi-okf-wiki 0.2.0 archive layout: the OKF archive lives
+// physically at `workspace/wiki/archive/` and is browsed as the `archive/`
+// subdirectory of the wiki folder (the renderer's selection key is
+// `wiki/archive/<rel>`). Covers listFolder (the wiki listing includes the
+// archive/ subdirectory), getPreview translation (`wiki/archive/<rel>` →
+// `wiki/archive/<rel>` with confinement to the archive base), `.md.orig`
+// rendered as markdown (no concept metadata), and binary originals returning
+// a `binary` placeholder instead of utf8 garbage.
 describe("archive layout (pi-okf-wiki 0.2.0)", () => {
   const workspaces: string[] = [];
 
@@ -194,24 +196,25 @@ describe("archive layout (pi-okf-wiki 0.2.0)", () => {
     else await writeFile(absolute, content);
   }
 
-  it("listFolder('archive') reads the virtual wiki/archive/ location", async () => {
+  it("listFolder('wiki') includes the wiki/archive/ subtree", async () => {
     const workspace = await newWorkspace();
     await writeArchive(workspace, "sample/01-taxonomy.md.orig", "body");
     await writeArchive(workspace, "sample/report.pdf", Buffer.from([0x25, 0x50, 0x44, 0x46]));
 
-    const result = await listFolder(workspace, "archive");
+    const result = await listFolder(workspace, "wiki");
 
     expect(result.success).toBe(true);
     if (!result.success) return;
     const paths = result.data.map((n) => n.relativePath).sort();
-    expect(paths).toEqual(["sample/01-taxonomy.md.orig", "sample/report.pdf"]);
+    // Archive files appear under the `archive/` prefix (relative to wiki/).
+    expect(paths).toEqual(["archive/sample/01-taxonomy.md.orig", "archive/sample/report.pdf"]);
   });
 
-  it("getPreview translates archive/<rel> → wiki/archive/<rel> and renders .md.orig as markdown", async () => {
+  it("getPreview renders wiki/archive/<rel> .md.orig as markdown (no concept metadata)", async () => {
     const workspace = await newWorkspace();
     await writeArchive(workspace, "sample/01-taxonomy.md.orig", "# Title\n\narchived body");
 
-    const result = await getPreview(workspace, "archive/sample/01-taxonomy.md.orig");
+    const result = await getPreview(workspace, "wiki/archive/sample/01-taxonomy.md.orig");
 
     expect(result.success).toBe(true);
     if (!result.success) return;
@@ -219,8 +222,8 @@ describe("archive layout (pi-okf-wiki 0.2.0)", () => {
     expect(result.data.content).toBe("# Title\n\narchived body");
     // Archived originals are NOT concepts — no concept metadata chip.
     expect(result.data.frontmatter).toBeUndefined();
-    // The renderer keeps the virtual form for display.
-    expect(result.data.relativePath).toBe("archive/sample/01-taxonomy.md.orig");
+    // The renderer keeps the selection-key form for display.
+    expect(result.data.relativePath).toBe("wiki/archive/sample/01-taxonomy.md.orig");
   });
 
   it("getPreview returns a binary placeholder for a non-text archive original", async () => {
@@ -228,30 +231,30 @@ describe("archive layout (pi-okf-wiki 0.2.0)", () => {
     // A PDF header followed by a NUL byte — trips the binary sniff.
     await writeArchive(workspace, "sample/report.pdf", Buffer.from([0x25, 0x50, 0x44, 0x46, 0x00, 0xff]));
 
-    const result = await getPreview(workspace, "archive/sample/report.pdf");
+    const result = await getPreview(workspace, "wiki/archive/sample/report.pdf");
 
     expect(result.success).toBe(true);
     if (!result.success) return;
     expect(result.data.kind).toBe("binary");
-    expect(result.data.content).toContain("archive/sample/report.pdf");
+    expect(result.data.content).toContain("wiki/archive/sample/report.pdf");
   });
 
   it("getPreview confines archive selections to wiki/archive/ (traversal blocked)", async () => {
     const workspace = await newWorkspace();
-    // Place a real, readable file OUTSIDE the archive but inside the
-    // workspace. The old (workspace-root) resolution would read this via
-    // `archive/../secret.md`; the archive-base resolution must reject it.
+    // Place a real, readable file OUTSIDE the archive but inside the wiki
+    // folder. The archive-base resolution must reject a selection that
+    // escapes `wiki/archive/` via `..`.
     await mkdir(join(workspace, "wiki"), { recursive: true });
     await writeFile(join(workspace, "wiki", "secret.md"), "private", "utf8");
 
-    // `archive/../secret.md` → stripped to `../secret.md` → resolved against
-    // `wiki/archive/` → escapes the archive base → safeResolve returns null.
-    const result = await getPreview(workspace, "archive/../secret.md");
+    // `wiki/archive/../secret.md` → stripped to `../secret.md` → resolved
+    // against `wiki/archive/` → escapes the archive base → safeResolve
+    // returns null.
+    const result = await getPreview(workspace, "wiki/archive/../secret.md");
     expect(result.success).toBe(false);
 
-    // Deeper traversal that would land back inside the archive is still
-    // rejected because the path leaves the archive base on the way.
-    const escape = await getPreview(workspace, "archive/../../etc/passwd");
+    // Deeper traversal that would land outside the workspace is also rejected.
+    const escape = await getPreview(workspace, "wiki/archive/../../etc/passwd");
     expect(escape.success).toBe(false);
   });
 });

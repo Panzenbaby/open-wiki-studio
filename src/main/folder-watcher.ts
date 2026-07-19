@@ -5,13 +5,13 @@
 // disk and are observed here.
 //
 // Design: ONE recursive `fs.watch` on the workspace root, with events routed
-// to `input/`/`wiki/`/`archive/` by parsing the top path segment of the
-// reported filename. A single root watcher is used (rather than one recursive
+// to `input/`/`wiki/` by parsing the top path segment of the reported
+// filename. A single root watcher is used (rather than one recursive
 // watcher per folder) because on macOS Node's recursive FSEvents watcher
-// cross-fires across sibling watched directories — three sibling recursive
-// watchers would all fire for a write to any one of them. Watching the root
+// cross-fires across sibling watched directories — two sibling recursive
+// watchers would both fire for a write to either of them. Watching the root
 // once avoids that, reports consistent root-relative filenames, and naturally
-// observes folders created after construction (e.g. `archive/` on first
+// observes folders created after construction (e.g. `wiki/archive/` on first
 // ingest) without a reconcile timer. Events under other root entries
 // (`sessions/`, config files) are filtered out.
 //
@@ -36,8 +36,10 @@ import { watch, type FSWatcher } from "node:fs";
 import type { Folder } from "../shared/ipc-types.ts";
 
 /** Folders whose changes are forwarded to the renderer. Events under any
- *  other root entry (sessions/, config files, …) are ignored. */
-const WATCHED_FOLDERS: readonly Folder[] = ["input", "wiki", "archive"];
+ *  other root entry (sessions/, config files, …) are ignored. The OKF archive
+ *  lives under `wiki/archive/` and is covered by the `wiki` folder — it has
+ *  no entry of its own. */
+const WATCHED_FOLDERS: readonly Folder[] = ["input", "wiki"];
 const WATCHED_SET: ReadonlySet<string> = new Set(WATCHED_FOLDERS);
 
 /** Coalesce window. File managers emit add+rename+delete bursts; a short
@@ -73,10 +75,10 @@ interface PendingFlush {
 
 /**
  * Watches the workspace root recursively and calls `listener(folder)` whenever
- * `input/`, `wiki/`, or `archive/` changes on disk. This is the renderer's
- * only signal to re-list a folder — there are no parallel manual refresh
- * paths. Reliability hardening (self-recreate, bounded debounce) is described
- * in the file header.
+ * `input/` or `wiki/` (including its `archive/` subtree) changes on disk. This
+ * is the renderer's only signal to re-list a folder — there are no parallel
+ * manual refresh paths. Reliability hardening (self-recreate, bounded
+ * debounce) is described in the file header.
  */
 export class FolderWatcher {
   private readonly workspace: string;
@@ -171,11 +173,11 @@ export class FolderWatcher {
    *  Events with no parseable filename, or under a non-watched root entry, are
    *  ignored.
    *
-   *  Archive is virtual: it physically lives at `wiki/archive/` (since
-   *  pi-okf-wiki 0.2.0). An event whose path begins with `wiki/archive/` is
-   *  routed to `"archive"`, NOT `"wiki"` — otherwise the archive browser would
-   *  never refresh on archive writes (its top segment is `wiki`). Other
-   *  `wiki/…` paths fall back to the top-segment rule (→ `"wiki"`). */
+   *  The OKF archive lives at `wiki/archive/` (since pi-okf-wiki 0.2.0). An
+   *  event whose path begins with `wiki/archive/` is routed to `"wiki"` via
+   *  the top-segment rule below — the archive is browsed as part of the wiki
+   *  folder, so a write there must bump the wiki version (and refresh the
+   *  wiki browser, which shows the `archive/` subdirectory). */
   private route(_eventType: string, filename: string | Buffer | null): void {
     if (this.disposed || filename == null) return;
     // `filename` is relative to the watched root. Buffer paths (Windows) →
@@ -183,15 +185,6 @@ export class FolderWatcher {
     const rel =
       typeof filename === "string" ? filename : filename.toString("utf8");
     const segments = rel.split(/[\\/]/);
-    // Virtual archive: `wiki/archive/<…>` → route to "archive" (check before
-    // the top-segment rule, which would otherwise send it to "wiki"). Handles
-    // both POSIX and Windows separators. The `segments[1] === "archive"` test
-    // is an EXACT match on purpose — `wiki/archiveX/…` must NOT route to
-    // "archive" (only the real archive subtree does).
-    if (segments[0] === "wiki" && segments[1] === "archive") {
-      this.schedule("archive");
-      return;
-    }
     const top = segments[0];
     if (top && WATCHED_SET.has(top)) this.schedule(top as Folder);
   }

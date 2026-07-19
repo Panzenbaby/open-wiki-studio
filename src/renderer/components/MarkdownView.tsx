@@ -39,12 +39,15 @@ function isArchiveLink(href: string): boolean {
   return p.startsWith("archive/");
 }
 
-/** The virtual selection key for an archive citation — the same
- *  `${folder}/${rel}` form the Browser uses, so the preview path and the
- *  click handler agree. `isArchiveLink` already guarantees the `archive/`
- *  prefix (after any leading `/`), so this just strips that leading slash. */
+/** The selection key for an archive citation — the same `${folder}/${rel}`
+ *  form the Browser uses. The markdown link is bundle-relative
+ *  (`/archive/<rel>`); the archive physically lives at `wiki/archive/<rel>`
+ *  and is browsed as a subdirectory of the wiki folder, so the selection key
+ *  is `wiki/archive/<rel>`. `isArchiveLink` already guarantees the `archive/`
+ *  prefix (after any leading `/`), so we strip the leading slash and prepend
+ *  `wiki/`. */
 function toArchivePath(href: string): string {
-  return href.replace(/^\//, "");
+  return `wiki/${href.replace(/^\//, "")}`;
 }
 
 /** Normalize any concept link to a workspace-relative "wiki/<concept-id>.md" path. */
@@ -72,20 +75,22 @@ export function MarkdownView(props: MarkdownViewProps): JSX.Element {
   }
 
   /** Open a citation into the OKF archive. The link is bundle-relative
-   *  (`/archive/<rel>`); we route the browser to the virtual `archive` folder
-   *  and set the selection key to `archive/<rel>` so the existing preview path
-   *  picks up the archived original (`.md.orig` rendered as markdown, or a
-   *  binary placeholder for pdf/docx/…).
+   *  (`/archive/<rel>`); the archive lives at `wiki/archive/<rel>` and is
+   *  browsed as the `archive/` subdirectory of the wiki folder, so we route
+   *  the browser to the `wiki` folder and set the selection key to
+   *  `wiki/archive/<rel>` so the existing preview path picks up the archived
+   *  original (`.md.orig` rendered as markdown, or a binary placeholder for
+   *  pdf/docx/…).
    *
    *  The three setStates are flushed as one batched re-render (React 18
    *  auto-batches event-handler updates), so Browser sees a consistent
    *  `[folder, selected]` pair. `getPreview` is additionally robust to any
-   *  folder-atom staleness: it sniffs the `archive/` prefix on the selection
-   *  key itself, so the translation does not depend on `browserFolder`
-   *  having propagated first. */
+   *  folder-atom staleness: it sniffs the `wiki/archive/` prefix on the
+   *  selection key itself, so the translation does not depend on
+   *  `browserFolder` having propagated first. */
   function openArchiveCitation(href: string): void {
     setSelected(toArchivePath(href));
-    setBrowserFolder("archive");
+    setBrowserFolder("wiki");
     setView("browser");
   }
 

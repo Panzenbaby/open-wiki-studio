@@ -1,5 +1,5 @@
 import { useAtomValue } from "jotai";
-import { ArrowLeftRight, Archive, Download, FileText, Play, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Download, FileText, Play, Trash2 } from "lucide-react";
 import { useT } from "../i18n.ts";
 import { countsAtom, currentSessionAtom, ingestStateAtom, sessionsAtom, workspaceAtom } from "../store.ts";
 
@@ -8,7 +8,7 @@ interface DashboardProps {
   onOpenSession: (path: string) => void;
   onDeleteSession: (path: string) => void;
   onSwitchWorkspace: () => void;
-  onBrowser: (folder: "input" | "wiki" | "archive") => void;
+  onBrowser: (folder: "input" | "wiki") => void;
   onIngest: () => void;
   onViewIngest: () => void;
 }
@@ -38,7 +38,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
               {t("dashboard.kicker", { name: workspace?.name ?? "" })}
             </span>
             <h1 style={{ marginTop: "var(--space-2)" }}>{t("dashboard.title", { name: workspace?.name ?? "" })}</h1>
-            <p>{t("dashboard.summary", { wiki: counts.wiki, input: counts.input, archive: counts.archive })}</p>
+            <p>{t("dashboard.summary", { wiki: counts.wiki, input: counts.input })}</p>
           </div>
           <div className="row" style={{ flexWrap: "wrap" }}>
             <button className="btn btn-primary" style={{ whiteSpace: "nowrap", flexShrink: 0 }} onClick={props.onAsk}>{t("dashboard.newQuestion")}</button>
@@ -70,7 +70,6 @@ export function Dashboard(props: DashboardProps): JSX.Element {
         <div className="folder-cards">
           <FolderCard dot="input" onClick={() => props.onBrowser("input")} />
           <FolderCard dot="wiki" onClick={() => props.onBrowser("wiki")} />
-          <FolderCard dot="archive" onClick={() => props.onBrowser("archive")} />
         </div>
 
         <section>
@@ -109,17 +108,17 @@ export function Dashboard(props: DashboardProps): JSX.Element {
   );
 }
 
-function FolderCard(props: { dot: "input" | "wiki" | "archive"; onClick: () => void }): JSX.Element {
+function FolderCard(props: { dot: "input" | "wiki"; onClick: () => void }): JSX.Element {
   const t = useT();
   const counts = useAtomValue(countsAtom);
-  const n = props.dot === "input" ? counts.input : props.dot === "wiki" ? counts.wiki : counts.archive;
-  const nameKey = props.dot === "input" ? "folder.input.name" : props.dot === "wiki" ? "folder.wiki.name" : "folder.archive.name";
-  const countKey = props.dot === "input" ? "folder.input.count" : props.dot === "wiki" ? "folder.wiki.count" : "folder.archive.count";
-  const descKey = props.dot === "input" ? "folder.input.desc" : props.dot === "wiki" ? "folder.wiki.desc" : "folder.archive.desc";
+  const n = props.dot === "input" ? counts.input : counts.wiki;
+  const nameKey = props.dot === "input" ? "folder.input.name" : "folder.wiki.name";
+  const countKey = props.dot === "input" ? "folder.input.count" : "folder.wiki.count";
+  const descKey = props.dot === "input" ? "folder.input.desc" : "folder.wiki.desc";
   return (
     <button type="button" className="folder-card" onClick={props.onClick}>
       <div className="fc-head">
-        <div className={`fc-icon ${props.dot}`}>{props.dot === "input" ? <Download size={18} /> : props.dot === "wiki" ? <FileText size={18} /> : <Archive size={18} />}</div>
+        <div className={`fc-icon ${props.dot}`}>{props.dot === "input" ? <Download size={18} /> : <FileText size={18} />}</div>
         <div>
           <div className="fc-name">{t(nameKey)}</div>
           <div className="fc-count mono">{t(countKey, { n })}</div>

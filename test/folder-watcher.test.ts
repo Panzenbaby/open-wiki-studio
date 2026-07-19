@@ -46,14 +46,17 @@ async function waitFor<T>(
   return last;
 }
 
-/** Fresh empty workspace with the given folders pre-created. The archive
- *  folder is VIRTUAL: it physically lives at `workspace/wiki/archive/` (since
- *  pi-okf-wiki 0.2.0), so pre-create it there — not at `workspace/archive/`. */
+/** Fresh empty workspace with the given folders pre-created. The OKF
+ *  archive lives under `workspace/wiki/archive/` (since pi-okf-wiki 0.2.0)
+ *  and is browsed as part of the wiki folder — pre-create it as a
+ *  subdirectory of `wiki/` when `wiki` is requested. */
 async function freshWorkspace(folders: readonly Folder[] = []): Promise<string> {
   const dir = join(tmpdir(), `watcher-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   await mkdir(dir, { recursive: true });
   for (const folder of folders) {
-    if (folder === "archive") {
+    if (folder === "wiki") {
+      // Pre-create the wiki folder together with its archive subtree so
+      // archive-write tests don't depend on post-construction mkdir.
       await mkdir(join(dir, "wiki", "archive"), { recursive: true });
     } else {
       await mkdir(join(dir, folder), { recursive: true });
@@ -63,10 +66,10 @@ async function freshWorkspace(folders: readonly Folder[] = []): Promise<string> 
 }
 
 /** Write `count` files into `folder/` in a tight loop so the underlying events
- *  arrive within a single debounce window. `folder` is a virtual Folder: the
- *  archive is written at `wiki/archive/`. */
+ *  arrive within a single debounce window. The archive lives at
+ *  `wiki/archive/` and is written through the `wiki` folder. */
 async function burstWrite(workspace: string, folder: Folder, count: number): Promise<void> {
-  const base = folder === "archive" ? join(workspace, "wiki", "archive") : join(workspace, folder);
+  const base = join(workspace, folder);
   for (let index = 0; index < count; index++) {
     await writeFile(join(base, `file-${index}-${Date.now()}.md`), "x", "utf8");
   }
@@ -165,18 +168,22 @@ describe("FolderWatcher", () => {
   // The single root watcher fires a rename event for the new dir, so
   // `wiki/archive/` appearing after construction is observed without a
   // reconcile timer (mirrors a fresh workspace before the first ingest creates
-  // it). Since pi-okf-wiki 0.2.0 the archive is virtual under `wiki/archive/`.
+  // it). Since pi-okf-wiki 0.2.0 the archive lives under `wiki/archive/` and
+  // routes to "wiki".
   it("observes a folder created after construction", async () => {
     const workspace = await trackWorkspace(await freshWorkspace(["input", "wiki"]));
+    // Remove the pre-created archive so we can observe its (re)creation.
+    await rm(join(workspace, "wiki", "archive"), { recursive: true, force: true });
     const { calls, listener } = recorder();
     makeWatcher(workspace, listener);
+    await warmup(calls);
 
     // Create wiki/archive/ after construction and write into it.
     await mkdir(join(workspace, "wiki", "archive"), { recursive: true });
     await writeFile(join(workspace, "wiki", "archive", "late.md.orig"), "x", "utf8");
 
     const found = await waitFor(
-      () => (calls.some((c) => c.folder === "archive") ? true : false),
+      () => (calls.some((c) => c.folder === "wiki") ? true : false),
       DEBOUNCE_MS + SLACK_MS,
     );
     expect(found).toBe(true);
@@ -184,9 +191,9 @@ describe("FolderWatcher", () => {
 
   // ── 4. Per-folder isolation ─────────────────────────────────────────
   // With a single root watcher (no sibling recursive watchers), a write under
-  // `input/` routes only to "input" — no spurious wiki/archive calls.
+  // `input/` routes only to "input" — no spurious wiki calls.
   it("does not fire for folders that were not written to", async () => {
-    const workspace = await trackWorkspace(await freshWorkspace(["input", "wiki", "archive"]));
+    const workspace = await trackWorkspace(await freshWorkspace(["input", "wiki"]));
     const { calls, listener } = recorder();
     makeWatcher(workspace, listener);
     await warmup(calls);
@@ -198,16 +205,17 @@ describe("FolderWatcher", () => {
     expect(calls.every((c) => c.folder === "input")).toBe(true);
   });
 
-  // ── 4b. Routing by top segment + virtual archive ───────────────────
-  // Confirms the route() parser: writes to different folders fire the
-  // matching folder, and writes under a non-watched root entry (sessions/)
-  // produce no calls at all. Also covers the VIRTUAL archive: since
-  // pi-okf-wiki 0.2.0 the archive lives at `wiki/archive/`, so a write there
-  // must route to "archive" (not "wiki"), while a `wiki/<concept>.md` write
-  // still routes to "wiki" (not "archive").
+  // ── 4b. Routing by top segment + archive subtree ───────────────────
+  // Confirms the route() parser: writes to different folders fire the matching
+  // folder, and writes under a non-watched root entry (sessions/) produce no
+  // calls at all. Also covers the archive subtree: since pi-okf-wiki 0.2.0 the
+  // archive lives at `wiki/archive/`, a write there must route to "wiki"
+  // (same top segment) — NOT be dropped — while a `wiki/<concept>.md` write
+  // also routes to "wiki". Both bump the wiki version so the wiki browser
+  // (which shows the `archive/` subdirectory) refreshes.
   it("routes events to the matching folder and ignores non-watched roots", async () => {
     const workspace = await trackWorkspace(
-      await freshWorkspace(["input", "wiki", "archive", "sessions" as unknown as Folder]),
+      await freshWorkspace(["input", "wiki", "sessions" as unknown as Folder]),
     );
     const { calls, listener } = recorder();
     makeWatcher(workspace, listener);
@@ -223,23 +231,27 @@ describe("FolderWatcher", () => {
       () => (calls.some((c) => c.folder === "wiki") ? true : false),
       DEBOUNCE_MS + SLACK_MS,
     );
-    // Virtual archive: `wiki/archive/<rel>` must route to "archive", not "wiki".
+
+    // Archive subtree: `wiki/archive/<rel>` must route to "wiki". Assert the
+    // wiki call count strictly increases after the archive write — this does
+    // NOT depend on the prior wiki/b.md flush having landed (coalescing may
+    // merge bursts); it only requires that the archive write produces a wiki
+    // call at all (i.e. is not dropped and not routed to a different folder).
+    const wikiCallsBefore = calls.filter((c) => c.folder === "wiki").length;
     await writeFile(join(workspace, "wiki", "archive", "c.md.orig"), "x", "utf8");
-    await waitFor(
-      () => (calls.some((c) => c.folder === "archive") ? true : false),
+    const archiveRoutedToWiki = await waitFor(
+      () => (calls.filter((c) => c.folder === "wiki").length > wikiCallsBefore ? true : false),
       DEBOUNCE_MS + SLACK_MS,
     );
+    expect(archiveRoutedToWiki).toBe(true);
+
     await writeFile(join(workspace, "sessions", "s.json"), "x", "utf8");
     await delay(DEBOUNCE_MS + SLACK_MS);
 
     const folders = new Set(calls.map((c) => c.folder));
     expect(folders.has("input")).toBe(true);
     expect(folders.has("wiki")).toBe(true);
-    expect(folders.has("archive")).toBe(true);
     expect(folders.has("sessions" as unknown as Folder)).toBe(false);
-    // The `wiki/archive/c.md.orig` write routed to "archive" and the
-    // `wiki/b.md` write routed to "wiki" — both present and neither
-    // cross-fired onto the other (covered by the two `has` checks above).
   }, (DEBOUNCE_MS + SLACK_MS) * 4 + 2000);
 
   // ── 5. dispose() cancels pending and stops future notifications ─────

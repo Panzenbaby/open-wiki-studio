@@ -47,11 +47,12 @@ export const wikiExistsAtom = atom<boolean>((get) => get(countsAtom).wiki > 0);
  *  a Modal by AppShell; cleared on close. */
 export const addFilesSummaryAtom = atom<AddFilesSummary | null>(null);
 
-// folder counts (dashboard)
-export const countsAtom = atom<{ input: number; wiki: number; archive: number }>({
+// folder counts (dashboard). `archive` is no longer a top-level folder:
+// the OKF archive lives under `wiki/archive/` and is browsed as part of the
+// wiki folder, so it has no separate count.
+export const countsAtom = atom<{ input: number; wiki: number }>({
   input: 0,
   wiki: 0,
-  archive: 0,
 });
 
 // sessions
@@ -81,7 +82,7 @@ export const ingestSummaryAtom = atom<IngestSummary | null>(null);
 export const ingestErrorAtom = atom<string | null>(null);
 
 // browser
-export const browserFolderAtom = atom<"input" | "wiki" | "archive">("wiki");
+export const browserFolderAtom = atom<"input" | "wiki">("wiki");
 export const browserModeAtom = atom<BrowserMode>("files");
 export const selectedFileAtom = atom<string | null>(null);
 
@@ -90,16 +91,16 @@ export const selectedFileAtom = atom<string | null>(null);
  * on disk. Bumped by exactly one source: the `onFolderChanged` event stream
  * from the main-process FolderWatcher, which fires for both in-app writes
  * (drag-and-drop, Add-button, ingest) and external OS edits/deletes on any
- * of `input`/`wiki`/`archive`.
+ * of `input`/`wiki` (the archive subtree under `wiki/archive/` is covered by
+ * the `wiki` bump).
  *
  * Browser subscribes to its active folder's version and re-lists on change.
  * This is the renderer's only "react to folder changes" mechanism — no
  * component manually re-lists after its own writes.
  */
-export const folderVersionAtom = atom<{ input: number; wiki: number; archive: number }>({
+export const folderVersionAtom = atom<{ input: number; wiki: number }>({
   input: 0,
   wiki: 0,
-  archive: 0,
 });
 
 // auto-update — state machine fed by `UpdateEvent`s from the main process.

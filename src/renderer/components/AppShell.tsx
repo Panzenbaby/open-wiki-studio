@@ -27,7 +27,7 @@ import {
   viewAtom,
   workspaceAtom,
 } from "../store.ts";
-import type { AddFilesSummary, Folder, SessionInfo } from "../../shared/ipc-types.ts";
+import type { AddFilesSummary, FileNode, Folder, SessionInfo } from "../../shared/ipc-types.ts";
 import { Sidebar } from "./Sidebar.tsx";
 import { Dashboard } from "../screens/Dashboard.tsx";
 import { Chat } from "../screens/Chat.tsx";
@@ -94,24 +94,33 @@ export function AppShell(): JSX.Element {
    *  (used on mount). With a `folder`, lists only that one and patches its
    *  count — used by the `onFolderChanged` handler so a single debounced
    *  burst costs one round-trip, not three. */
+  /** Count file entries in a folder result, excluding the OKF archive
+   *  subtree for the wiki folder. `listFolder("wiki")` walks `wiki/`
+   *  recursively and includes `wiki/archive/` (archived originals — pdf,
+   *  .md.orig, …), which are NOT concepts. The dashboard summary and
+   *  `wikiExistsAtom` are meant to reflect concept count, so drop entries
+   *  whose path (relative to `wiki/`) starts with `archive/`. */
+  function countConcepts(folder: Folder, files: readonly FileNode[]): number {
+    if (folder !== "wiki") return files.length;
+    return files.filter((node) => !node.relativePath.startsWith("archive/")).length;
+  }
+
   async function refreshCounts(folder?: Folder): Promise<void> {
     if (folder) {
       const result = await api.listFolder(folder);
       setCounts((current) => ({
         ...current,
-        [folder]: result.success ? result.data.length : 0,
+        [folder]: result.success ? countConcepts(folder, result.data) : 0,
       }));
       return;
     }
-    const [input, wiki, archive] = await Promise.all([
+    const [input, wiki] = await Promise.all([
       api.listFolder("input"),
       api.listFolder("wiki"),
-      api.listFolder("archive"),
     ]);
     setCounts({
       input: input.success ? input.data.length : 0,
-      wiki: wiki.success ? wiki.data.length : 0,
-      archive: archive.success ? archive.data.length : 0,
+      wiki: wiki.success ? countConcepts("wiki", wiki.data) : 0,
     });
   }
 
@@ -235,11 +244,11 @@ export function AppShell(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turnEnded]);
 
-  // External filesystem changes (OS-level add/delete/edit on input/wiki/archive)
-  // arrive from the main-process FolderWatcher. This is the renderer's single
-  // "react to folder changes" entry point: bump the per-folder version so any
-  // visible Browser re-lists, and patch just that folder's count (one
-  // round-trip, not three).
+  // External filesystem changes (OS-level add/delete/edit on input/wiki,
+  //  including the wiki/archive/ subtree) arrive from the main-process
+  //  FolderWatcher. This is the renderer's single "react to folder changes"
+  //  entry point: bump the per-folder version so any visible Browser re-lists,
+  //  and patch just that folder's count (one round-trip, not two).
   useEffect(() => {
     const unsubscribe = api.onFolderChanged((folder) => {
       setFolderVersion((version) => ({ ...version, [folder]: version[folder] + 1 }));

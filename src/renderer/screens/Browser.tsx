@@ -15,7 +15,6 @@ import type { FileNode, FilePreview, Folder } from "../../shared/ipc-types.ts";
 const FOLDERS: ReadonlyArray<{ id: Folder; labelKey: string }> = [
   { id: "input", labelKey: "folder.input.name" },
   { id: "wiki", labelKey: "folder.wiki.name" },
-  { id: "archive", labelKey: "folder.archive.name" },
 ];
 
 /** OS-adaptive i18n key for the "reveal in file manager" action. */

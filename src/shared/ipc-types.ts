@@ -59,8 +59,12 @@ export type CopilotLoginEvent =
   | { type: "device_code"; userCode: string; verificationUri: string }
   | { type: "progress"; message: string };
 
-// ─── Filesystem (input/wiki/archive) ─────────────────────────────────
-export type Folder = "input" | "wiki" | "archive";
+// ─── Filesystem (input/wiki) ─────────────────────────────────────────
+// The OKF archive lives physically at `workspace/wiki/archive/` (since
+// pi-okf-wiki 0.2.0) and is browsed as the `archive/` subdirectory of the
+// wiki folder — it is not a top-level folder. `Folder` covers only the two
+// top-level workspace folders the UI switches between.
+export type Folder = "input" | "wiki";
 
 /** Outcome of copying dropped/picked files (and folders) into `input/`.
  *  Paths are POSIX-style, relative to `input/`.
@@ -274,11 +278,12 @@ export interface AgentApi {
   onIngestSummary(listener: (summary: IngestSummary) => void): () => void;
   onCopilotLoginEvent(listener: (event: CopilotLoginEvent) => void): () => void;
   /** Subscribe to filesystem changes in the workspace folders. The listener
-   *  is called when `input/`, `wiki/`, or `archive/` is modified on disk —
-   *  whether the change originates inside the app (drag-and-drop, Add-button,
-   *  ingest) or outside (e.g. files deleted via the OS file manager). Use it
-   *  to trigger a re-list of the affected folder. This is the renderer's only
-   *  "a folder changed" signal — do not depend on a specific delivery cadence
-   *  (the main process is free to coalesce bursts). */
+   *  is called when `input/` or `wiki/` (including its `archive/` subtree)
+   *  is modified on disk — whether the change originates inside the app
+   *  (drag-and-drop, Add-button, ingest) or outside (e.g. files deleted via
+   *  the OS file manager). Use it to trigger a re-list of the affected
+   *  folder. This is the renderer's only "a folder changed" signal — do not
+   *  depend on a specific delivery cadence (the main process is free to
+   *  coalesce bursts). */
   onFolderChanged(listener: (folder: Folder) => void): () => void;
 }
