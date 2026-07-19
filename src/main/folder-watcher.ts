@@ -169,14 +169,30 @@ export class FolderWatcher {
 
   /** Determine which watched folder an event belongs to and schedule a flush.
    *  Events with no parseable filename, or under a non-watched root entry, are
-   *  ignored. */
+   *  ignored.
+   *
+   *  Archive is virtual: it physically lives at `wiki/archive/` (since
+   *  pi-okf-wiki 0.2.0). An event whose path begins with `wiki/archive/` is
+   *  routed to `"archive"`, NOT `"wiki"` — otherwise the archive browser would
+   *  never refresh on archive writes (its top segment is `wiki`). Other
+   *  `wiki/…` paths fall back to the top-segment rule (→ `"wiki"`). */
   private route(_eventType: string, filename: string | Buffer | null): void {
     if (this.disposed || filename == null) return;
     // `filename` is relative to the watched root. Buffer paths (Windows) →
     // decode as utf8; segment on either separator for cross-platform safety.
     const rel =
       typeof filename === "string" ? filename : filename.toString("utf8");
-    const top = rel.split(/[\\/]/)[0];
+    const segments = rel.split(/[\\/]/);
+    // Virtual archive: `wiki/archive/<…>` → route to "archive" (check before
+    // the top-segment rule, which would otherwise send it to "wiki"). Handles
+    // both POSIX and Windows separators. The `segments[1] === "archive"` test
+    // is an EXACT match on purpose — `wiki/archiveX/…` must NOT route to
+    // "archive" (only the real archive subtree does).
+    if (segments[0] === "wiki" && segments[1] === "archive") {
+      this.schedule("archive");
+      return;
+    }
+    const top = segments[0];
     if (top && WATCHED_SET.has(top)) this.schedule(top as Folder);
   }
 

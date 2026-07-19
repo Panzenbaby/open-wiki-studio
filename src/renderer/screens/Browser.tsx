@@ -203,6 +203,27 @@ export function Browser(): JSX.Element {
                 <div className="pv-body">
                   {preview.kind === "markdown" ? (
                     <MarkdownView source={preview.content} />
+                  ) : preview.kind === "binary" ? (
+                    <div className="empty" style={{ flex: 1 }}>
+                      <div className="glyph"><FileText size={28} /></div>
+                      <div className="e-title">{t("preview.binaryTitle")}</div>
+                      <div className="muted" style={{ maxWidth: 480, textAlign: "center" }}>
+                        {preview.content}
+                      </div>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        style={{ marginTop: "var(--space-3)" }}
+                        onClick={() => {
+                          const prefix = `${folder}/`;
+                          const relativePath = selected && selected.startsWith(prefix)
+                            ? selected.slice(prefix.length)
+                            : "";
+                          void api.revealInFileManager(folder, relativePath, false);
+                        }}
+                      >
+                        <ExternalLink size={14} /> {t(revealLabelKey(platform))}
+                      </button>
+                    </div>
                   ) : (
                     <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--font-body)", color: "var(--fg-2)", background: "transparent", border: "none", padding: 0 }}>{preview.content}</pre>
                   )}

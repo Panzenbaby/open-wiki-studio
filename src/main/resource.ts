@@ -18,18 +18,18 @@ let cached: string | undefined;
 export function resolveOkfExtensionPath(): string {
   if (cached) return cached;
   if (app.isPackaged) {
-    cached = join(process.resourcesPath, "pi-okf-wiki", "index.ts");
+    cached = join(process.resourcesPath, "pi-okf-wiki", "src", "index.ts");
     return cached;
   }
   const require = createRequire(import.meta.url);
   try {
     const pkgPath = require.resolve("pi-okf-wiki/package.json");
-    cached = join(dirname(pkgPath), "index.ts");
+    cached = join(dirname(pkgPath), "src", "index.ts");
     return cached;
   } catch {
     // Fallback: assume a standard node_modules layout relative to the bundle.
     const here = dirname(fileURLToPath(import.meta.url));
-    cached = join(here, "..", "..", "node_modules", "pi-okf-wiki", "index.ts");
+    cached = join(here, "..", "..", "node_modules", "pi-okf-wiki", "src", "index.ts");
     return cached;
   }
 }

@@ -22,7 +22,7 @@ export const messages: Record<Locale, Dict> = {
     // ── workspace picker ───────────────────────────────────────────
     "picker.title": "Choose a workspace",
     "picker.desc":
-      "The workspace is the folder containing input/, wiki/ and archive/ (they will be created if missing).",
+      "The workspace is the folder containing input/, wiki/ (with its archive/ of originals); they are created if missing.",
     "picker.chooseFolder": "Choose folder…",
     "picker.recent": "Recently opened",
     "picker.openFailed": "Could not open workspace",
@@ -178,6 +178,8 @@ export const messages: Record<Locale, Dict> = {
     "browser.reveal.finder": "Reveal in Finder",
     "browser.reveal.explorer": "Reveal in Explorer",
     "browser.reveal.fileManager": "Reveal in file manager",
+    "preview.binaryPlaceholder": "{path} is a binary file — preview not available. Use \"Reveal in file manager\" to open it.",
+    "preview.binaryTitle": "Binary file",
 
     // ── sidebar ───────────────────────────────────────────────────
     "sidebar.sessions": "Sessions",
@@ -295,7 +297,7 @@ export const messages: Record<Locale, Dict> = {
     // ── workspace picker ───────────────────────────────────────────
     "picker.title": "Wähle einen Workspace",
     "picker.desc":
-      "Der Workspace ist der Ordner, der input/, wiki/ und archive/ enthält (oder sie werden angelegt).",
+      "Der Workspace ist der Ordner, der input/, wiki/ (mit dessen archive/ an Originalen) enthält; wird angelegt, falls fehlend.",
     "picker.chooseFolder": "Ordner wählen…",
     "picker.recent": "Zuletzt geöffnet",
     "picker.openFailed": "Workspace konnte nicht geöffnet werden",
@@ -453,6 +455,8 @@ export const messages: Record<Locale, Dict> = {
     "browser.reveal.finder": "Im Finder anzeigen",
     "browser.reveal.explorer": "Im Explorer anzeigen",
     "browser.reveal.fileManager": "Im Dateimanager anzeigen",
+    "preview.binaryPlaceholder": "{path} ist eine Binärdatei — keine Vorschau verfügbar. \"Im Dateimanager anzeigen\" zum Öffnen verwenden.",
+    "preview.binaryTitle": "Binärdatei",
 
     // ── sidebar ───────────────────────────────────────────────────
     "sidebar.sessions": "Sessions",

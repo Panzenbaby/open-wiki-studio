@@ -31,15 +31,12 @@ if (Object.keys(deps).length === 0) {
 }
 
 // 1. Stage the extension (sources + package.json) to an isolated temp dir.
+//    The extension ships its sources under `src/` (see pi-okf-wiki
+//    package.json `files`), so copy the whole `src/` tree verbatim — this
+//    stays correct as new files are added without a per-file list to drift.
 const stage = await mkdtemp(join(tmpdir(), "okf-ext-stage-"));
-await cp(join(extDir, "index.ts"), join(stage, "index.ts"));
-for (const file of [
-  "wiki.ts", "update.ts", "query.ts", "types.ts", "files.ts",
-  "frontmatter.ts", "prompts.ts", "LICENSE",
-]) {
-  await cp(join(extDir, file), join(stage, file)).catch(() => undefined);
-}
-await cp(join(extDir, "extract"), join(stage, "extract"), { recursive: true }).catch(() => undefined);
+await cp(join(extDir, "src"), join(stage, "src"), { recursive: true });
+await cp(join(extDir, "LICENSE"), join(stage, "LICENSE")).catch(() => undefined);
 await writeFile(join(stage, "package.json"), JSON.stringify({ ...pkg, devDependencies: {}, peerDependencies: {} }, null, 2));
 
 // 2. Install runtime deps nested in the staging dir.

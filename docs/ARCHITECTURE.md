@@ -111,9 +111,16 @@ the OS. Key modules:
   before/after snapshots for the ingest summary.
 - **`wiki-graph.ts`** — builds the wiki graph (nodes = concepts, edges =
   cross-references); keeps link extraction as its own graph policy.
-- **`files.ts`** — filesystem operations on the `input/` / `wiki/` / `archive/`
-  folders (listing, preview, add-to-input, reveal in file manager), delegating
-  wiki concept reading to the `ConceptStore`.
+- **`files.ts`** — filesystem operations on the `input/` / `wiki/` /
+  `archive/` folders (listing, preview, add-to-input, reveal in file
+  manager), delegating wiki concept reading to the `ConceptStore`. The
+  `archive` folder is VIRTUAL: it physically lives at `wiki/archive/`
+  (since pi-okf-wiki 0.2.0). `workspaceDir` centralizes the translation
+  (used by `listFolder`/`revealInFileManager`), and `getPreview` resolves
+  archive selections against the same archive base dir, so the
+  `"input" | "wiki" | "archive"` `Folder` type stays unchanged AND archive
+  previews are confined to `wiki/archive/` (no `../` traversal out of the
+  archive, even to other workspace files).
 - **`config.ts`** — persists recent workspaces and the LLM config in Electron's
   `userData/config.json`, with serialized reads/writes.
 - **`resource.ts`** — resolves the bundled `pi-okf-wiki` extension entry path

@@ -67,6 +67,12 @@ async function walk(
     if (entry.name.startsWith(".")) continue;
     const abs = join(dir, entry.name);
     if (entry.isDirectory()) {
+      // The OKF bundle keeps archived originals under `wiki/archive/` (since
+      // pi-okf-wiki 0.2.0). Archived `.md.orig` files don't end in `.md` so the
+      // `endsWith(".md")` filter below already excludes them — but skip the
+      // whole subtree up front: archive can hold many binaries (pdf, docx, …)
+      // that would otherwise be stat'd + read for nothing.
+      if (dir === root && entry.name === "archive") continue;
       out.push(...(await walk(abs, root)));
     } else if (entry.isFile()) {
       const rel = relative(root, abs).split(sep).join("/");

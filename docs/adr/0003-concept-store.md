@@ -121,6 +121,11 @@ knowledge):
 - `readConcept` swallows read errors (returns `null`); `files.ts getPreview`
   falls through to a direct read on `null` to surface the error. Acceptable
   (rare path, single extra read).
-- Non-wiki `.md` files (in `input/`/`archive/`) now preview as raw markdown
-  without concept metadata, where before they parsed frontmatter. This is
-  more correct (input documents are not concepts) and was the agreed design.
+- Non-wiki `.md` files (in `input/`, or archived `.md.orig` originals under
+  `wiki/archive/`) now preview as raw markdown without concept metadata,
+  where before they parsed frontmatter. This is more correct (input documents
+  and archived originals are not concepts) and was the agreed design. Since
+  pi-okf-wiki 0.2.0 archived markdown originals are stored with an outermost
+  `.orig` suffix (`foo.md` → `foo.md.orig`), so they do NOT end in `.md` and
+  are excluded from the concept walk; binary originals (pdf, docx, …) keep
+  their real extension and preview as a `binary` placeholder.

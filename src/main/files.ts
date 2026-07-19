@@ -7,7 +7,7 @@
 //   - getPreview: single-file preview — wiki .md delegates to the store; text
 //     and binary stay here
 //   - addInputFiles / revealInFileManager: input-folder writes + OS integration
-import { copyFile, lstat, mkdir, readFile, readdir, stat } from "node:fs/promises";
+import { copyFile, lstat, mkdir, open, readFile, readdir, stat } from "node:fs/promises";
 import type { Dirent, Stats } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { shell } from "electron";
@@ -23,7 +23,21 @@ import type {
   Result,
 } from "../shared/ipc-types.ts";
 
-function workspaceDir(workspace: string, folder: Folder): string {
+/** Resolve a `Folder` to its physical base directory under `workspace`.
+ *
+ *  `input` and `wiki` are top-level siblings (`workspace/input`,
+ *  `workspace/wiki`). `archive` is a VIRTUAL folder: physically located at
+ *  `workspace/wiki/archive` (pi-okf-wiki 0.2.0 moved the archive into the OKF
+ *  bundle). Keeping the `Folder` type unchanged (`"input" | "wiki" | "archive"`)
+ *  and centralizing the translation here means every folder-path resolution
+ *  in the app agrees on where archive lives — callers never sprinkle
+ *  `if (folder === "archive")` themselves.
+ *
+ *  This is the SINGLE place that knows archive is virtual. Used by
+ *  `listFolder` (walk root) and `revealInFileManager` (base dir), both of
+ *  which already operate on a `Folder`. */
+export function workspaceDir(workspace: string, folder: Folder): string {
+  if (folder === "archive") return join(workspace, "wiki", "archive");
   return join(workspace, folder);
 }
 
@@ -91,7 +105,20 @@ export async function getPreview(
   workspace: string,
   relativePath: string,
 ): Promise<Result<FilePreview>> {
-  const absolute = safeResolve(workspace, relativePath);
+  // The renderer sends the VIRTUAL selection key (`${folder}/${rel}`). Archive
+  // is virtual: `archive/<rel>` physically lives at `wiki/archive/<rel>`.
+  // Resolve archive selections against the archive BASE dir (not the workspace
+  // root) so `safeResolve` confines the preview to `wiki/archive/` — an
+  // `archive/../../etc/passwd` selection can never read a file outside the
+  // archive, even if that file exists in the workspace. `input`/`wiki` keep
+  // resolving against the workspace root as before. `relativePath` itself
+  // (virtual form) is used for all extension/kind checks below — its suffix is
+  // the same as the physical file's, and `isWikiMarkdown` keys off the `wiki/`
+  // prefix which archive paths do not have.
+  const isArchive = relativePath.startsWith("archive/");
+  const base = isArchive ? workspaceDir(workspace, "archive") : workspace;
+  const stripped = isArchive ? relativePath.slice("archive/".length) : relativePath;
+  const absolute = safeResolve(base, stripped);
   if (!absolute) {
     return err<FilePreview>(mainT("error.invalidPath", { path: relativePath }), { path: relativePath });
   }
@@ -99,6 +126,9 @@ export async function getPreview(
   // Wiki markdown: delegate concept reading (conceptId, frontmatter metadata,
   // body) to the store. Reserved files (index/log) come back with kind !==
   // "concept" and no ConceptInfo, matching the previous RESERVED behaviour.
+  // Archived `.md.orig` files are under `archive/` (no `wiki/` prefix) so
+  // `isWikiMarkdown` excludes them — they are archived originals, not
+  // concepts, and must NOT get concept metadata.
   if (isWikiMarkdown(relativePath)) {
     const store = new ConceptStore(workspace);
     const concept = await store.readConcept(relativePath);
@@ -124,11 +154,34 @@ export async function getPreview(
   }
 
   // Non-wiki files, non-markdown, or a wiki .md the store could not read: read
-  // directly. Non-wiki .md is shown as raw markdown (no concept metadata) —
-  // input/archive documents are not concepts.
+  // directly. Non-wiki `.md` (and archived `.md.orig` — the markdown original)
+  // is shown as raw markdown WITHOUT concept metadata — input/archive
+  // documents are not concepts (archived `.md.orig` bodies are rendered
+  // verbatim, including any stored-but-unprocessed frontmatter block; that is
+  // the agreed "raw markdown, no metadata" behaviour per ADR 0003). Binary
+  // originals (pdf, docx, …) yield garbage on a utf8 read; detect that and
+  // return a `binary` placeholder instead.
   try {
+    const fd = await open(absolute, "r");
+    try {
+      const sniff = Buffer.alloc(BINARY_SNIFF_BYTES);
+      const { bytesRead } = await fd.read(sniff, 0, BINARY_SNIFF_BYTES, 0);
+      if (looksBinary(sniff.subarray(0, bytesRead))) {
+        return ok({
+          relativePath,
+          kind: "binary",
+          content: mainT("preview.binaryPlaceholder", { path: relativePath }),
+        });
+      }
+    } finally {
+      await fd.close();
+    }
+    // Sniffed as text — read the full content. For very large text files this
+    // still loads everything into memory, but text originals are the common
+    // small case; binary originals (the large-PDF risk) were handled above
+    // without reading the whole file.
     const content = await readFile(absolute, "utf8");
-    const isMarkdown = relativePath.endsWith(".md");
+    const isMarkdown = relativePath.endsWith(".md") || relativePath.endsWith(".md.orig");
     return ok({
       relativePath,
       kind: isMarkdown ? "markdown" : "text",
@@ -139,6 +192,22 @@ export async function getPreview(
       path: relativePath,
     });
   }
+}
+
+/** Heuristic for "is this file binary?" — the same rule `git` uses: a NUL byte
+ *  in the first 8 KB means binary. Archived originals (pdf, docx, png, …) trip
+ *  this; text files (incl. `.md.orig`) do not. Limitation: UTF-16 text files
+ *  contain NUL bytes in their encoding and would be misclassified as binary —
+ *  acceptable here because archive originals are pdf/docx/png, not UTF-16
+ *  text. The sniff reads only the first `BINARY_SNIFF_BYTES` from disk (via
+ *  `open`+`read`) so a multi-hundred-MB PDF never enters the heap. */
+const BINARY_SNIFF_BYTES = 8 * 1024;
+function looksBinary(buffer: Buffer): boolean {
+  const len = Math.min(buffer.length, BINARY_SNIFF_BYTES);
+  for (let i = 0; i < len; i++) {
+    if (buffer[i] === 0) return true;
+  }
+  return false;
 }
 
 export async function addInputFiles(

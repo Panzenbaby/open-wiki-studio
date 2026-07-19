@@ -12,10 +12,14 @@ interface MarkdownViewProps {
   readonly className?: string;
 }
 
-/** True for any internal wiki/concept link (not http/mailto/anchor). */
+/** True for any internal wiki/concept link (not http/mailto/anchor). Archive
+ *  citations (`/archive/…`, `archive/…`) are NOT concept links — they point at
+ *  archived originals inside the OKF bundle and are handled separately by
+ *  `openArchiveCitation`. */
 function isConceptLink(href: string | undefined): boolean {
   if (!href) return false;
   if (/^(https?:|mailto:|#)/.test(href)) return false;
+  if (isArchiveLink(href)) return false;
   // Relative concept reference: "wiki/x.md", "/x.md", "/x", "x/y.md", "x/y".
   return (
     href.startsWith("wiki/") ||
@@ -23,6 +27,24 @@ function isConceptLink(href: string | undefined): boolean {
     href.includes("/") ||
     /\.md$/.test(href)
   );
+}
+
+/** True for a citation link into the OKF archive. The extension emits
+ *  bundle-relative `/archive/<rel>` links; the leading `/` may or may not be
+ *  present in hand-written markdown. The path inside the archive may end in
+ *  `.md.orig` (an archived markdown original) or a binary extension (pdf,
+ *  docx, …). A bare `archive` (no trailing path) is not a file citation. */
+function isArchiveLink(href: string): boolean {
+  const p = href.replace(/^\//, "");
+  return p.startsWith("archive/");
+}
+
+/** The virtual selection key for an archive citation — the same
+ *  `${folder}/${rel}` form the Browser uses, so the preview path and the
+ *  click handler agree. `isArchiveLink` already guarantees the `archive/`
+ *  prefix (after any leading `/`), so this just strips that leading slash. */
+function toArchivePath(href: string): string {
+  return href.replace(/^\//, "");
 }
 
 /** Normalize any concept link to a workspace-relative "wiki/<concept-id>.md" path. */
@@ -49,8 +71,43 @@ export function MarkdownView(props: MarkdownViewProps): JSX.Element {
     setView("browser");
   }
 
+  /** Open a citation into the OKF archive. The link is bundle-relative
+   *  (`/archive/<rel>`); we route the browser to the virtual `archive` folder
+   *  and set the selection key to `archive/<rel>` so the existing preview path
+   *  picks up the archived original (`.md.orig` rendered as markdown, or a
+   *  binary placeholder for pdf/docx/…).
+   *
+   *  The three setStates are flushed as one batched re-render (React 18
+   *  auto-batches event-handler updates), so Browser sees a consistent
+   *  `[folder, selected]` pair. `getPreview` is additionally robust to any
+   *  folder-atom staleness: it sniffs the `archive/` prefix on the selection
+   *  key itself, so the translation does not depend on `browserFolder`
+   *  having propagated first. */
+  function openArchiveCitation(href: string): void {
+    setSelected(toArchivePath(href));
+    setBrowserFolder("archive");
+    setView("browser");
+  }
+
   const components: Components = {
     a({ href, children }) {
+      if (isArchiveLink(href ?? "")) {
+        return (
+          <button
+            type="button"
+            className="chip"
+            style={{
+              border: "1px solid var(--border)",
+              background: "var(--glass-bg)",
+            }}
+            title={toArchivePath(href ?? "")}
+            onClick={() => openArchiveCitation(href ?? "")}
+          >
+            <FileText size={12} />
+            {children}
+          </button>
+        );
+      }
       if (isConceptLink(href)) {
         return (
           <button
