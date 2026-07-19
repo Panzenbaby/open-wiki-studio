@@ -7,7 +7,50 @@
     <title>Open Wiki Studio</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!--
+        Pre-React splash: shown instantly while the JS bundle loads and
+        React mounts. `createRoot(#root).render()` replaces this content
+        on first render, so it never overlaps the real UI. The text is
+        localized inline (de/en) because the shared i18n dictionary is
+        only available after the bundle loads — values mirror the
+        `app.loading` / `app.name` keys in src/shared/i18n.ts and the
+        locale detection mirrors src/renderer/i18n.ts:detectLocale.
+      -->
+      <div id="oks-splash" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#0e1214;color:#868889;font-family:'Proxima Nova Soft','Avenir Next','Segoe UI',Verdana,Arial,Helvetica,sans-serif;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:14px;">
+          <img src="./assets/app-icon.png" alt="" width="72" height="72" style="width:72px;height:72px;border-radius:14px;display:block;box-shadow:0 16px 40px rgba(0,0,0,.55);" />
+          <span style="color:#f1f1f1;font-weight:700;font-size:20px;letter-spacing:.01em;">Open Wiki Studio</span>
+        </div>
+        <div id="oks-splash-loading" style="display:inline-flex;align-items:center;gap:10px;font-size:14px;">
+          <span style="display:inline-flex;gap:5px;align-items:center;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#c51a1b;animation:oks-splash-wave 1.4s ease-in-out infinite;"></span>
+            <span style="width:6px;height:6px;border-radius:50%;background:#c51a1b;animation:oks-splash-wave 1.4s ease-in-out infinite;animation-delay:.2s;"></span>
+            <span style="width:6px;height:6px;border-radius:50%;background:#c51a1b;animation:oks-splash-wave 1.4s ease-in-out infinite;animation-delay:.4s;"></span>
+          </span>
+          <span id="oks-splash-text">Loading…</span>
+        </div>
+      </div>
+      <style>
+        @keyframes oks-splash-wave {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.25; }
+          30% { transform: translateY(-5px); opacity: 1; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          #oks-splash-loading span > span { animation: none; opacity: 0.6; }
+        }
+      </style>
+      <script>
+        (function () {
+          try {
+            var lang = (typeof navigator !== "undefined" ? navigator.language : "en").toLowerCase();
+            var text = lang.indexOf("de") === 0 ? "Lade\u2026" : "Loading\u2026";
+            var el = document.getElementById("oks-splash-text");
+            if (el) el.textContent = text;
+          } catch (_) { /* splash stays in English */ }
+        })();
+      </script>
+    </div>
     <script type="module" src="./main.tsx"></script>
   </body>
 </html>
