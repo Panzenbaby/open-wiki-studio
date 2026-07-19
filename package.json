@@ -47,9 +47,10 @@
     "release:patch": "npm version patch -m \"chore(release): %s\"",
     "release:minor": "npm version minor -m \"chore(release): %s\"",
     "release:major": "npm version major -m \"chore(release): %s\"",
-    "package:mac": "electron-vite build && electron-builder --mac --arm64 --x64",
-    "package:win": "electron-vite build && electron-builder --win --arm64 --x64",
-    "package:linux": "electron-vite build && electron-builder --linux --arm64 --x64"
+    "package:mac": "electron-vite build && npm run sync-ext-deps && electron-builder --mac --arm64 --x64",
+    "package:win": "electron-vite build && npm run sync-ext-deps && electron-builder --win --arm64 --x64",
+    "package:linux": "electron-vite build && npm run sync-ext-deps && electron-builder --linux --arm64 --x64",
+    "sync-ext-deps": "node scripts/sync-ext-deps.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.80.3",
@@ -112,6 +113,8 @@
           "files.ts",
           "frontmatter.ts",
           "prompts.ts",
+          "extract/**",
+          "node_modules/**",
           "package.json",
           "LICENSE"
         ]
