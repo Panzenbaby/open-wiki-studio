@@ -64,9 +64,15 @@ function fatal(message: string, error?: unknown): void {
 
 async function activateWorkspace(folderPath: string): Promise<Result<WorkspaceInfo>> {
   try {
+    // Dispose the bridge BEFORE the repo: the bridge forwards repo event
+    // streams (chat/ingest) to the renderer, and disposing the bridge first
+    // stops the folder watcher too. Otherwise `repo.dispose()` could still
+    // emit ingest events into a live bridge (harmless — `send` is guarded by
+    // `isDestroyed` — but the order reads more correctly this way).
+    state.bridge?.dispose();
+    state.bridge = null;
     if (state.repo) await state.repo.dispose();
     state.repo = null;
-    state.bridge = null;
     state.workspace = null;
 
     const created = await AgentRepository.create(folderPath);
@@ -290,6 +296,8 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   const repo = state.repo;
   state.repo = null;
+  state.bridge?.dispose();
+  state.bridge = null;
   void repo.dispose().finally(() => {
     app.exit(0);
   });

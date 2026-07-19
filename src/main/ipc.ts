@@ -6,6 +6,7 @@ import { BrowserWindow, dialog, ipcMain, type WebContents } from "electron";
 import { addInputFiles, getPreview, listFolder, revealInFileManager } from "./files.ts";
 import { buildWikiGraph } from "./wiki-graph.ts";
 import { setLlmConfig } from "./config.ts";
+import { FolderWatcher } from "./folder-watcher.ts";
 import { errorMessage, ok, err } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
 import type { Folder, LlmConfig, ProviderId } from "../shared/ipc-types.ts";
@@ -15,6 +16,9 @@ const CHAT_CHANNEL = "okf:chat-event";
 const INGEST_CHANNEL = "okf:ingest-event";
 const SUMMARY_CHANNEL = "okf:ingest-summary";
 const COPILOT_LOGIN_CHANNEL = "okf:copilot-login-event";
+/** Pushed to the renderer whenever a workspace folder changes on disk (OS
+ *  edit, external delete, …) so views can re-list without polling. */
+const FOLDER_CHANGED_CHANNEL = "okf:folder-changed";
 
 /** Known `ProviderId` values — used to validate IPC payloads before forwarding. */
 const VALID_PROVIDERS: ReadonlyArray<ProviderId> = [
@@ -52,6 +56,8 @@ const BRIDGE_CHANNELS = [
 ] as const;
 
 export class IpcBridge {
+  private readonly watcher: FolderWatcher;
+
   constructor(
     private readonly webContents: WebContents,
     private readonly repo: AgentRepository,
@@ -61,10 +67,25 @@ export class IpcBridge {
     repo.setIngestListener((e) => this.send(INGEST_CHANNEL, e));
     repo.setSummaryListener((s) => this.send(SUMMARY_CHANNEL, s));
     repo.setCopilotLoginListener((e) => this.send(COPILOT_LOGIN_CHANNEL, e));
+    // Watch the workspace folders for external (OS) changes and forward a
+    // coalesced event per folder. The renderer re-lists on receipt.
+    this.watcher = new FolderWatcher(workspace, (folder) =>
+      this.send(FOLDER_CHANGED_CHANNEL, folder),
+    );
   }
 
   private send(channel: string, payload: unknown): void {
     if (!this.webContents.isDestroyed()) this.webContents.send(channel, payload);
+  }
+
+  /** Tear down the folder watcher. IPC handlers are NOT removed here: `register()`
+   *  calls `ipcMain.removeHandler(channel)` for every bridge channel before
+   *  re-`handle`-ing, so a workspace switch cleanly overwrites all handlers
+   *  (no duplicate-handler crash). On app quit the process is exiting anyway.
+   *  The watcher, by contrast, holds an OS resource that must be closed
+   *  explicitly — that's what this method does. */
+  dispose(): void {
+    this.watcher.dispose();
   }
 
   register(): void {

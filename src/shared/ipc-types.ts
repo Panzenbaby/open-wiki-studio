@@ -267,4 +267,12 @@ export interface AgentApi {
   onIngestEvent(listener: (event: AgentEvent) => void): () => void;
   onIngestSummary(listener: (summary: IngestSummary) => void): () => void;
   onCopilotLoginEvent(listener: (event: CopilotLoginEvent) => void): () => void;
+  /** Subscribe to filesystem changes in the workspace folders. The listener
+   *  is called when `input/`, `wiki/`, or `archive/` is modified on disk —
+   *  whether the change originates inside the app (drag-and-drop, Add-button,
+   *  ingest) or outside (e.g. files deleted via the OS file manager). Use it
+   *  to trigger a re-list of the affected folder. This is the renderer's only
+   *  "a folder changed" signal — do not depend on a specific delivery cadence
+   *  (the main process is free to coalesce bursts). */
+  onFolderChanged(listener: (folder: Folder) => void): () => void;
 }

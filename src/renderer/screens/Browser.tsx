@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { ExternalLink, FileText, Folder as FolderIcon, Plus, Share2 } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import { reportAddFilesResult } from "../add-files.ts";
-import { addFilesSummaryAtom, browserFolderAtom, browserModeAtom, platformAtom, selectedFileAtom, toastAtom } from "../store.ts";
+import { addFilesSummaryAtom, browserFolderAtom, browserModeAtom, folderVersionAtom, platformAtom, selectedFileAtom, toastAtom } from "../store.ts";
 import { MarkdownView } from "../components/MarkdownView.tsx";
 import { FileTree } from "../components/FileTree.tsx";
 import { ContextMenu, type ContextMenuItem, type ContextMenuPosition } from "../components/ContextMenu.tsx";
@@ -38,26 +38,45 @@ export function Browser(): JSX.Element {
   const [folder, setFolder] = useAtom(browserFolderAtom);
   const [mode, setMode] = useAtom(browserModeAtom);
   const [selected, setSelected] = useAtom(selectedFileAtom);
+  const folderVersion = useAtomValue(folderVersionAtom);
+  // Derived once so the refresh effect can list it as an honest dependency.
+  // Other folders' bumps are ignored to avoid needless re-lists.
+  const activeFolderVersion = folderVersion[folder];
   const [nodes, setNodes] = useState<readonly FileNode[]>([]);
   const [preview, setPreview] = useState<FilePreview | null>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [ctx, setCtx] = useState<CtxState | null>(null);
+  // Token guarding against stale overwrites: each refreshList call increments
+  // it; the response is applied only if the token still matches. Without this,
+  // rapid bursts could let a slow, older listFolder response clobber a fresher
+  // one.
+  const refreshToken = useRef(0);
 
-  async function refreshList(): Promise<void> {
+  // Memoized on `folder` so the effect below can depend on it honestly
+  // (no eslint-disable) without re-running on every render.
+  const refreshList = useCallback(async (): Promise<void> => {
+    const token = ++refreshToken.current;
     const list = await api.listFolder(folder);
+    if (refreshToken.current !== token) return; // a newer refresh superseded us
     setNodes(list.success ? list.data : []);
-  }
+  }, [folder]);
 
   async function addFiles(): Promise<void> {
     const result = await api.addInputFilesDialog();
-    const summary = reportAddFilesResult(result, { setToast, setSummary: setAddFilesSummary, t });
-    if (summary && summary.added.length > 0) await refreshList();
+    reportAddFilesResult(result, { setToast, setSummary: setAddFilesSummary, t });
+    // No manual `refreshList()` here: the dialog writes to `input/`, the
+    // FolderWatcher fires, `folderVersion.input` bumps, and the effect below
+    // re-lists. Folder refresh stays in one place.
   }
 
+  // Single refresh entry point for BOTH triggers: a folder switch (refreshList
+  // identity changes) and a FolderWatcher version bump for the active folder
+  // (activeFolderVersion changes). Honest deps, no eslint-disable; the
+  // refreshToken guard inside refreshList discards stale responses during
+  // rapid bursts.
   useEffect(() => {
     void refreshList();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folder]);
+  }, [refreshList, activeFolderVersion]);
 
   // Auto-expand all ancestor folders of the selected file so it stays
   // visible after a refresh or folder switch.

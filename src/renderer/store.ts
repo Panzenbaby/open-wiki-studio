@@ -72,6 +72,23 @@ export const browserFolderAtom = atom<"input" | "wiki" | "archive">("wiki");
 export const browserModeAtom = atom<BrowserMode>("files");
 export const selectedFileAtom = atom<string | null>(null);
 
+/**
+ * Monotonically incremented per folder whenever that folder's contents change
+ * on disk. Bumped by exactly one source: the `onFolderChanged` event stream
+ * from the main-process FolderWatcher, which fires for both in-app writes
+ * (drag-and-drop, Add-button, ingest) and external OS edits/deletes on any
+ * of `input`/`wiki`/`archive`.
+ *
+ * Browser subscribes to its active folder's version and re-lists on change.
+ * This is the renderer's only "react to folder changes" mechanism — no
+ * component manually re-lists after its own writes.
+ */
+export const folderVersionAtom = atom<{ input: number; wiki: number; archive: number }>({
+  input: 0,
+  wiki: 0,
+  archive: 0,
+});
+
 // auto-update — state machine fed by `UpdateEvent`s from the main process.
 // `lastAvailableInfoAtom` is internal bookkeeping so a download error can
 // revert the badge to the pulsing "available" state (with its version info).

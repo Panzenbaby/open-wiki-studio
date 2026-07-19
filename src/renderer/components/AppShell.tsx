@@ -8,6 +8,7 @@ import {
   addFilesSummaryAtom,
   browserFolderAtom,
   browserModeAtom,
+  folderVersionAtom,
   chatErrorAtom,
   chatStreamingAtom,
   chatTurnEndedAtom,
@@ -26,7 +27,7 @@ import {
   viewAtom,
   workspaceAtom,
 } from "../store.ts";
-import type { AddFilesSummary, SessionInfo } from "../../shared/ipc-types.ts";
+import type { AddFilesSummary, Folder, SessionInfo } from "../../shared/ipc-types.ts";
 import { Sidebar } from "./Sidebar.tsx";
 import { Dashboard } from "../screens/Dashboard.tsx";
 import { Chat } from "../screens/Chat.tsx";
@@ -47,7 +48,6 @@ export function AppShell(): JSX.Element {
   const setMessages = useSetAtom(messagesAtom);
   const messages = useAtomValue(messagesAtom);
   const ingestState = useAtomValue(ingestStateAtom);
-  const ingestSummary = useAtomValue(ingestSummaryAtom);
   const setIngestError = useSetAtom(ingestErrorAtom);
   const setIngestState = useSetAtom(ingestStateAtom);
   const setIngestStream = useSetAtom(ingestStreamAtom);
@@ -63,6 +63,7 @@ export function AppShell(): JSX.Element {
   const setToast = useSetAtom(toastAtom);
   const setAddFilesSummary = useSetAtom(addFilesSummaryAtom);
   const addFilesSummary = useAtomValue(addFilesSummaryAtom);
+  const setFolderVersion = useSetAtom(folderVersionAtom);
   const [dragOver, setDragOver] = useState<boolean>(false);
 
   /**
@@ -82,10 +83,26 @@ export function AppShell(): JSX.Element {
     if (paths.length === 0) return;
     const result = await api.addInputFiles(paths);
     reportAddFilesResult(result, { setToast, setSummary: setAddFilesSummary, t });
-    await refreshCounts();
+    // No manual refresh here: `addInputFiles` writes to `input/`, the
+    // FolderWatcher fires for those writes, and the unified `onFolderChanged`
+    // handler in AppShell bumps `folderVersion` + refreshes counts. The
+    // Browser re-lists on the version bump. This keeps "react to folder
+    // changes" in exactly one place.
   }
 
-  async function refreshCounts(): Promise<void> {
+  /** Refresh folder counts. With no argument, re-lists all three folders
+   *  (used on mount). With a `folder`, lists only that one and patches its
+   *  count — used by the `onFolderChanged` handler so a single debounced
+   *  burst costs one round-trip, not three. */
+  async function refreshCounts(folder?: Folder): Promise<void> {
+    if (folder) {
+      const result = await api.listFolder(folder);
+      setCounts((current) => ({
+        ...current,
+        [folder]: result.success ? result.data.length : 0,
+      }));
+      return;
+    }
     const [input, wiki, archive] = await Promise.all([
       api.listFolder("input"),
       api.listFolder("wiki"),
@@ -189,13 +206,17 @@ export function AppShell(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-useEffect(() => {
-    if (ingestSummary) void refreshCounts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ingestSummary]);
+  // Folder-count refresh is driven by the FolderWatcher (see the
+  // `onFolderChanged` effect below): ingest writes to `wiki/`, drag-and-drop
+  // and the Add-button write to `input/`, and OS edits touch any folder —
+  // all flow through the same handler. No per-action `refreshCounts()` here.
 
-  // Refresh folder counts whenever the user returns to the dashboard so
-  // changes made in the Browser are reflected.
+  // Safety net: fs.watch is best-effort (Linux rename gaps, transient
+  // watcher errors). When the user enters the dashboard, re-pull all three
+  // counts so a missed event can't leave the dashboard stale. This is
+  // navigation-triggered (not change-triggered), so it doesn't break the
+  // "FolderWatcher is the single change-reaction source" invariant — it's a
+  // cheap, view-local fallback.
   useEffect(() => {
     if (view === "dashboard") void refreshCounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -213,6 +234,20 @@ useEffect(() => {
     void refreshSessions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turnEnded]);
+
+  // External filesystem changes (OS-level add/delete/edit on input/wiki/archive)
+  // arrive from the main-process FolderWatcher. This is the renderer's single
+  // "react to folder changes" entry point: bump the per-folder version so any
+  // visible Browser re-lists, and patch just that folder's count (one
+  // round-trip, not three).
+  useEffect(() => {
+    const unsubscribe = api.onFolderChanged((folder) => {
+      setFolderVersion((version) => ({ ...version, [folder]: version[folder] + 1 }));
+      void refreshCounts(folder);
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const navBtn = (target: "chat" | "dashboard" | "browser", label: string): JSX.Element => (
     <button
