@@ -112,6 +112,7 @@ export const messages: Record<Locale, Dict> = {
     "dashboard.title": "Knowledge base \u201c{name}\u201d",
     "dashboard.summary":
       "{wiki} concepts · {input} pending.",
+    "dashboard.summaryShort": "{wiki} concepts",
     "dashboard.newQuestion": "New question",
     "dashboard.inputWaiting": "{n} files waiting in input/",
     "dashboard.ingestHint":
@@ -385,6 +386,7 @@ export const messages: Record<Locale, Dict> = {
     "dashboard.title": "Wissensbasis \u201e{name}\u201c",
     "dashboard.summary":
       "{wiki} Concepts · {input} ausstehend.",
+    "dashboard.summaryShort": "{wiki} Concepts",
     "dashboard.newQuestion": "Neue Frage",
     "dashboard.inputWaiting": "{n} Dateien warten in input/",
     "dashboard.ingestHint":

@@ -22,6 +22,8 @@ export function Dashboard(props: DashboardProps): JSX.Element {
   const currentSession = useAtomValue(currentSessionAtom);
   const running = ingestState === "running";
   const inputPending = counts.input > 0;
+  const showIngest = inputPending || running;
+  const summaryKey = showIngest ? "dashboard.summaryShort" : "dashboard.summary";
 
   const confirmDelete = (path: string, e: React.MouseEvent): void => {
     e.stopPropagation();
@@ -38,7 +40,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
               {t("dashboard.kicker", { name: workspace?.name ?? "" })}
             </span>
             <h1 style={{ marginTop: "var(--space-2)" }}>{t("dashboard.title", { name: workspace?.name ?? "" })}</h1>
-            <p>{t("dashboard.summary", { wiki: counts.wiki, input: counts.input })}</p>
+            <p>{t(summaryKey, showIngest ? { wiki: counts.wiki } : { wiki: counts.wiki, input: counts.input })}</p>
           </div>
           <div className="row" style={{ flexWrap: "wrap" }}>
             <button className="btn btn-primary" style={{ whiteSpace: "nowrap", flexShrink: 0 }} onClick={props.onAsk}>{t("dashboard.newQuestion")}</button>
@@ -46,7 +48,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
           </div>
         </div>
 
-        {(inputPending || running) && (
+        {showIngest && (
           <div className="ingest-hero" style={{ border: "1px solid color-mix(in oklab, var(--accent), transparent 40%)", background: "linear-gradient(180deg, color-mix(in oklab, var(--accent), transparent 90%), var(--surface))", borderRadius: "var(--radius-lg)", padding: "var(--space-6)", display: "flex", alignItems: "center", gap: "var(--space-6)" }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: "var(--text-xl)", display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
@@ -67,8 +69,8 @@ export function Dashboard(props: DashboardProps): JSX.Element {
           </div>
         )}
 
-        <div className="folder-cards">
-          <FolderCard dot="input" onClick={() => props.onBrowser("input")} />
+        <div className={`folder-cards${showIngest ? " single" : ""}`}>
+          {!showIngest && <FolderCard dot="input" onClick={() => props.onBrowser("input")} />}
           <FolderCard dot="wiki" onClick={() => props.onBrowser("wiki")} />
         </div>
 

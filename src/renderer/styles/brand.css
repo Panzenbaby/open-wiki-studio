@@ -529,6 +529,7 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .ws-hero h1 { font-size: var(--text-3xl); }
 .ws-hero p { color: var(--fg-2); margin-top: var(--space-2); max-width: 560px; }
 .folder-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
+.folder-cards.single { grid-template-columns: 1fr; }
 .folder-card { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-6); background: var(--glass-bg); cursor: pointer; transition: border-color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard); }
 .folder-card:hover { border-color: var(--accent); background: var(--glass-bg-hover); }
 button.folder-card { font: inherit; color: inherit; text-align: left; width: 100%; }
