@@ -77,7 +77,7 @@ function TreeBranch(props: BranchProps): JSX.Element {
           <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {node.name}
           </span>
-          <span className="tag">{node.children.length}</span>
+          <span className="tag">{node.fileCount}</span>
         </div>
         {isOpen && node.children.length > 0 && (
           <ul className="tree-children" role="group">

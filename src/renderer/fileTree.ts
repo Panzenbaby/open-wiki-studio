@@ -12,6 +12,10 @@ export interface TreeNode {
   readonly isDirectory: boolean;
   readonly size?: number;
   readonly children: readonly TreeNode[];
+  /** Total number of files reachable through this node (recursive).
+   *  For a file node this is always 1; for a directory it counts every
+   *  file in all nested subdirectories, not just immediate children. */
+  readonly fileCount: number;
 }
 
 const sep = "/";
@@ -29,12 +33,14 @@ export function buildFileTree(files: readonly FileNode[]): TreeNode {
     isDirectory: boolean;
     size?: number;
     children: Mutable[];
+    fileCount: number;
   };
   const root: Mutable = {
     relativePath: "",
     name: "",
     isDirectory: true,
     children: [],
+    fileCount: 0,
   };
 
   function getOrCreateDir(parent: Mutable, name: string, pathPrefix: string): Mutable {
@@ -47,6 +53,7 @@ export function buildFileTree(files: readonly FileNode[]): TreeNode {
       name,
       isDirectory: true,
       children: [],
+      fileCount: 0,
     };
     parent.children.push(dir);
     return dir;
@@ -67,6 +74,7 @@ export function buildFileTree(files: readonly FileNode[]): TreeNode {
       isDirectory: false,
       size: file.size,
       children: [],
+      fileCount: 1,
     };
     cursor.children.push(leaf);
   }
@@ -81,12 +89,19 @@ export function buildFileTree(files: readonly FileNode[]): TreeNode {
   sortNode(root);
 
   function freeze(node: Mutable): TreeNode {
+    const children = node.children.map(freeze);
+    // For a directory, fileCount = sum of all descendant files. Files
+    // carry fileCount = 1 directly, so summing children yields the total.
+    const fileCount = node.isDirectory
+      ? children.reduce((sum, child) => sum + child.fileCount, 0)
+      : 1;
     return {
       relativePath: node.relativePath,
       name: node.name,
       isDirectory: node.isDirectory,
       size: node.size,
-      children: node.children.map(freeze),
+      children,
+      fileCount,
     };
   }
   return freeze(root);
