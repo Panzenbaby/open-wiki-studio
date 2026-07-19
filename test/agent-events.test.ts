@@ -16,6 +16,7 @@ import {
   ingestSummaryAtom,
   messagesAtom,
   streamingSessionsAtom,
+  toastAtom,
 } from "../src/renderer/store.ts";
 import { t } from "../src/shared/i18n.ts";
 import type { AgentEvent, IngestSummary, SessionInfo } from "../src/shared/ipc-types.ts";
@@ -242,6 +243,97 @@ describe("bindAgentEvents — chat router", () => {
     expect(store.get(chatStreamingAtom)).toBe(false);
     expect(store.get(chatErrorAtom)).toBeNull();
   });
+
+  it("notify on current session → global toast, kind from notifyType", () => {
+    const store = createStore();
+    store.set(currentSessionAtom, session("p1"));
+    const f = makeApi();
+    bindAgentEvents(f.api, store, "en");
+
+    f.emitAgent({
+      type: "notify",
+      sessionPath: "p1",
+      message: "No wiki/ folder yet.",
+      notifyType: "warning",
+    });
+
+    expect(store.get(toastAtom)).toEqual({
+      message: "No wiki/ folder yet.",
+      kind: "warning",
+    });
+  });
+
+  it("notify on background session → toast STILL set (deliberately not isCurrent-gated)", () => {
+    // Regression guard for decision 9a: notify is a transient, session-agnostic
+    // notice. Unlike the thread-mutating branches (text_delta/agent_end/error),
+    // it must NOT be gated on sessionPath === current — a background pooled
+    // session's /wiki-query notify should still inform the user via toast.
+    const store = createStore();
+    store.set(currentSessionAtom, session("p1"));
+    const f = makeApi();
+    bindAgentEvents(f.api, store, "en");
+
+    f.emitAgent({
+      type: "notify",
+      sessionPath: "p2",
+      message: "wiki/ has no concepts yet.",
+      notifyType: "warning",
+    });
+
+    expect(store.get(toastAtom)).toEqual({
+      message: "wiki/ has no concepts yet.",
+      kind: "warning",
+    });
+  });
+
+  it("notify without notifyType → kind defaults to info", () => {
+    const store = createStore();
+    const f = makeApi();
+    bindAgentEvents(f.api, store, "en");
+
+    f.emitAgent({ type: "notify", sessionPath: "p1", message: "hi" });
+
+    expect(store.get(toastAtom)).toEqual({ message: "hi", kind: "info" });
+  });
+
+  it("notify maps each level to the right kind (info/warning/error)", () => {
+    const store = createStore();
+    const f = makeApi();
+    bindAgentEvents(f.api, store, "en");
+
+    f.emitAgent({ type: "notify", sessionPath: "p", message: "a", notifyType: "info" });
+    expect(store.get(toastAtom)?.kind).toBe("info");
+
+    f.emitAgent({ type: "notify", sessionPath: "p", message: "b", notifyType: "warning" });
+    expect(store.get(toastAtom)?.kind).toBe("warning");
+
+    f.emitAgent({ type: "notify", sessionPath: "p", message: "c", notifyType: "error" });
+    expect(store.get(toastAtom)?.kind).toBe("error");
+  });
+
+  it("notify is non-mutating to chat turn state", () => {
+    // A notify is NOT a turn. It must not flip streaming, set the chat error
+    // banner, append messages, or touch the streaming-sessions set — the
+    // original bug was exactly a /wiki-query that "started no turn" leaving no
+    // feedback; notify→toast is the defense-in-depth, not a turn signal.
+    const store = createStore();
+    store.set(currentSessionAtom, session("p1"));
+    store.set(messagesAtom, [{ role: "user", text: "hi" }]);
+    const f = makeApi();
+    bindAgentEvents(f.api, store, "en");
+
+    f.emitAgent({
+      type: "notify",
+      sessionPath: "p1",
+      message: "No wiki/ folder yet.",
+      notifyType: "warning",
+    });
+
+    expect(store.get(chatStreamingAtom)).toBe(false);
+    expect(store.get(chatErrorAtom)).toBeNull();
+    expect(store.get(messagesAtom)).toEqual([{ role: "user", text: "hi" }]);
+    expect(store.get(streamingSessionsAtom)).toEqual(new Set());
+  });
 });
 
 describe("bindAgentEvents — ingest router", () => {
@@ -302,6 +394,54 @@ describe("bindAgentEvents — ingest router", () => {
 
     expect(store.get(ingestStateAtom)).toBe("idle");
     expect(store.get(ingestErrorAtom)).toBe("broken");
+  });
+
+  it("ingest notify → global toast, kind from notifyType", () => {
+    const store = createStore();
+    const f = makeApi();
+    bindAgentEvents(f.api, store, "en");
+
+    f.emitIngest({
+      type: "notify",
+      sessionPath: "",
+      message: "input/ is empty — nothing to update.",
+      notifyType: "info",
+    });
+
+    expect(store.get(toastAtom)).toEqual({
+      message: "input/ is empty — nothing to update.",
+      kind: "info",
+    });
+  });
+
+  it("ingest notify without notifyType → kind defaults to info", () => {
+    const store = createStore();
+    const f = makeApi();
+    bindAgentEvents(f.api, store, "en");
+
+    f.emitIngest({ type: "notify", sessionPath: "", message: "note" });
+
+    expect(store.get(toastAtom)).toEqual({ message: "note", kind: "info" });
+  });
+
+  it("ingest notify is non-mutating to ingest state", () => {
+    // A /wiki-update warning must not flip ingest to "done" or "error", nor
+    // append to the ingest stream — it is a notice, not a turn outcome.
+    const store = createStore();
+    store.set(ingestStateAtom, "idle");
+    const f = makeApi();
+    bindAgentEvents(f.api, store, "en");
+
+    f.emitIngest({
+      type: "notify",
+      sessionPath: "",
+      message: "No wiki/ folder yet.",
+      notifyType: "warning",
+    });
+
+    expect(store.get(ingestStateAtom)).toBe("idle");
+    expect(store.get(ingestErrorAtom)).toBeNull();
+    expect(store.get(ingestStreamAtom)).toBe("");
   });
 
   it("onIngestSummary → summary set + state done", () => {

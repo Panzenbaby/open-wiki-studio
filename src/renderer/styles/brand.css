@@ -414,6 +414,21 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .empty .e-title { font-size: var(--text-lg); color: var(--fg-2); }
 .empty .e-sub { font-size: var(--text-sm); max-width: 420px; }
 
+/* ---------- chat: no-wiki state ---------- */
+.chat-nowiki-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--warn), transparent 55%);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--warn), transparent 90%);
+  color: var(--warn);
+  font-size: var(--text-sm);
+}
+.composer textarea:disabled { cursor: not-allowed; opacity: 0.5; }
+.composer .field-wrap:has(textarea:disabled) { border-color: var(--border-soft); }
+
 /* ---------- streaming / working state ---------- */
 .working .dots { display: inline-flex; gap: 4px; align-items: center; }
 .working .dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: wave 1.4s ease-in-out infinite; }
@@ -467,6 +482,7 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast .t-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
 .toast.err .t-dot { background: var(--danger); }
+.toast.warn .t-dot { background: var(--warn); }
 
 /* ---------- badges ---------- */
 .badge { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: var(--radius-pill); font-size: var(--text-xs); font-family: var(--font-mono); background: var(--glass-bg); color: var(--fg-2); border: 1px solid var(--border-soft); }

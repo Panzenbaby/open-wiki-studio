@@ -153,6 +153,12 @@ export const messages: Record<Locale, Dict> = {
     "chat.errorNoResponse":
       "The agent did not produce a response. Please try again.",
     "chat.errorPrefix": "Chat error",
+    "chat.noWikiTitle": "No wiki yet",
+    "chat.noWikiSub":
+      "Run /wiki-update to build the wiki from input/. Chat becomes available once the wiki has concepts.",
+    "chat.noWikiBanner":
+      "The wiki is empty. Run /wiki-update to rebuild it before asking questions.",
+    "chat.noWikiHint": "Chat unavailable — build the wiki first",
 
     // ── browser ───────────────────────────────────────────────────
     "browser.emptyFiles": "No files.",
@@ -422,6 +428,12 @@ export const messages: Record<Locale, Dict> = {
     "chat.errorNoResponse":
       "Der Agent hat keine Antwort erzeugt. Bitte versuche es erneut.",
     "chat.errorPrefix": "Chat-Fehler",
+    "chat.noWikiTitle": "Noch kein Wiki",
+    "chat.noWikiSub":
+      "Führe /wiki-update aus, um das Wiki aus input/ aufzubauen. Der Chat ist verfügbar, sobald das Wiki Concepts enthält.",
+    "chat.noWikiBanner":
+      "Das Wiki ist leer. Führe /wiki-update aus, um es neu aufzubauen, bevor du Fragen stellst.",
+    "chat.noWikiHint": "Chat nicht verfügbar — erst das Wiki aufbauen",
 
     // ── browser ───────────────────────────────────────────────────
     "browser.emptyFiles": "Keine Dateien.",

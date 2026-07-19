@@ -103,6 +103,7 @@ export class AgentRepository {
       workspace,
       forwardEvents: forwardAgentEvents,
       onChatEvent: (event) => this.chatListener?.(event),
+      attachNotify: attachNotifyForwarding,
       getIngestModel: () => this.ingestModel,
     });
   }
@@ -169,7 +170,10 @@ export class AgentRepository {
   private async bindIngest(): Promise<void> {
     this.ingestUnsub?.();
     await this.ingestSession.bindExtensions({});
-    this.ingestUnsub = forwardAgentEvents(this.ingestSession, "", (e) => this.ingestListener?.(e));
+    // Both forwarders use the ingest path "" (renderer ignores sessionPath for
+    // ingest). Routed through one helper so the empty path can't drift between
+    // the notify + event wiring.
+    this.ingestUnsub = bindIngestForwarding(this.ingestSession, (e) => this.ingestListener?.(e));
   }
 
   /**
@@ -674,6 +678,64 @@ export function forwardAgentEvents(
       });
     }
   });
+}
+
+/**
+ * The `ExtensionMode` we run in: `"print"` (non-interactive/headless). The
+ * app embeds pi without a TUI, so extensions never get terminal UI. This is
+ * the same mode `bindExtensions({})` installs by default; we re-state it
+ * explicitly when re-installing the (notify-overridden) UI context so the
+ * mode isn't a magic string at the call site.
+ */
+const EMBEDDED_UI_MODE = "print";
+
+/**
+ * Wire both extension-forwarding seams onto the ingest session in one place:
+ * `notify` overrides (→ renderer toast) and the pi→AgentEvent translator.
+ * The ingest session is ephemeral/in-memory and uses path "" (the renderer
+ * ignores sessionPath for ingest). Centralising this keeps the empty path
+ * from drifting between the two forwarders.
+ */
+function bindIngestForwarding(
+  session: AgentSession,
+  emit: (event: AgentEvent) => void,
+): () => void {
+  attachNotifyForwarding(session, "", emit);
+  return forwardAgentEvents(session, "", emit);
+}
+
+/**
+ * Override the extension UI `notify` on a freshly-bound session so extension
+ * notifications (e.g. "/wiki-query: No wiki/ folder yet") reach the renderer
+ * instead of being swallowed by the default no-op UI context.
+ *
+ * The default `ExtensionUIContext` installed by `bindExtensions({})` is a
+ * shared no-op singleton (`notify: () => {}`), so per-session routing requires
+ * a *fresh* context object. We spread the default and override only `notify`,
+ * preserving every other no-op method (and `theme`) without enumerating the
+ * full interface — robust to SDK additions. The spread object is a new
+ * reference, so `ExtensionRunner.hasUI()` flips to `true`; this is safe here
+ * because the app isolates to a single extension (pi-okf-wiki) that never
+ * gates on `ctx.hasUI`.
+ *
+ * `emit` receives a `notify` AgentEvent tagged with `sessionPath` ("" for the
+ * ingest session); the renderer routes it to the global toast.
+ */
+export function attachNotifyForwarding(
+  session: AgentSession,
+  sessionPath: string,
+  emit: (event: AgentEvent) => void,
+): void {
+  const runner = session.extensionRunner;
+  const base = runner.getUIContext();
+  runner.setUIContext(
+    {
+      ...base,
+      notify: (message: string, type?: "info" | "warning" | "error") =>
+        emit({ type: "notify", message, notifyType: type, sessionPath }),
+    },
+    EMBEDDED_UI_MODE,
+  );
 }
 
 /**

@@ -113,6 +113,15 @@ export interface ChatSessionPoolDeps {
   ) => () => void;
   /** Chat event sink (the agent's chatListener). */
   readonly onChatEvent: (event: AgentEvent) => void;
+  /** Wire an extension UI `notify` override onto a freshly-bound session so
+   *  extension notifications surface to the renderer (per-session, so
+   *  concurrent pooled sessions route to the correct listener). Injected by
+   *  the agent so the pool does not import it (shared with the ingest path). */
+  readonly attachNotify: (
+    session: AgentSession,
+    sessionPath: string,
+    emit: (event: AgentEvent) => void,
+  ) => void;
   /** Resolved model to apply to newly created sessions (read lazily, after
    *  reload + creation, so a configureLlm that races creation still applies). */
   readonly getIngestModel: () => ResolvedModel | null;
@@ -274,6 +283,10 @@ export class ChatSessionPool {
     });
     await session.bindExtensions({});
     const sessionPath = sessionManager.getSessionFile() ?? "";
+    // Forward extension `ctx.ui.notify` calls to the renderer. Done per-session
+    // after bind so concurrent pooled sessions route to the chat listener with
+    // their own sessionPath. (Ingest uses the same helper with path "".)
+    this.deps.attachNotify(session, sessionPath, this.deps.onChatEvent);
     const model = this.deps.getIngestModel();
     if (model) {
       try {

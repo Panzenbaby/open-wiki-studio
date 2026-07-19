@@ -116,6 +116,12 @@ class TestPool extends ChatSessionPool {
       workspace: "/test-workspace",
       forwardEvents: () => () => {},
       onChatEvent: () => {},
+      // The pool calls `attachNotify` inside `createLiveChatSession`, which
+      // this TestPool overrides (the override IS the test seam — see ADR
+      // 0005), so this stub is never invoked here. The `attachNotifyForwarding`
+      // helper itself is covered by test/agent.test.ts; the pool→helper wiring
+      // call is a one-liner kept simple enough for review to catch drift.
+      attachNotify: () => {},
       getIngestModel: () => null,
       maxLiveSessions,
     });

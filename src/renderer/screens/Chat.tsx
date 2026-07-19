@@ -3,7 +3,7 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { AlertTriangle, HelpCircle, RefreshCw, Send, Square } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
-import { chatErrorAtom, chatStreamingAtom, currentSessionAtom, messagesAtom } from "../store.ts";
+import { chatErrorAtom, chatStreamingAtom, currentSessionAtom, messagesAtom, wikiExistsAtom } from "../store.ts";
 import { stripQueryCommand } from "../../shared/text.ts";
 import type { Result } from "../../shared/ipc-types.ts";
 import { Message } from "../components/Message.tsx";
@@ -14,6 +14,7 @@ export function Chat(): JSX.Element {
   const [streaming, setStreaming] = useAtom(chatStreamingAtom);
   const [chatError, setChatError] = useAtom(chatErrorAtom);
   const current = useAtomValue(currentSessionAtom);
+  const wikiExists = useAtomValue(wikiExistsAtom);
   const setMessages = useSetAtom(messagesAtom);
   const [input, setInput] = useState("");
   // Send/retry debounce for the brief window before `agent_start` flips
@@ -65,7 +66,10 @@ export function Chat(): JSX.Element {
 
   async function send(): Promise<void> {
     const question = input.trim();
-    if (!question || pending) return;
+    // `!wikiExists` is also enforced by the disabled composer, but guard here
+    // so a programmatic send can never fire a /wiki-query that would silently
+    // no-op (no agent turn) without a wiki.
+    if (!question || pending || !wikiExists) return;
     setInput("");
     setChatError(null);
     setPending(true);
@@ -96,7 +100,7 @@ export function Chat(): JSX.Element {
   }
 
   async function retry(): Promise<void> {
-    if (streaming || pending) return;
+    if (streaming || pending || !wikiExists) return;
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     if (!lastUser) return;
     setChatError(null);
@@ -120,6 +124,23 @@ export function Chat(): JSX.Element {
     }
   }
 
+  // State matrix for the indicator shown above the message list. Mutually
+  // exclusive (24a): the no-wiki empty block and the slim banner never show
+  // together — one replaces the other depending on whether there's history.
+  const hasMessages = messages.length > 0;
+  const indicator:
+    | "noWikiEmpty"
+    | "wikiEmpty"
+    | "noWikiBanner"
+    | null =
+    !wikiExists && !hasMessages
+      ? "noWikiEmpty"
+      : !wikiExists && hasMessages
+        ? "noWikiBanner"
+        : wikiExists && !hasMessages
+          ? "wikiEmpty"
+          : null;
+
   return (
     <section className="chat">
       <div className="chat-head">
@@ -130,11 +151,24 @@ export function Chat(): JSX.Element {
       </div>
       <div className="chat-stream" ref={streamRef} onScroll={handleScroll}>
         <div className="thread">
-          {messages.length === 0 && (
+          {indicator === "noWikiEmpty" && (
+            <div className="empty">
+              <div className="glyph"><AlertTriangle size={28} /></div>
+              <div className="e-title">{t("chat.noWikiTitle")}</div>
+              <div className="e-sub">{t("chat.noWikiSub")}</div>
+            </div>
+          )}
+          {indicator === "wikiEmpty" && (
             <div className="empty">
               <div className="glyph"><HelpCircle size={28} /></div>
               <div className="e-title">{t("chat.emptyTitle")}</div>
               <div className="e-sub">{t("chat.emptySub")}</div>
+            </div>
+          )}
+          {indicator === "noWikiBanner" && (
+            <div className="chat-nowiki-banner">
+              <AlertTriangle size={14} />
+              <span>{t("chat.noWikiBanner")}</span>
             </div>
           )}
           {messages.map((message, index) => (
@@ -154,7 +188,7 @@ export function Chat(): JSX.Element {
               <div className="bubble">
                 <div className="content error-bubble">
                   <p>{t("chat.errorPrefix")}: {chatError}</p>
-                  <button className="btn btn-sm btn-ghost" onClick={retry} disabled={streaming}>
+                  <button className="btn btn-sm btn-ghost" onClick={retry} disabled={streaming || !wikiExists}>
                     <RefreshCw size={14} />
                     <span>{t("chat.retry")}</span>
                   </button>
@@ -174,11 +208,12 @@ export function Chat(): JSX.Element {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  void send();
+                  if (wikiExists) void send();
                 }
               }}
               placeholder={t("chat.placeholder")}
               rows={1}
+              disabled={!wikiExists}
             />
             {streaming ? (
               <button
@@ -191,15 +226,25 @@ export function Chat(): JSX.Element {
                 <Square size={16} />
               </button>
             ) : (
-              <button className="send" disabled={!input.trim() || pending} onClick={() => void send()}>
+              <button
+                className="send"
+                disabled={!input.trim() || pending || !wikiExists}
+                onClick={() => void send()}
+              >
                 <Send size={16} />
               </button>
             )}
           </div>
-          <div className="composer-hint">
-            <span>{t("chat.hintSend")}</span>
-            <span>{t("chat.hintAuto")}</span>
-          </div>
+          {wikiExists ? (
+            <div className="composer-hint">
+              <span>{t("chat.hintSend")}</span>
+              <span>{t("chat.hintAuto")}</span>
+            </div>
+          ) : (
+            <div className="composer-hint">
+              <span>{t("chat.noWikiHint")}</span>
+            </div>
+          )}
         </div>
       </div>
     </section>

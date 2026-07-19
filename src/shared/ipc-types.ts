@@ -122,7 +122,13 @@ export type AgentEvent =
   | { type: "message_end"; role: "user" | "assistant"; text: string }
   | { type: "agent_start"; sessionId: string; sessionPath: string }
   | { type: "agent_end"; sessionId: string; sessionPath: string; aborted: boolean; lastError?: string }
-  | { type: "error"; sessionPath: string; message: string };
+  | { type: "error"; sessionPath: string; message: string }
+  | {
+      type: "notify";
+      sessionPath: string;
+      message: string;
+      notifyType?: "info" | "warning" | "error";
+    };
 
 export interface IngestSummary {
   readonly leftover: readonly string[];

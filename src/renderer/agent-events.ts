@@ -16,6 +16,7 @@ import {
   ingestSummaryAtom,
   messagesAtom,
   streamingSessionsAtom,
+  toastAtom,
 } from "./store.ts";
 
 /** Minimal API surface the binder needs. Narrowing the param type lets tests
@@ -105,6 +106,23 @@ export function bindAgentEvents(
         store.set(chatStreamingAtom, false);
         store.set(chatErrorAtom, event.message);
       }
+    } else if (event.type === "notify") {
+      // Defense-in-depth: extension `ctx.ui.notify` (e.g. "/wiki-query: No
+      // wiki/ folder yet"). Surfaced as a global toast; the normal no-wiki
+      // path is already blocked by the chat composer gate, so this only fires
+      // when some bypass triggers /wiki-query without a wiki.
+      //
+      // Deliberately NO `isCurrent`/`sessionPath` check here, unlike the
+      // thread-mutating branches above: `messagesAtom`/`chatStreamingAtom`
+      // belong to the current session, so those must be session-routed, but a
+      // notify is a transient, non-modal, session-agnostic notice. Routing it
+      // to the global toast (not the current thread) means a notify from a
+      // background pooled session informs the user without polluting the
+      // current session's message list — intended (decision 9a), not a leak.
+      store.set(toastAtom, {
+        message: event.message,
+        kind: event.notifyType ?? "info",
+      });
     }
   });
 
@@ -128,6 +146,11 @@ export function bindAgentEvents(
     } else if (event.type === "error") {
       store.set(ingestStateAtom, "idle");
       store.set(ingestErrorAtom, event.message);
+    } else if (event.type === "notify") {
+      store.set(toastAtom, {
+        message: event.message,
+        kind: event.notifyType ?? "info",
+      });
     }
   });
 

@@ -27,7 +27,20 @@ export const llmConfiguredAtom = atom<boolean>(false);
 export const platformAtom = atom<string>("");
 /** App version reported by the main process (`app.getVersion()`). */
 export const currentVersionAtom = atom<string>("");
-export const toastAtom = atom<{ message: string; kind: "info" | "error" } | null>(null);
+export type ToastKind = "info" | "warning" | "error";
+
+export const toastAtom = atom<{ message: string; kind: ToastKind } | null>(null);
+
+/** Whether the workspace wiki has any content (`counts.wiki > 0`).
+ *
+ *  `countsAtom` is NOT live from disk — AppShell refreshes it from the
+ *  debounced `onFolderChanged` event stream (FolderWatcher coalesces a write
+ *  burst, then AppShell re-lists the wiki folder). So after /wiki-update
+ *  writes the first concept there is a small window (one debounce tick + one
+ *  folder-scan round-trip) during which the chat composer stays disabled.
+ *  The lag is intentional (coalescing external + in-app writes into one
+ *  refresh) and the gate flips as soon as the refreshed count lands. */
+export const wikiExistsAtom = atom<boolean>((get) => get(countsAtom).wiki > 0);
 
 /** Summary of the last add-files operation that needs a manual-acknowledge
  *  modal (failures, or a pure no-op where everything was skipped). Rendered as
