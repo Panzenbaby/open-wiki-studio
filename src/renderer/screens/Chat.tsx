@@ -50,6 +50,28 @@ export function Chat(): JSX.Element {
     if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
   }, [messages, streaming]);
 
+  // Scroll to the bottom whenever the active session changes (opening a
+  // session for the first time, or switching from one to another). The
+  // pinned-autoscroll effect above is gated on `pinnedRef`, which may be
+  // `false` if the user scrolled up in the previous session — so switching
+  // sessions would otherwise inherit that "not pinned" state and stay
+  // scrolled to the top. Resetting the pin here and scrolling after layout
+  // (rAF) guarantees the latest message is in view regardless of prior
+  // scroll position.
+  useEffect(() => {
+    pinnedRef.current = true;
+    const el = streamRef.current;
+    if (!el) return;
+    const scrollToBottom = (): void => {
+      el.scrollTop = el.scrollHeight;
+    };
+    scrollToBottom();
+    // A second pass after layout settles — markdown / images can grow the
+    // thread height after the synchronous pass.
+    const rafId = requestAnimationFrame(scrollToBottom);
+    return () => cancelAnimationFrame(rafId);
+  }, [current?.path]);
+
   // Shared turn runner: evaluates the Result of `ask`/`retryChat` and surfaces
   // synchronous failures as the chat error banner. `chatStreamingAtom` is
   // NOT touched here — it is driven solely by the `agent_start`/`agent_end`
