@@ -1,5 +1,5 @@
 import { useSetAtom } from "jotai";
-import { FileText } from "lucide-react";
+import { FileText, Folder as FolderIcon } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { remarkConceptLinks } from "../remark-concept-links.ts";
@@ -10,23 +10,19 @@ interface MarkdownViewProps {
   readonly source: string;
   /** Extra className(s) added to the wrapping container. */
   readonly className?: string;
-}
-
-/** True for any internal wiki/concept link (not http/mailto/anchor). Archive
- *  citations (`/archive/…`, `archive/…`) are NOT concept links — they point at
- *  archived originals inside the OKF bundle and are handled separately by
- *  `openArchiveCitation`. */
-function isConceptLink(href: string | undefined): boolean {
-  if (!href) return false;
-  if (/^(https?:|mailto:|#)/.test(href)) return false;
-  if (isArchiveLink(href)) return false;
-  // Relative concept reference: "wiki/x.md", "/x.md", "/x", "x/y.md", "x/y".
-  return (
-    href.startsWith("wiki/") ||
-    href.startsWith("/") ||
-    href.includes("/") ||
-    /\.md$/.test(href)
-  );
+  /** Wiki-relative path of the file being rendered (e.g.
+   *  "wiki/species/index.md"), used to resolve relative links against the
+   *  file's own directory — the same way VS Code's markdown preview does.
+   *  Omitted in the chat view, where the assistant always writes
+   *  wiki-root-relative links (`wiki/<concept-id>.md`). */
+  readonly basePath?: string;
+  /** Called when the user clicks a folder link (a href ending in "/").
+   *  `wikiDir` is the resolved wiki-relative directory with no trailing
+   *  slash (e.g. "wiki/species"). Only the Browser supplies this — it can
+   *  decide whether to open the folder's `index.md` or navigate into the
+   *  folder, because it owns the folder listing. When omitted, folder
+   *  links render as non-clickable text. */
+  readonly onOpenFolder?: (wikiDir: string) => void;
 }
 
 /** True for a citation link into the OKF archive. The extension emits
@@ -37,6 +33,26 @@ function isConceptLink(href: string | undefined): boolean {
 function isArchiveLink(href: string): boolean {
   const p = href.replace(/^\//, "");
   return p.startsWith("archive/");
+}
+
+/** External (http/mailto) or in-page anchor links — never internal wiki
+ *  navigation. */
+function isExternal(href: string): boolean {
+  return /^(https?:|mailto:|#)/.test(href);
+}
+
+/** A folder link: href ends in a slash (OKF index.md emits `* [name/](name/)`). */
+function isFolderLink(href: string): boolean {
+  return href.endsWith("/");
+}
+
+/** A concept-file link: href ends in `.md`. Bare names without a slash and
+ *  without `.md` are NOT concept links (left as ordinary `<a>`). The suffix
+ *  check is case-sensitive to match `isWikiMarkdown` in main/files.ts, so a
+ *  `Foo.MD` link falls through to a normal anchor instead of resolving to a
+ *  wiki path the store would not treat as a concept. */
+function isConceptFileLink(href: string): boolean {
+  return /\.md$/.test(href);
 }
 
 /** The selection key for an archive citation — the same `${folder}/${rel}`
@@ -50,13 +66,49 @@ function toArchivePath(href: string): string {
   return `wiki/${href.replace(/^\//, "")}`;
 }
 
-/** Normalize any concept link to a workspace-relative "wiki/<concept-id>.md" path. */
-function toWikiPath(href: string): string {
-  let p = href.replace(/^\//, "");
-  if (p.startsWith("wiki/")) p = p.slice("wiki/".length);
-  if (!p.endsWith(".md")) p += ".md";
-  return `wiki/${p}`;
+/** Resolve an internal wiki link to a wiki-relative path.
+ *
+ *  - Root-relative hrefs (starting with `wiki/` or `/`) resolve against the
+ *    wiki root — e.g. `wiki/foo/bar.md`, `/foo/bar.md`, or the bundle-relative
+ *    `/tables/orders.md` the agent writes in concept bodies.
+ *  - Relative hrefs (no prefix) resolve against the directory of `basePath`
+ *    when present (Browser preview), so `[Chimpanzees](chimpanzees.md)` from
+ *    `wiki/species/index.md` becomes `wiki/species/chimpanzees.md`, matching
+ *    VS Code preview behavior.
+ *  - Relative hrefs with no `basePath` (chat view) fall back to the wiki root
+ *    (`wiki/<href>`), so bare concept paths the remark plugin auto-linked in
+ *    assistant prose still resolve to a real concept — preserving the old
+ *    chat behavior.
+ *
+ *  For folder links (`kind: "folder"`) the returned path has no trailing
+ *  slash and no `.md`; for concept files (`kind: "file"`) it ends in `.md`. */
+function resolveWikiPath(
+  href: string,
+  basePath: string | undefined,
+): { wikiPath: string; kind: "file" | "folder" } {
+  const isFolder = isFolderLink(href);
+  const rootRelative = href.startsWith("/") || href.startsWith("wiki/");
+  // Drop a leading "/" and a redundant "wiki/" prefix for root-relative links.
+  let h = href.replace(/^\//, "");
+  if (h.startsWith("wiki/")) h = h.slice("wiki/".length);
+  // Drop the trailing slash for folder links.
+  if (isFolder) h = h.replace(/\/+$/, "");
+  if (!rootRelative) {
+    // Relative link: resolve against the file's own directory when we know
+    // it (Browser preview); otherwise fall back to the wiki root.
+    const baseDir = basePath && basePath.includes("/")
+      ? basePath.slice(0, basePath.lastIndexOf("/"))
+      : "";
+    h = baseDir ? `${baseDir}/${h}` : h;
+  }
+  const wikiPath = h.startsWith("wiki/") ? h : `wiki/${h}`;
+  return { wikiPath, kind: isFolder ? "folder" : "file" };
 }
+
+const chipStyle: Readonly<React.CSSProperties> = {
+  border: "1px solid var(--border)",
+  background: "var(--glass-bg)",
+};
 
 /**
  * Shared markdown renderer used by the chat view (Message.tsx) and the
@@ -68,8 +120,8 @@ export function MarkdownView(props: MarkdownViewProps): JSX.Element {
   const setSelected = useSetAtom(selectedFileAtom);
   const setBrowserFolder = useSetAtom(browserFolderAtom);
 
-  function openConcept(href: string): void {
-    setSelected(toWikiPath(href));
+  function openConcept(wikiPath: string): void {
+    setSelected(wikiPath);
     setBrowserFolder("wiki");
     setView("browser");
   }
@@ -96,44 +148,64 @@ export function MarkdownView(props: MarkdownViewProps): JSX.Element {
 
   const components: Components = {
     a({ href, children }) {
-      if (isArchiveLink(href ?? "")) {
+      const h = href ?? "";
+      if (isArchiveLink(h)) {
         return (
           <button
             type="button"
             className="chip"
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--glass-bg)",
-            }}
-            title={toArchivePath(href ?? "")}
-            onClick={() => openArchiveCitation(href ?? "")}
+            style={chipStyle}
+            title={toArchivePath(h)}
+            onClick={() => openArchiveCitation(h)}
           >
             <FileText size={12} />
             {children}
           </button>
         );
       }
-      if (isConceptLink(href)) {
+      if (isExternal(h)) {
+        return (
+          <a href={h} target="_blank" rel="noreferrer noopener">
+            {children}
+          </a>
+        );
+      }
+      // Internal concept/folder link. Bare names (no slash, no .md) are not
+      // concept links — fall through to an ordinary external anchor.
+      if (!isFolderLink(h) && !isConceptFileLink(h)) {
+        return (
+          <a href={h} target="_blank" rel="noreferrer noopener">
+            {children}
+          </a>
+        );
+      }
+      const resolved = resolveWikiPath(h, props.basePath);
+      if (resolved.kind === "folder") {
+        if (!props.onOpenFolder) return <span>{children}</span>;
         return (
           <button
             type="button"
             className="chip"
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--glass-bg)",
-            }}
-            title={toWikiPath(href ?? "")}
-            onClick={() => openConcept(href ?? "")}
+            style={chipStyle}
+            title={resolved.wikiPath}
+            onClick={() => props.onOpenFolder!(resolved.wikiPath)}
           >
-            <FileText size={12} />
+            <FolderIcon size={12} />
             {children}
           </button>
         );
       }
       return (
-        <a href={href} target="_blank" rel="noreferrer noopener">
+        <button
+          type="button"
+          className="chip"
+          style={chipStyle}
+          title={resolved.wikiPath}
+          onClick={() => openConcept(resolved.wikiPath)}
+        >
+          <FileText size={12} />
           {children}
-        </a>
+        </button>
       );
     },
   };

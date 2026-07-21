@@ -130,6 +130,51 @@ export function Browser(): JSX.Element {
     await api.revealInFileManager(folder, node.relativePath, node.isDirectory);
   }
 
+  /** Handle a folder link click from a rendered `index.md` (or any markdown
+   *  preview). `wikiDir` is a wiki-relative directory with no trailing slash
+   *  (e.g. "wiki/species"). If the folder has an `index.md`, open it as the
+   *  preview (the OKF convention — every indexed folder has one); otherwise
+   *  navigate the Browser into the folder by expanding it in the tree and
+   *  closing any open preview, so no stale preview state lingers.
+   *
+   *  `nodes` already lists every file under the wiki folder recursively (see
+   *  `listFolder`'s walk), so the `index.md` existence check is a local set
+   *  lookup — no extra IPC round-trip. */
+  function openFolderLink(wikiDir: string): void {
+    // wikiDir is wiki-relative, no trailing slash (e.g. "wiki/species"). For
+    // the nodes lookup we need the folder-relative path (no "wiki/" prefix),
+    // since listFolder lists files relative to the wiki folder.
+    const dirRel = wikiDir.startsWith("wiki/") ? wikiDir.slice("wiki/".length) : wikiDir;
+    const indexPath = dirRel ? `${dirRel}/index.md` : "index.md";
+    // `nodes` reflects the CURRENTLY listed folder, so the index.md
+    // existence check is only valid while the Browser is already on the wiki
+    // folder. A folder link rendered from a non-wiki preview (rare) would
+    // otherwise match against the wrong listing; in that case we skip the
+    // index check and just navigate into the folder.
+    const hasIndex =
+      folder === "wiki" &&
+      nodes.some((n) => n.relativePath === indexPath && !n.isDirectory);
+    if (hasIndex) {
+      setSelected(`${wikiDir}/index.md`);
+      setFolder("wiki");
+      return;
+    }
+    // No index.md (or not on the wiki folder): expand the folder in the tree
+    // and drop any open preview to avoid a stale preview state. dirRel is
+    // empty only for a link to the wiki root itself, which has no tree node
+    // to expand — skip the setExpanded in that case to avoid a dead entry.
+    setSelected(null);
+    setFolder("wiki");
+    if (dirRel) {
+      setExpanded((prev) => {
+        if (prev.has(dirRel)) return prev;
+        const next = new Set(prev);
+        next.add(dirRel);
+        return next;
+      });
+    }
+  }
+
   const ctxItems: ContextMenuItem[] = ctx
     ? [
         {
@@ -201,7 +246,11 @@ export function Browser(): JSX.Element {
                 )}
                 <div className="pv-body">
                   {preview.kind === "markdown" ? (
-                    <MarkdownView source={preview.content} />
+                    <MarkdownView
+                      source={preview.content}
+                      basePath={preview.relativePath}
+                      onOpenFolder={openFolderLink}
+                    />
                   ) : preview.kind === "binary" ? (
                     <div className="empty" style={{ flex: 1 }}>
                       <div className="glyph"><FileText size={28} /></div>
