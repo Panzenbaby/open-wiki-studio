@@ -46,9 +46,22 @@ execSync("npm install --omit=dev --no-package-lock --ignore-scripts", {
 });
 
 // 3. Copy the staged node_modules back into the app's extension checkout.
+//
+// `verbatimSymlinks: true` is essential: npm creates the `.bin/` shims as
+// *relative* symlinks (e.g. `../crc-32/bin/crc32.njs`). Without this flag,
+// Node's `fs.cp` rewrites every symlink target to an absolute path resolved
+// against the staging dir. Once we `rm` the staging dir below, those
+// absolute links dangle — and electron-builder's macOS code-signing pass
+// stats every file in the bundle and fails with ENOENT on the first broken
+// link (Linux/Windows don't sign, so they mask the bug). Preserving the
+// symlinks verbatim keeps them relative so they still resolve in the
+// destination.
 const target = join(extDir, "node_modules");
 await rm(target, { recursive: true, force: true });
-await cp(join(stage, "node_modules"), target, { recursive: true });
+await cp(join(stage, "node_modules"), target, {
+  recursive: true,
+  verbatimSymlinks: true,
+});
 await rm(stage, { recursive: true, force: true });
 
 console.log("[sync-ext-deps] populated", target);
