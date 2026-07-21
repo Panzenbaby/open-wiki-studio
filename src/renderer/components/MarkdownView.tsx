@@ -66,6 +66,21 @@ function toArchivePath(href: string): string {
   return `wiki/${href.replace(/^\//, "")}`;
 }
 
+/** Safely percent-decode a markdown link href so that spaces (and other
+ *  characters the writer encoded as `%20`/`%C3%A4`/…) match the real file
+ *  name on disk. The file tree keys use the raw decoded names, so a link
+ *  like `[Foo](My%20Doc.md)` must resolve to `wiki/My Doc.md`, not
+ *  `wiki/My%20Doc.md`. Malformed sequences (a stray `%` not followed by two
+ *  hex digits) are left untouched instead of throwing. Only applied to
+ *  internal wiki/archive links — external URLs keep their encoding. */
+function decodeHref(href: string): string {
+  try {
+    return decodeURIComponent(href);
+  } catch {
+    return href;
+  }
+}
+
 /** Resolve an internal wiki link to a wiki-relative path.
  *
  *  - Root-relative hrefs (starting with `wiki/` or `/`) resolve against the
@@ -150,13 +165,14 @@ export function MarkdownView(props: MarkdownViewProps): JSX.Element {
     a({ href, children }) {
       const h = href ?? "";
       if (isArchiveLink(h)) {
+        const archiveHref = decodeHref(h);
         return (
           <button
             type="button"
             className="chip"
             style={chipStyle}
-            title={toArchivePath(h)}
-            onClick={() => openArchiveCitation(h)}
+            title={toArchivePath(archiveHref)}
+            onClick={() => openArchiveCitation(archiveHref)}
           >
             <FileText size={12} />
             {children}
@@ -179,7 +195,7 @@ export function MarkdownView(props: MarkdownViewProps): JSX.Element {
           </a>
         );
       }
-      const resolved = resolveWikiPath(h, props.basePath);
+      const resolved = resolveWikiPath(decodeHref(h), props.basePath);
       if (resolved.kind === "folder") {
         if (!props.onOpenFolder) return <span>{children}</span>;
         return (
