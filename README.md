@@ -153,6 +153,23 @@ Each ingest runs in its own isolated session, so your chat history is never
 touched by the ingest. You can re-run `/wiki-update` anytime; existing concepts
 update in place when their source changed.
 
+### Supported file formats
+
+The agent understands the most common document formats. Files are grouped by
+how they are read:
+
+| Group | Extensions | How they are read |
+|-------|------------|-------------------|
+| Documents | `.pdf`, `.docx`, `.pptx`, `.odt`, `.epub`, `.rtf` | Text is extracted into Markdown before the agent reads it. |
+| Spreadsheets | `.xlsx`, `.csv` | Sheets are read as structured text (`.xlsx` is extracted, `.csv` is read directly). |
+| Web & markup | `.html`, `.htm`, `.md`, `.txt`, `.json` | Read as text — Markdown directly, HTML/HTM stripped to text. |
+| Images | `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp` | Read through the LLM's vision capability (requires a vision-capable model). |
+
+> **Not supported:** legacy Office formats (`.doc`, `.xls`, `.ppt`), older
+> OpenDocument variants (`.ods`, `.odp`), and any other extension not listed
+> above are left in `input/` as leftover files. Save these as one of the
+> supported formats and re-run `/wiki-update`.
+
 ### Asking questions
 
 Open the **Chat** view to ask questions about your wiki.
