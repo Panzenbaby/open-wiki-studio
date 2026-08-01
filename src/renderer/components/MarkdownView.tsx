@@ -237,7 +237,7 @@ export function MarkdownView(props: MarkdownViewProps): JSX.Element {
       return (
         <button
           type="button"
-          className="chip"
+          className={trashed ? "chip chip-removed" : "chip"}
           style={trashed ? trashChipStyle : chipStyle}
           title={trashed ? t("remove.trashHint") : selectionKey}
           onClick={() => void openFile(selectionKey)}

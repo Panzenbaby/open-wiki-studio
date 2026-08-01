@@ -350,6 +350,9 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 }
 .chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .chip:hover { border-color: var(--accent); background: color-mix(in oklab, var(--accent), transparent 82%); color: var(--fg); }
+/* A link into wiki/trash/: removed knowledge. The accent dot would read as a
+   live source, so it is muted along with the struck-through label. */
+.chip-removed::before { background: var(--muted); }
 .chip .num { color: var(--muted); }
 .sources { margin-top: var(--space-5); border-top: 1px solid var(--border-soft); padding-top: var(--space-4); }
 .sources h4 { font-size: var(--text-sm); color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: var(--space-3); font-family: var(--font-mono); font-weight: 600; }
