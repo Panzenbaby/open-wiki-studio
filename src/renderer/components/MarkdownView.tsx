@@ -37,6 +37,14 @@ function isArchiveLink(href: string): boolean {
   return p.startsWith("archive/");
 }
 
+/** True for a link into the bundle trash. The extension rewrites links to
+ *  removed concepts to `/trash/<rel>`, so the path itself is the marker — the
+ *  link label in the file is deliberately left unchanged, and the "this is
+ *  removed knowledge" signal is applied here at render time instead. */
+function isTrashLink(href: string): boolean {
+  return href.replace(/^\//, "").startsWith("trash/");
+}
+
 /** True for a link into the `input/` folder. Concepts are not supposed to
  *  cite input files (originals are archived first), but a hand-written link
  *  should still resolve instead of dead-ending. */
@@ -76,7 +84,7 @@ function toArchivePath(href: string): string {
  *  absolute references regardless of which concept cites them; everything
  *  else follows the wiki resolution rules (see `resolveWikiPath`). */
 function toSelectionKey(href: string, basePath: string | undefined): string {
-  if (isArchiveLink(href)) return toArchivePath(href);
+  if (isArchiveLink(href) || isTrashLink(href)) return toArchivePath(href);
   if (isInputLink(href)) return href.replace(/^\//, "");
   return resolveWikiPath(href, basePath).wikiPath;
 }
@@ -138,6 +146,14 @@ function resolveWikiPath(
 const chipStyle: Readonly<React.CSSProperties> = {
   border: "1px solid var(--border)",
   background: "var(--glass-bg)",
+};
+
+/** Removed knowledge stays reachable, but must not read as a live source. */
+const trashChipStyle: Readonly<React.CSSProperties> = {
+  ...chipStyle,
+  color: "var(--fg-2)",
+  opacity: 0.6,
+  textDecoration: "line-through",
 };
 
 /**
@@ -217,12 +233,13 @@ export function MarkdownView(props: MarkdownViewProps): JSX.Element {
         );
       }
       const selectionKey = toSelectionKey(decoded, props.basePath);
+      const trashed = isTrashLink(decoded);
       return (
         <button
           type="button"
           className="chip"
-          style={chipStyle}
-          title={selectionKey}
+          style={trashed ? trashChipStyle : chipStyle}
+          title={trashed ? t("remove.trashHint") : selectionKey}
           onClick={() => void openFile(selectionKey)}
         >
           <FileText size={12} />

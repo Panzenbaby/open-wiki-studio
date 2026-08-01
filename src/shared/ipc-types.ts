@@ -105,6 +105,34 @@ export interface ConceptInfo {
   readonly type: string;
 }
 
+// ─── Removal (concept / directory → wiki/trash/) ──────────────────
+/** A link from a surviving concept to one that is about to be removed. */
+export interface IncomingLink {
+  readonly fromConceptId: string;
+  readonly toConceptId: string;
+}
+
+/** What a removal would affect. Shown for confirmation before anything moves. */
+export interface RemovalPlan {
+  readonly conceptIds: readonly string[];
+  /** Directories that lose their last concept and therefore disappear. */
+  readonly directories: readonly string[];
+  readonly incomingLinks: readonly IncomingLink[];
+}
+
+export interface RemovedConcept {
+  readonly conceptId: string;
+  /** Bundle-relative trash path, e.g. `/trash/project/foo.md.orig`. */
+  readonly trashPath: string;
+}
+
+export interface RemovalReport {
+  readonly removed: readonly RemovedConcept[];
+  readonly removedDirectories: readonly string[];
+  /** Concepts whose links were redirected to the trash. */
+  readonly rewrittenConcepts: readonly string[];
+}
+
 export interface FilePreview {
   readonly relativePath: string;
   readonly kind: "markdown" | "text" | "binary";
@@ -274,6 +302,12 @@ export interface AgentApi {
   addInputFilesDialog(): Promise<Result<AddFilesSummary>>;
   /** Reveal a file/folder in the OS file manager (Finder / Explorer / file manager). */
   revealInFileManager(folder: Folder, relativePath: string, isDirectory: boolean): Promise<Result<void>>;
+
+  // removal
+  /** What removing this concept/directory would affect. Does not mutate. */
+  planRemoval(relativePath: string): Promise<Result<RemovalPlan>>;
+  /** Move a concept (or a whole directory of concepts) to `wiki/trash/`. */
+  removeFromWiki(relativePath: string): Promise<Result<RemovalReport>>;
 
   // sessions
   listSessions(): Promise<Result<readonly SessionInfo[]>>;

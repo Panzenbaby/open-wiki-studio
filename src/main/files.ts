@@ -51,14 +51,16 @@ function safeResolve(baseDir: string, relativePath: string): string | null {
 }
 
 /** Is `relativePath` a wiki markdown concept (starts with `wiki/` and ends
- *  with `.md`, but NOT under the `wiki/archive/` subtree)? The store handles
- *  only concept files; everything else (input/text/binary, and ALL archive
- *  originals — `.md.orig` by convention, but defensively any file under
- *  `wiki/archive/`, including a stray `.md`) is read directly here. The
- *  archive-subtree guard mirrors the ConceptStore walk's skip so a misplaced
- *  `.md` inside the archive can never be treated as a concept. */
+ *  with `.md`, but NOT under the `wiki/archive/` or `wiki/trash/` subtrees)?
+ *  The store handles only concept files; everything else (input/text/binary,
+ *  ALL archive originals and ALL trashed concepts — `.md.orig` by convention,
+ *  but defensively any file under those subtrees, including a stray `.md`) is
+ *  read directly here. The guards mirror the ConceptStore walk's skip so a
+ *  misplaced `.md` in either subtree can never be treated as a concept. */
 function isWikiMarkdown(relativePath: string): boolean {
-  if (relativePath.startsWith("wiki/archive/")) return false;
+  if (relativePath.startsWith("wiki/archive/") || relativePath.startsWith("wiki/trash/")) {
+    return false;
+  }
   return relativePath.startsWith("wiki/") && relativePath.endsWith(".md");
 }
 

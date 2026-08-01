@@ -4,7 +4,11 @@ import { resolve } from "node:path";
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    // pi-okf-wiki ships TypeScript sources (it is loaded by Pi, which
+    // transpiles them). The main process imports its removal logic directly,
+    // so it must be bundled and transpiled here rather than externalized —
+    // Node could not `import` a `.ts` file at runtime.
+    plugins: [externalizeDepsPlugin({ exclude: ["pi-okf-wiki"] })],
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, "src/main/index.ts") },

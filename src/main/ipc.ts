@@ -5,6 +5,7 @@
 import { BrowserWindow, dialog, ipcMain, type WebContents } from "electron";
 import { addInputFiles, fileExists, getPreview, listFolder, revealInFileManager } from "./files.ts";
 import { buildWikiGraph } from "./wiki-graph.ts";
+import { planRemoval, removeFromWiki } from "./wiki-remove.ts";
 import { setLlmConfig } from "./config.ts";
 import { FolderWatcher } from "./folder-watcher.ts";
 import { errorMessage, ok, err } from "../shared/result.ts";
@@ -43,6 +44,8 @@ const BRIDGE_CHANNELS = [
   "addInputFiles",
   "addInputFilesDialog",
   "revealInFileManager",
+  "planRemoval",
+  "removeFromWiki",
   "listSessions",
   "newSession",
   "openSession",
@@ -133,6 +136,8 @@ export class IpcBridge {
       },
       revealInFileManager: async (folder: Folder, relativePath: string, isDirectory: boolean) =>
         revealInFileManager(workspace, folder, relativePath, isDirectory),
+      planRemoval: async (relativePath: string) => planRemoval(workspace, relativePath),
+      removeFromWiki: async (relativePath: string) => removeFromWiki(workspace, relativePath),
       listSessions: async () => repo.listSessions(),
       newSession: async () => repo.newSession(),
       openSession: async (path: string) => repo.openSession(path),

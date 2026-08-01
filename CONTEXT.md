@@ -26,6 +26,17 @@ reserved lives in one place.
 `"log"`. Lets each caller apply its own include/exclude policy without
 re-deriving the reserved set.
 
+**Trash** — `wiki/trash/`, where removed concepts land (as `.md.orig`). Browsed
+like the archive, but excluded everywhere a concept is expected: the
+ConceptStore walk, the preview's concept detection, the graph, and
+`/wiki-query` retrieval. Removed knowledge must never resurface as a source.
+
+**Removal** — moving a concept (or a whole directory of them) into the Trash,
+redirecting incoming links to the trash path, regenerating `index.md`, and
+appending a `Removal` entry to `log.md`. Owned by pi-okf-wiki and called
+directly from the main process (`wiki-remove.ts`) — deterministic, no agent
+turn.
+
 ## ConceptStore (the deepened module)
 
 **ConceptStore** — the module that owns concept identity, metadata, and body.

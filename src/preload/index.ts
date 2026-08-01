@@ -32,6 +32,8 @@ const api: AgentApi = {
   addInputFiles: (filePaths) => ipcRenderer.invoke("okf:addInputFiles", filePaths),
   addInputFilesDialog: () => ipcRenderer.invoke("okf:addInputFilesDialog"),
   revealInFileManager: (folder, relativePath, isDirectory) => ipcRenderer.invoke("okf:revealInFileManager", folder, relativePath, isDirectory),
+  planRemoval: (relativePath) => ipcRenderer.invoke("okf:planRemoval", relativePath),
+  removeFromWiki: (relativePath) => ipcRenderer.invoke("okf:removeFromWiki", relativePath),
 
   listSessions: () => ipcRenderer.invoke("okf:listSessions"),
   newSession: () => ipcRenderer.invoke("okf:newSession"),
