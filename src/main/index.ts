@@ -13,10 +13,11 @@ import {
   listRecentWorkspaces,
   rememberWorkspace,
 } from "./config.ts";
+import { mergeWorkspaces } from "./workspace-merge.ts";
 import { createUpdateRepository, type UpdateRepository } from "./update-repository.ts";
 import { ok, err, errorMessage } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
-import type { ProviderId, Result, UpdateEvent, WorkspaceInfo } from "../shared/ipc-types.ts";
+import type { MergeReport, ProviderId, Result, UpdateEvent, WorkspaceInfo } from "../shared/ipc-types.ts";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
@@ -148,12 +149,43 @@ function registerGlobalHandlers(): void {
   ipcMain.handle("okf:pickWorkspace", async (): Promise<Result<WorkspaceInfo | null>> => {
     if (!state.window) return ok(null);
     const result = await dialog.showOpenDialog(state.window, {
-      properties: ["openDirectory"],
+      // `createDirectory` is macOS-only; the Windows and Linux folder pickers
+      // already offer a "new folder" button natively.
+      properties: ["openDirectory", "createDirectory"],
       title: mainT("dialog.chooseWorkspace"),
     });
     if (result.canceled || result.filePaths.length === 0) return ok(null);
     return activateWorkspace(result.filePaths[0]);
   });
+
+  ipcMain.handle(
+    "okf:pickMergeFolder",
+    async (_event, role: string): Promise<Result<string | null>> => {
+      if (!state.window) return ok(null);
+      const result = await dialog.showOpenDialog(state.window, {
+        properties: ["openDirectory", "createDirectory"],
+        title: mainT(role === "source" ? "dialog.chooseWorkspace" : "dialog.mergeTarget"),
+      });
+      if (result.canceled || result.filePaths.length === 0) return ok(null);
+      return ok(result.filePaths[0]);
+    },
+  );
+
+  // Merging is workspace-independent: it reads the sources and writes a new
+  // workspace, without touching the active AgentRepository. The renderer
+  // activates the result afterwards via `okf:openWorkspace`.
+  ipcMain.handle(
+    "okf:mergeWorkspaces",
+    async (_event, sources: readonly string[], target: string) => {
+      if (!Array.isArray(sources) || sources.some((path) => typeof path !== "string" || path === "")) {
+        return err<MergeReport>(mainT("error.invalidWorkspacePath"));
+      }
+      if (typeof target !== "string" || target === "") {
+        return err<MergeReport>(mainT("merge.errorInvalidTarget"));
+      }
+      return mergeWorkspaces(sources, target);
+    },
+  );
 
   ipcMain.handle("okf:openWorkspace", async (_event, path: string) => {
     // The renderer can pass any string here; validate it resolves to an

@@ -10,6 +10,8 @@ const api: AgentApi = {
   openWorkspace: (path) => ipcRenderer.invoke("okf:openWorkspace", path),
   pickWorkspace: () => ipcRenderer.invoke("okf:pickWorkspace"),
   forgetWorkspace: (path) => ipcRenderer.invoke("okf:forgetWorkspace", path),
+  pickMergeFolder: (role) => ipcRenderer.invoke("okf:pickMergeFolder", role),
+  mergeWorkspaces: (sources, target) => ipcRenderer.invoke("okf:mergeWorkspaces", sources, target),
 
   configureLlm: (config) => ipcRenderer.invoke("okf:configureLlm", config),
   listAvailableModels: (provider) => ipcRenderer.invoke("okf:listAvailableModels", provider),

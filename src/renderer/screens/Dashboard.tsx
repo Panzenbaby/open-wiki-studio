@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useAtomValue } from "jotai";
-import { ArrowLeftRight, Download, FileText, Play, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Download, FileText, Merge, Play, Trash2 } from "lucide-react";
 import { useT } from "../i18n.ts";
+import { MergeWorkspacesModal } from "../components/MergeWorkspacesModal.tsx";
 import { countsAtom, currentSessionAtom, ingestStateAtom, sessionsAtom, workspaceAtom } from "../store.ts";
 
 interface DashboardProps {
@@ -20,6 +22,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
   const ingestState = useAtomValue(ingestStateAtom);
   const sessions = useAtomValue(sessionsAtom);
   const currentSession = useAtomValue(currentSessionAtom);
+  const [merging, setMerging] = useState<boolean>(false);
   const running = ingestState === "running";
   const inputPending = counts.input > 0;
   const showIngest = inputPending || running;
@@ -45,6 +48,9 @@ export function Dashboard(props: DashboardProps): JSX.Element {
           <div className="row" style={{ flexWrap: "wrap" }}>
             <button className="btn btn-primary" style={{ whiteSpace: "nowrap", flexShrink: 0 }} onClick={props.onAsk}>{t("dashboard.newQuestion")}</button>
             <button className="btn btn-ghost" style={{ whiteSpace: "nowrap", flexShrink: 0 }} onClick={props.onSwitchWorkspace}><ArrowLeftRight size={14} /> {t("nav.switchWorkspace")}</button>
+            {/* A merge copies the wiki as it is on disk — refuse while an ingest
+                is rewriting it. */}
+            <button className="btn btn-ghost" style={{ whiteSpace: "nowrap", flexShrink: 0 }} disabled={running} onClick={() => setMerging(true)}><Merge size={14} /> {t("merge.action")}</button>
           </div>
         </div>
 
@@ -106,6 +112,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
           )}
         </section>
       </div>
+      {merging && <MergeWorkspacesModal onClose={() => setMerging(false)} />}
     </div>
   );
 }

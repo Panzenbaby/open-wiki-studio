@@ -22,6 +22,16 @@ export interface WorkspaceInfo {
   readonly missing?: boolean;
 }
 
+/** Outcome of merging several workspaces into a new one. Counts are over all
+ *  copied files (concepts, archive originals, input files). */
+export interface MergeReport {
+  /** Absolute path of the merged workspace. */
+  readonly workspace: string;
+  readonly concepts: number;
+  readonly renamed: number;
+  readonly deduplicated: number;
+}
+
 export interface AppSelfInfo {
   readonly version: string;
   readonly hasLlmConfig: boolean;
@@ -197,6 +207,12 @@ export interface AgentApi {
   /** Remove a workspace from the recent list (the folder on disk stays
    *  untouched). Returns `void`; never throws. */
   forgetWorkspace(path: string): Promise<Result<void>>;
+  /** Choose a folder for a merge — an additional source or the destination.
+   *  `null` when cancelled. */
+  pickMergeFolder(role: "source" | "target"): Promise<Result<string | null>>;
+  /** Merge the given workspaces into a new one at `target`. The sources stay
+   *  untouched. Open the result with `openWorkspace(report.workspace)`. */
+  mergeWorkspaces(sources: readonly string[], target: string): Promise<Result<MergeReport>>;
 
   // llm
   configureLlm(config: LlmConfig): Promise<Result<void>>;

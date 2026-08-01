@@ -33,6 +33,34 @@ export const messages: Record<Locale, Dict> = {
     "picker.forgetFailed": "Could not remove workspace",
     "picker.missing": "Folder no longer exists",
 
+    // ── merge workspaces ──────────────────────────────────────────
+    "merge.action": "Merge workspaces",
+    "merge.title": "Merge workspaces",
+    "merge.desc":
+      "Pick at least two workspaces. Their wikis, archives, and pending input files are copied into a new workspace; the originals stay untouched.",
+    "merge.sources": "Workspaces",
+    "merge.addSource": "Add folder…",
+    "merge.target": "Destination",
+    "merge.chooseTarget": "Choose folder…",
+    "merge.noTarget": "No folder chosen",
+    "merge.start": "Merge",
+    "merge.running": "Merging…",
+    "merge.cancel": "Cancel",
+    "merge.close": "Open merged workspace",
+    "merge.doneTitle": "Workspaces merged",
+    "merge.doneSummary":
+      "{concepts} concepts · {renamed} renamed · {deduplicated} deduplicated.",
+    "merge.logEntry":
+      "Merged workspaces {sources} — {concepts} concepts, {renamed} renamed, {deduplicated} deduplicated.",
+    "merge.errorTooFewSources": "Pick at least two workspaces to merge.",
+    "merge.errorDuplicateSource": "The same workspace was picked more than once.",
+    "merge.errorNotAWorkspace": "Not a workspace (no wiki/ folder): {path}",
+    "merge.errorTargetInsideSource":
+      "The destination must lie outside every source workspace: {path}",
+    "merge.errorTargetNotEmpty": "The destination folder is not empty: {path}",
+    "merge.errorFailed": "Merge failed: {detail}",
+    "merge.errorInvalidTarget": "Invalid destination folder",
+
     // ── first run ─────────────────────────────────────────────────
     "firstrun.title": "Connect an LLM",
     "firstrun.desc": "Stored globally and used for all workspaces.",
@@ -252,6 +280,7 @@ export const messages: Record<Locale, Dict> = {
     "error.ingestTimeout": "Ingest did not finish in time",
     "dialog.addFiles": "Add to input/",
     "dialog.chooseWorkspace": "Choose a workspace folder",
+    "dialog.mergeTarget": "Choose the folder for the merged workspace",
     "dialog.startupError": "Open Wiki Studio — startup error",
     "error.windowLoad": "Failed to load renderer window",
     "error.windowCreate": "Could not create window",
@@ -304,6 +333,34 @@ export const messages: Record<Locale, Dict> = {
       "Diesen Workspace aus der Liste entfernen? Der Ordner selbst bleibt unangetastet.",
     "picker.forgetFailed": "Workspace konnte nicht entfernt werden",
     "picker.missing": "Ordner existiert nicht mehr",
+
+    // ── Workspaces zusammenführen ─────────────────────────────────
+    "merge.action": "Workspaces zusammenführen",
+    "merge.title": "Workspaces zusammenführen",
+    "merge.desc":
+      "Wähle mindestens zwei Workspaces. Ihre Wikis, Archive und offenen Input-Dateien werden in einen neuen Workspace kopiert; die Originale bleiben unverändert.",
+    "merge.sources": "Workspaces",
+    "merge.addSource": "Ordner hinzufügen…",
+    "merge.target": "Ziel",
+    "merge.chooseTarget": "Ordner wählen…",
+    "merge.noTarget": "Kein Ordner gewählt",
+    "merge.start": "Zusammenführen",
+    "merge.running": "Wird zusammengeführt…",
+    "merge.cancel": "Abbrechen",
+    "merge.close": "Neuen Workspace öffnen",
+    "merge.doneTitle": "Workspaces zusammengeführt",
+    "merge.doneSummary":
+      "{concepts} Konzepte · {renamed} umbenannt · {deduplicated} dedupliziert.",
+    "merge.logEntry":
+      "Workspaces {sources} zusammengeführt — {concepts} Konzepte, {renamed} umbenannt, {deduplicated} dedupliziert.",
+    "merge.errorTooFewSources": "Wähle mindestens zwei Workspaces zum Zusammenführen.",
+    "merge.errorDuplicateSource": "Derselbe Workspace wurde mehrfach gewählt.",
+    "merge.errorNotAWorkspace": "Kein Workspace (kein wiki/-Ordner): {path}",
+    "merge.errorTargetInsideSource":
+      "Das Ziel muss außerhalb aller Quell-Workspaces liegen: {path}",
+    "merge.errorTargetNotEmpty": "Der Zielordner ist nicht leer: {path}",
+    "merge.errorFailed": "Zusammenführen fehlgeschlagen: {detail}",
+    "merge.errorInvalidTarget": "Ungültiger Zielordner",
 
     // ── first run ─────────────────────────────────────────────────
     "firstrun.title": "LLM verbinden",
@@ -529,6 +586,7 @@ export const messages: Record<Locale, Dict> = {
     "error.ingestTimeout": "Ingest wurde nicht rechtzeitig abgeschlossen",
     "dialog.addFiles": "Zu input/ hinzufügen",
     "dialog.chooseWorkspace": "Workspace-Ordner wählen",
+    "dialog.mergeTarget": "Ordner für den zusammengeführten Workspace wählen",
     "dialog.startupError": "Open Wiki Studio — Startfehler",
     "error.windowLoad": "Renderer-Fenster konnte nicht geladen werden",
     "error.windowCreate": "Fenster konnte nicht erstellt werden",
