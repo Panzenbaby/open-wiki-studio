@@ -1,7 +1,7 @@
 import { useAtom, useAtomValue } from "jotai";
 import { Plus, Trash2 } from "lucide-react";
 import { useT } from "../i18n.ts";
-import { currentSessionAtom, sessionsAtom, streamingSessionsAtom } from "../store.ts";
+import { currentSessionAtom, streamingSessionsAtom, visibleSessionsAtom } from "../store.ts";
 
 interface SidebarProps {
   onOpenSession: (path: string) => void;
@@ -15,7 +15,7 @@ interface SidebarProps {
 
 export function Sidebar(props: SidebarProps): JSX.Element {
   const t = useT();
-  const sessions = useAtomValue(sessionsAtom);
+  const sessions = useAtomValue(visibleSessionsAtom);
   const streamingSessions = useAtomValue(streamingSessionsAtom);
   const [current] = useAtom(currentSessionAtom);
 

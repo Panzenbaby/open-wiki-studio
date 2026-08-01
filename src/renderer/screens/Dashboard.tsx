@@ -3,7 +3,7 @@ import { useAtomValue } from "jotai";
 import { ArrowLeftRight, Download, FileText, Merge, Play, Trash2 } from "lucide-react";
 import { useT } from "../i18n.ts";
 import { MergeWorkspacesModal } from "../components/MergeWorkspacesModal.tsx";
-import { countsAtom, currentSessionAtom, ingestStateAtom, sessionsAtom, workspaceAtom } from "../store.ts";
+import { countsAtom, currentSessionAtom, ingestStateAtom, visibleSessionsAtom, workspaceAtom } from "../store.ts";
 
 interface DashboardProps {
   onAsk: () => void;
@@ -20,7 +20,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
   const counts = useAtomValue(countsAtom);
   const workspace = useAtomValue(workspaceAtom);
   const ingestState = useAtomValue(ingestStateAtom);
-  const sessions = useAtomValue(sessionsAtom);
+  const sessions = useAtomValue(visibleSessionsAtom);
   const currentSession = useAtomValue(currentSessionAtom);
   const [merging, setMerging] = useState<boolean>(false);
   const running = ingestState === "running";

@@ -58,6 +58,19 @@ export const countsAtom = atom<{ input: number; wiki: number }>({
 // sessions
 export const sessionsAtom = atom<readonly SessionInfo[]>([]);
 export const currentSessionAtom = atom<SessionInfo | null>(null);
+
+/** Session list for the UI: `sessionsAtom` plus the active session while it is
+ *  not yet listable. Pi persists a session file only once the first assistant
+ *  message exists, so a freshly asked question would otherwise be missing from
+ *  the list until the answer arrives — which reads as a failed send. */
+export const visibleSessionsAtom = atom<readonly SessionInfo[]>((get) => {
+  const sessions = get(sessionsAtom);
+  const current = get(currentSessionAtom);
+  if (!current || sessions.some((session) => session.path === current.path)) return sessions;
+  const firstUserMessage = get(messagesAtom).find((message) => message.role === "user");
+  if (!firstUserMessage) return sessions;
+  return [{ ...current, name: firstUserMessage.text }, ...sessions];
+});
 /** Paths of sessions with an in-flight agent turn (live sidebar indicator). */
 export const streamingSessionsAtom = atom<ReadonlySet<string>>(new Set<string>());
 
