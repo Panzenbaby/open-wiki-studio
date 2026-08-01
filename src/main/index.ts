@@ -256,8 +256,8 @@ async function createWindow(): Promise<BrowserWindow> {
   win.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
     log("did-fail-load", errorCode, errorDescription, validatedURL);
   });
-  win.webContents.on("console-message", (_event, level, message) => {
-    log("renderer:", level, message);
+  win.webContents.on("console-message", (event) => {
+    log("renderer:", event.level, event.message);
   });
 
   const devUrl = process.env["ELECTRON_RENDERER_URL"];
