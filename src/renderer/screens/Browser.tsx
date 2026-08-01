@@ -75,6 +75,8 @@ export function Browser(): JSX.Element {
   // rapid bursts could let a slow, older listFolder response clobber a fresher
   // one.
   const refreshToken = useRef(0);
+  /** Same stale-response guard as `refreshToken`, for the preview read. */
+  const previewToken = useRef(0);
 
   // Memoized on `folder` so the effect below can depend on it honestly
   // (no eslint-disable) without re-running on every render.
@@ -125,16 +127,30 @@ export function Browser(): JSX.Element {
     });
   }, [selected, folder]);
 
+  // Re-read the open file whenever its folder changes on disk, not just when
+  // the selection changes: a removal rewrites index.md and the citing
+  // concepts, and an ingest or an external edit changes files under the user's
+  // cursor too. Keyed on the folder the SELECTION lives in (not the folder the
+  // tree is showing), because a citation chip can open a wiki file while the
+  // tree sits on input/.
+  const selectedFolder = selected?.split("/")[0];
+  const selectedFolderVersion =
+    selectedFolder === "input" || selectedFolder === "wiki" ? folderVersion[selectedFolder] : 0;
+
   useEffect(() => {
     if (!selected) {
       setPreview(null);
       return;
     }
+    const token = ++previewToken.current;
     void (async () => {
       const result = await api.getPreview(selected);
+      // A newer read superseded us — dropping the stale response keeps a slow
+      // response from clobbering a fresher one during a burst of changes.
+      if (previewToken.current !== token) return;
       setPreview(result.success ? result.data : null);
     })();
-  }, [selected]);
+  }, [selected, selectedFolderVersion]);
 
   const tree = useMemo(() => buildFileTree(nodes), [nodes]);
 

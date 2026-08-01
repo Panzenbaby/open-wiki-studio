@@ -37,6 +37,29 @@ async function writeConcept(
   await writeFile(absolute, `---\n${frontmatter}\n---\n\n${body}\n`, "utf8");
 }
 
+describe("change notification", () => {
+  // The Browser re-reads the OPEN file on a folder-changed event, so a removal
+  // that silently failed to notify would leave a stale index.md on screen —
+  // the first bug found by hand after this feature shipped.
+  it("a removal notifies the wiki folder, so open previews re-read", async () => {
+    const { FolderWatcher, DEBOUNCE_MS } = await import("../src/main/folder-watcher.ts");
+    const folders: string[] = [];
+    const watcher = new FolderWatcher(workspace, (folder) => folders.push(folder));
+    try {
+      // Let the watcher's construction-time burst settle before acting.
+      await new Promise((resolve) => setTimeout(resolve, DEBOUNCE_MS + 400));
+      folders.length = 0;
+
+      await removeFromWiki(workspace, "project/foo.md");
+      await new Promise((resolve) => setTimeout(resolve, DEBOUNCE_MS + 600));
+
+      expect(folders).toContain("wiki");
+    } finally {
+      watcher.dispose();
+    }
+  });
+});
+
 describe("planRemoval", () => {
   it("reports the concepts and the concepts linking to them", async () => {
     const result = await planRemoval(workspace, "project/foo.md");
