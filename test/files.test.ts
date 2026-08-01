@@ -257,6 +257,15 @@ describe("archive layout (pi-okf-wiki 0.2.0)", () => {
     const escape = await getPreview(workspace, "wiki/archive/../../etc/passwd");
     expect(escape.success).toBe(false);
   });
+
+  it("getPreview confines trash selections to wiki/trash/ (traversal blocked)", async () => {
+    const workspace = await newWorkspace();
+    await mkdir(join(workspace, "wiki"), { recursive: true });
+    await writeFile(join(workspace, "wiki", "log.md"), "# Wiki Update Log", "utf8");
+
+    const result = await getPreview(workspace, "wiki/trash/../log.md");
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("ConceptStore archive exclusion (pi-okf-wiki 0.2.0)", () => {

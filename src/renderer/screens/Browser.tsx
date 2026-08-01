@@ -177,7 +177,8 @@ export function Browser(): JSX.Element {
     }
     // The preview would otherwise keep showing a file that is no longer there.
     // The tree itself re-lists via the FolderWatcher, like every other write.
-    if (selected?.startsWith(`wiki/${removal.relativePath}`)) setSelected(null);
+    const removedKey = `wiki/${removal.relativePath}`;
+    if (selected === removedKey || selected?.startsWith(`${removedKey}/`)) setSelected(null);
     setRemoval(null);
     setToast({ message: t("remove.done", { n: result.data.removed.length }), kind: "info" });
   }

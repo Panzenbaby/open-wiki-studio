@@ -121,7 +121,8 @@ export function conceptRenames(
   return renames;
 }
 
-/** archive-relative → archive-relative for the originals a plan moved. */
+/** Subtree-relative → subtree-relative for the raw files a plan moved. Used
+ *  for both `wiki/archive/` originals and `wiki/trash/` removed concepts. */
 export function archiveRenames(
   placements: readonly Placement[],
 ): ReadonlyMap<string, string> {
@@ -145,20 +146,21 @@ function stripMd(path: string): string {
 const LINK_RE =
   /(\[[^\]]*\]\()(<?)([^)>]+)(>?)(\))|((?:wiki\/)?[A-Za-z0-9_]+(?:\/[A-Za-z0-9_.-]+)+\.md)/g;
 
-/** Rewrite concept + archive references in a markdown fragment. Refs that no
- *  rename touches are returned verbatim, including their `/`, `wiki/`, and
- *  `#anchor` decorations. */
+/** Rewrite concept, archive, and trash references in a markdown fragment.
+ *  Refs that no rename touches are returned verbatim, including their `/`,
+ *  `wiki/`, and `#anchor` decorations. */
 export function rewriteLinks(
   text: string,
   concepts: ReadonlyMap<string, string>,
   archive: ReadonlyMap<string, string>,
+  trash: ReadonlyMap<string, string> = new Map(),
 ): string {
-  if (concepts.size === 0 && archive.size === 0) return text;
+  if (concepts.size === 0 && archive.size === 0 && trash.size === 0) return text;
   return text.replace(
     LINK_RE,
     (match, open?: string, lt?: string, target?: string, gt?: string, close?: string, bare?: string) => {
       const ref = open === undefined ? bare! : target!;
-      const rewritten = rewriteRef(ref, concepts, archive);
+      const rewritten = rewriteRef(ref, concepts, archive, trash);
       if (rewritten === null) return match;
       return open === undefined ? rewritten : `${open}${lt}${rewritten}${gt}${close}`;
     },
@@ -169,6 +171,7 @@ function rewriteRef(
   ref: string,
   concepts: ReadonlyMap<string, string>,
   archive: ReadonlyMap<string, string>,
+  trash: ReadonlyMap<string, string>,
 ): string | null {
   const cut = ref.search(/[#?]/);
   const path = cut === -1 ? ref : ref.slice(0, cut);
@@ -179,9 +182,10 @@ function rewriteRef(
   const rootSlash = rest.startsWith("/") ? "/" : "";
   if (rootSlash) rest = rest.slice(1);
 
-  if (rest.startsWith("archive/")) {
-    const renamed = archive.get(rest.slice("archive/".length));
-    return renamed === undefined ? null : `${rootSlash}archive/${renamed}${suffix}`;
+  for (const [dir, renames] of [["archive", archive], ["trash", trash]] as const) {
+    if (!rest.startsWith(`${dir}/`)) continue;
+    const renamed = renames.get(rest.slice(dir.length + 1));
+    return renamed === undefined ? null : `${rootSlash}${dir}/${renamed}${suffix}`;
   }
 
   const wikiPrefix = rest.startsWith("wiki/") ? "wiki/" : "";
@@ -199,9 +203,10 @@ export function rewriteConceptContent(
   content: string,
   concepts: ReadonlyMap<string, string>,
   archive: ReadonlyMap<string, string>,
+  trash: ReadonlyMap<string, string> = new Map(),
 ): string {
   const { head, body } = splitFrontmatter(content);
-  return head + rewriteLinks(body, concepts, archive);
+  return head + rewriteLinks(body, concepts, archive, trash);
 }
 
 function splitFrontmatter(content: string): { head: string; body: string } {
@@ -255,6 +260,9 @@ export interface LogSource {
   readonly content: string;
   readonly concepts: ReadonlyMap<string, string>;
   readonly archive: ReadonlyMap<string, string>;
+  /** Renames of `wiki/trash/` entries — `log.md` links to them from `Removal`
+   *  entries, which would otherwise dangle after a collision rename. */
+  readonly trash?: ReadonlyMap<string, string>;
 }
 
 interface LogEntry {
@@ -270,7 +278,7 @@ export function mergeLogs(sources: readonly LogSource[], mergeEntry: string): st
     for (const entry of parseLog(source.content)) {
       entries.push({
         date: entry.date,
-        text: rewriteLinks(entry.text, source.concepts, source.archive),
+        text: rewriteLinks(entry.text, source.concepts, source.archive, source.trash),
       });
     }
   }
@@ -311,6 +319,7 @@ interface ScannedSource {
   readonly name: string;
   readonly wiki: readonly FileEntry[];
   readonly archive: readonly FileEntry[];
+  readonly trash: readonly FileEntry[];
   readonly input: readonly FileEntry[];
   readonly log: string;
 }
@@ -364,8 +373,11 @@ async function scanSource(path: string, name: string): Promise<ScannedSource> {
   const wikiRoot = join(path, "wiki");
   // The root index.md/log.md are derived files: regenerated resp. merged
   // separately, never copied.
-  const wiki = await scanDir(wikiRoot, new Set(["archive"]), (rel) => RESERVED.has(rel));
+  // `trash/` is scanned as its own category, not as wiki content: its entries
+  // are removed knowledge and must not be planned or renamed as concepts.
+  const wiki = await scanDir(wikiRoot, new Set(["archive", "trash"]), (rel) => RESERVED.has(rel));
   const archive = await scanDir(join(wikiRoot, "archive"));
+  const trash = await scanDir(join(wikiRoot, "trash"));
   const input = await scanDir(join(path, "input"));
   let log = "";
   try {
@@ -373,7 +385,7 @@ async function scanSource(path: string, name: string): Promise<ScannedSource> {
   } catch {
     /* no log yet */
   }
-  return { path, name, wiki, archive, input, log };
+  return { path, name, wiki, archive, trash, input, log };
 }
 
 async function isDirectory(path: string): Promise<boolean> {
@@ -442,6 +454,7 @@ export async function mergeWorkspaces(
 
     const wikiPlans = planPlacements(scanned.map((s) => ({ name: s.name, files: s.wiki })));
     const archivePlans = planPlacements(scanned.map((s) => ({ name: s.name, files: s.archive })));
+    const trashPlans = planPlacements(scanned.map((s) => ({ name: s.name, files: s.trash })));
     const inputPlans = planPlacements(scanned.map((s) => ({ name: s.name, files: s.input })));
 
     await mkdir(join(targetPath, "wiki"), { recursive: true });
@@ -455,6 +468,7 @@ export async function mergeWorkspaces(
       const source = scanned[i]!;
       const concepts = conceptRenames(wikiPlans[i]!);
       const archive = archiveRenames(archivePlans[i]!);
+      const trash = archiveRenames(trashPlans[i]!);
 
       for (const placement of wikiPlans[i]!) {
         if (!placement.copy) {
@@ -468,7 +482,7 @@ export async function mergeWorkspaces(
           await copyFileTo(from, to);
           continue;
         }
-        const content = rewriteConceptContent(await readFile(from, "utf8"), concepts, archive);
+        const content = rewriteConceptContent(await readFile(from, "utf8"), concepts, archive, trash);
         await writeFileAt(to, content);
         if (!RESERVED.has(basename(placement.target))) {
           const parsed = parseDocument(content);
@@ -489,6 +503,18 @@ export async function mergeWorkspaces(
         await copyFileTo(
           join(source.path, "wiki", "archive", placement.relativePath),
           join(targetPath, "wiki", "archive", placement.target),
+        );
+      }
+
+      for (const placement of trashPlans[i]!) {
+        if (!placement.copy) {
+          deduplicated++;
+          continue;
+        }
+        if (placement.target !== placement.relativePath) renamed++;
+        await copyFileTo(
+          join(source.path, "wiki", "trash", placement.relativePath),
+          join(targetPath, "wiki", "trash", placement.target),
         );
       }
 
@@ -526,6 +552,7 @@ export async function mergeWorkspaces(
           content: source.log,
           concepts: conceptRenames(wikiPlans[i]!),
           archive: archiveRenames(archivePlans[i]!),
+          trash: archiveRenames(trashPlans[i]!),
         })),
         mergeEntry,
       ),

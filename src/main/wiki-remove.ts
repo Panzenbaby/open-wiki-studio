@@ -16,7 +16,6 @@ import {
 } from "pi-okf-wiki/src/remove.ts";
 
 import { err, ok } from "../shared/result.ts";
-import { mainT } from "./i18n.ts";
 import type { RemovalPlan, RemovalReport, Result } from "../shared/ipc-types.ts";
 
 function toRemovalPlan(plan: BundleRemovalPlan): RemovalPlan {
@@ -54,12 +53,9 @@ export async function removeFromWiki(
   workspace: string,
   relativePath: string,
 ): Promise<Result<RemovalReport>> {
+  // Passed through unwrapped: the renderer phrases the failure for the user
+  // (`remove.failed`), so prefixing it here would double the wording.
   const result = await removeFromBundle(workspace, relativePath);
-  if (!result.success) {
-    return err<RemovalReport>(
-      mainT("error.removeFromWiki", { detail: result.error.message }),
-      { path: result.error.path },
-    );
-  }
+  if (!result.success) return err<RemovalReport>(result.error.message, { path: result.error.path });
   return ok(toRemovalReport(result.data));
 }

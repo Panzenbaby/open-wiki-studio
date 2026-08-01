@@ -115,13 +115,20 @@ export async function listFolder(
  *  (e.g. from LLM output on a case-insensitive FS like macOS APFS / Windows
  *  NTFS) is still confined to the archive base rather than falling through to
  *  the looser workspace-root resolution. Other keys resolve against the
- *  workspace root. */
+ *  workspace root.
+ *
+ *  `wiki/trash/` is confined the same way: it holds removed concepts and is
+ *  reachable from links rewritten in surviving concepts, so a
+ *  `wiki/trash/../log.md` chip must not escape it either. */
+const CONFINED_SUBTREES: readonly string[] = ["archive", "trash"];
+
 function resolveSelectionKey(workspace: string, relativePath: string): string | null {
-  const ARCHIVE_PREFIX = "wiki/archive/";
-  const isArchive = relativePath.toLowerCase().startsWith(ARCHIVE_PREFIX);
-  const base = isArchive ? join(workspace, "wiki", "archive") : workspace;
-  const stripped = isArchive ? relativePath.slice(ARCHIVE_PREFIX.length) : relativePath;
-  return safeResolve(base, stripped);
+  for (const subtree of CONFINED_SUBTREES) {
+    const prefix = `wiki/${subtree}/`;
+    if (!relativePath.toLowerCase().startsWith(prefix)) continue;
+    return safeResolve(join(workspace, "wiki", subtree), relativePath.slice(prefix.length));
+  }
+  return safeResolve(workspace, relativePath);
 }
 
 /** Does the selection key name an existing regular file? Used by markdown

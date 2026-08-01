@@ -233,6 +233,37 @@ describe("mergeWorkspaces", () => {
     expect(index).toContain("B shared");
   });
 
+  it("merges wiki/trash/ as its own category and keeps links to it valid", async () => {
+    // Both sources removed a concept at the same path, so the trashed files
+    // collide and one gets renamed — the surviving concept's link must follow.
+    const a = await workspace("ta", {
+      "keeps.md": "---\ntitle: Keeps A\n---\n\nGone: [foo](/trash/project/foo.md.orig).\n",
+      "trash/project/foo.md.orig": "A removed foo",
+    });
+    const b = await workspace("tb", {
+      "other.md": "---\ntitle: Other B\n---\n\nB body\n",
+      "trash/project/foo.md.orig": "B removed foo",
+    });
+    const target = await mkdtemp(join(tmpdir(), "merge-target-"));
+    roots.push(target);
+
+    const result = await mergeWorkspaces([a, b], target);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    // Trashed files are not concepts: they must not inflate the concept count
+    // or show up in the index.
+    expect(result.data.concepts).toBe(2);
+    const index = await readFile(join(target, "wiki", "index.md"), "utf8");
+    expect(index).not.toContain("foo.md.orig");
+
+    // Both removed versions survive, and the link resolves to the one that
+    // actually holds source A's content.
+    const link = await readFile(join(target, "wiki", "keeps.md"), "utf8");
+    const target_ = /\(\/trash\/(\S+?)\)/.exec(link)?.[1];
+    expect(target_).toBeDefined();
+    expect(await readFile(join(target, "wiki", "trash", target_!), "utf8")).toBe("A removed foo");
+  });
+
   it("refuses a non-empty destination", async () => {
     const a = await workspace("v1", { "x.md": "x" });
     const b = await workspace("v2", { "y.md": "y" });
