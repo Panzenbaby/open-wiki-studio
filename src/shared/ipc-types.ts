@@ -153,8 +153,15 @@ export interface IngestSummary {
 }
 
 // ─── Wiki graph ────────────────────────────────────────────────────
+/** `concept` nodes are wiki markdown files (id = conceptId, no `.md`);
+ *  `source` nodes are archived originals cited by a concept (id =
+ *  `archive/<rel>`, extension included). The kind tells the click handler
+ *  which selection key to build. */
+export type GraphNodeKind = "concept" | "source";
+
 export interface GraphNode {
-  readonly id: string; // conceptId
+  readonly id: string; // conceptId, or `archive/<rel>` for sources
+  readonly kind: GraphNodeKind;
   readonly title: string;
   readonly type: string;
   readonly tags: readonly string[];
@@ -162,8 +169,8 @@ export interface GraphNode {
 }
 
 export interface GraphEdge {
-  readonly source: string; // conceptId
-  readonly target: string; // conceptId
+  readonly source: string; // node id
+  readonly target: string; // node id
 }
 
 export interface WikiGraph {
@@ -261,6 +268,8 @@ export interface AgentApi {
   // files
   listFolder(folder: Folder): Promise<Result<readonly FileNode[]>>;
   getPreview(relativePath: string): Promise<Result<FilePreview>>;
+  /** Whether the selection key (`${folder}/${rel}`) names an existing file. */
+  fileExists(relativePath: string): Promise<Result<boolean>>;
   addInputFiles(filePaths: readonly string[]): Promise<Result<AddFilesSummary>>;
   addInputFilesDialog(): Promise<Result<AddFilesSummary>>;
   /** Reveal a file/folder in the OS file manager (Finder / Explorer / file manager). */

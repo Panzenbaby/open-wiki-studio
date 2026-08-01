@@ -3,7 +3,7 @@
 // globally in index.ts; this bridge registers the handlers that need an
 // active AgentRepository.
 import { BrowserWindow, dialog, ipcMain, type WebContents } from "electron";
-import { addInputFiles, getPreview, listFolder, revealInFileManager } from "./files.ts";
+import { addInputFiles, fileExists, getPreview, listFolder, revealInFileManager } from "./files.ts";
 import { buildWikiGraph } from "./wiki-graph.ts";
 import { setLlmConfig } from "./config.ts";
 import { FolderWatcher } from "./folder-watcher.ts";
@@ -39,6 +39,7 @@ const BRIDGE_CHANNELS = [
   "logoutCopilot",
   "listFolder",
   "getPreview",
+  "fileExists",
   "addInputFiles",
   "addInputFilesDialog",
   "revealInFileManager",
@@ -116,6 +117,7 @@ export class IpcBridge {
       logoutCopilot: async () => repo.logoutCopilot(),
       listFolder: async (folder: Folder) => listFolder(workspace, folder),
       getPreview: async (relativePath: string) => getPreview(workspace, relativePath),
+      fileExists: async (relativePath: string) => fileExists(workspace, relativePath),
       addInputFiles: async (filePaths: readonly string[]) => addInputFiles(workspace, filePaths),
       addInputFilesDialog: async () => {
         const win = BrowserWindow.fromWebContents(webContents);

@@ -101,28 +101,48 @@ export async function listFolder(
   }
 }
 
-export async function getPreview(
-  workspace: string,
-  relativePath: string,
-): Promise<Result<FilePreview>> {
-  // The renderer sends the selection key (`${folder}/${rel}`). The OKF
-  // archive lives at `wiki/archive/<rel>` and is browsed as a subdirectory of
-  // the wiki folder. Detect that prefix and confine archive previews to the
-  // archive base (`workspace/wiki/archive/`) specifically — a
-  // `wiki/archive/../../etc/passwd` (or `wiki/archive/../secret.md`)
-  // selection can never read a file outside the archive, even if that file
-  // exists in the workspace. The prefix check is case-insensitive so a
-  // `wiki/Archive/…` link (e.g. from LLM output on a case-insensitive FS like
-  // macOS APFS / Windows NTFS) is still confined to the archive base rather
-  // than falling through to the looser workspace-root resolution. Other paths
-  // keep resolving against the workspace root as before. `relativePath` itself
-  // is used for all extension/kind checks below — its suffix is the same as
-  // the physical file's.
+/** Absolute path for a renderer selection key (`${folder}/${rel}`), or null
+ *  when the key escapes its base.
+ *
+ *  The OKF archive lives at `wiki/archive/<rel>` and is browsed as a
+ *  subdirectory of the wiki folder. Archive keys are confined to the archive
+ *  base (`workspace/wiki/archive/`) specifically — a
+ *  `wiki/archive/../../etc/passwd` (or `wiki/archive/../secret.md`) key can
+ *  never reach a file outside the archive, even if that file exists in the
+ *  workspace. The prefix check is case-insensitive so a `wiki/Archive/…` link
+ *  (e.g. from LLM output on a case-insensitive FS like macOS APFS / Windows
+ *  NTFS) is still confined to the archive base rather than falling through to
+ *  the looser workspace-root resolution. Other keys resolve against the
+ *  workspace root. */
+function resolveSelectionKey(workspace: string, relativePath: string): string | null {
   const ARCHIVE_PREFIX = "wiki/archive/";
   const isArchive = relativePath.toLowerCase().startsWith(ARCHIVE_PREFIX);
   const base = isArchive ? join(workspace, "wiki", "archive") : workspace;
   const stripped = isArchive ? relativePath.slice(ARCHIVE_PREFIX.length) : relativePath;
-  const absolute = safeResolve(base, stripped);
+  return safeResolve(base, stripped);
+}
+
+/** Does the selection key name an existing regular file? Used by markdown
+ *  link chips, which resolve on click so a link to a moved/deleted file
+ *  reports "not found" instead of navigating to an empty preview. */
+export async function fileExists(
+  workspace: string,
+  relativePath: string,
+): Promise<Result<boolean>> {
+  const absolute = resolveSelectionKey(workspace, relativePath);
+  if (!absolute) return ok(false);
+  const stats = await stat(absolute).catch(() => null);
+  return ok(stats?.isFile() === true);
+}
+
+export async function getPreview(
+  workspace: string,
+  relativePath: string,
+): Promise<Result<FilePreview>> {
+  // The renderer sends the selection key (`${folder}/${rel}`). `relativePath`
+  // itself is used for all extension/kind checks below — its suffix is the
+  // same as the physical file's.
+  const absolute = resolveSelectionKey(workspace, relativePath);
   if (!absolute) {
     return err<FilePreview>(mainT("error.invalidPath", { path: relativePath }), { path: relativePath });
   }

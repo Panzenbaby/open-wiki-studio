@@ -297,7 +297,7 @@ export const messages: Record<Locale, Dict> = {
     "graph.desc": "Concepts and the links between them.",
     "graph.loading": "Building graph…",
     "graph.empty": "No concepts yet. Run /wiki-update to build the wiki.",
-    "graph.nodes": "{n} concepts",
+    "graph.nodes": "{n} nodes",
     "graph.edges": "{n} links",
     "graph.zoomIn": "Zoom in",
     "graph.zoomOut": "Zoom out",
@@ -305,6 +305,8 @@ export const messages: Record<Locale, Dict> = {
     "graph.legend": "Types",
     "graph.type.index": "Index",
     "graph.type.log": "Log",
+    "graph.type.source": "Source",
+    "browser.fileMissing": "File not found: {path}",
   },
   de: {
     // ── app ────────────────────────────────────────────────────────
@@ -603,7 +605,7 @@ export const messages: Record<Locale, Dict> = {
     "graph.desc": "Concepts und ihre Verlinkungen.",
     "graph.loading": "Graph wird erstellt…",
     "graph.empty": "Noch keine Concepts. Führe /wiki-update aus, um das Wiki aufzubauen.",
-    "graph.nodes": "{n} Concepts",
+    "graph.nodes": "{n} Knoten",
     "graph.edges": "{n} Verlinkungen",
     "graph.zoomIn": "Vergrößern",
     "graph.zoomOut": "Verkleinern",
@@ -611,6 +613,8 @@ export const messages: Record<Locale, Dict> = {
     "graph.legend": "Typen",
     "graph.type.index": "Index",
     "graph.type.log": "Log",
+    "graph.type.source": "Quelle",
+    "browser.fileMissing": "Datei nicht gefunden: {path}",
   },
 };
 

@@ -171,7 +171,7 @@ export class ConceptStore {
    *  external / non-concept refs. Shared with wiki-graph's link extraction so
    *  the `wiki/` prefix + `.md` stripping rule is not duplicated. */
   normalizeRef(ref: string): string | null {
-    let p = ref.trim().split("#")[0]!.split("?")[0]!;
+    let p = stripAngleBrackets(ref).split("#")[0]!.split("?")[0]!;
     if (/^(https?:|mailto:)/.test(p)) return null;
     // strip leading slash (root-relative concept refs)
     p = p.replace(/^\//, "");
@@ -180,6 +180,17 @@ export class ConceptStore {
     if (!p.endsWith(".md")) return null;
     return p.slice(0, -3);
   }
+}
+
+/** Unwrap a markdown link destination written as `<path>` — the form the
+ *  agent must use for targets containing spaces (`[x](</archive/My Doc.pdf>)`).
+ *  CommonMark strips the brackets during parsing; link extraction reads the
+ *  raw source, so it has to strip them itself. */
+export function stripAngleBrackets(ref: string): string {
+  const trimmed = ref.trim();
+  return trimmed.startsWith("<") && trimmed.endsWith(">")
+    ? trimmed.slice(1, -1).trim()
+    : trimmed;
 }
 
 /** Strip an optional `wiki/` prefix from a workspace-relative path. Returns

@@ -2,8 +2,10 @@ import { useSetAtom } from "jotai";
 import { FileText, Folder as FolderIcon } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { api } from "../ipc.ts";
+import { useT } from "../i18n.ts";
 import { remarkConceptLinks } from "../remark-concept-links.ts";
-import { browserFolderAtom, selectedFileAtom, viewAtom } from "../store.ts";
+import { browserFolderAtom, browserModeAtom, selectedFileAtom, toastAtom, viewAtom } from "../store.ts";
 
 interface MarkdownViewProps {
   /** Raw markdown source to render. */
@@ -35,6 +37,20 @@ function isArchiveLink(href: string): boolean {
   return p.startsWith("archive/");
 }
 
+/** True for a link into the `input/` folder. Concepts are not supposed to
+ *  cite input files (originals are archived first), but a hand-written link
+ *  should still resolve instead of dead-ending. */
+function isInputLink(href: string): boolean {
+  return href.replace(/^\//, "").startsWith("input/");
+}
+
+/** True for any link target that names a file, i.e. ends in an extension.
+ *  Broader than `.md` on purpose: pdf/docx/png citations must become chips
+ *  too, since the app cannot render them but can select them in the tree. */
+function isFileLink(href: string): boolean {
+  return /\.[A-Za-z0-9]{1,8}$/.test(href);
+}
+
 /** External (http/mailto) or in-page anchor links — never internal wiki
  *  navigation. */
 function isExternal(href: string): boolean {
@@ -46,24 +62,23 @@ function isFolderLink(href: string): boolean {
   return href.endsWith("/");
 }
 
-/** A concept-file link: href ends in `.md`. Bare names without a slash and
- *  without `.md` are NOT concept links (left as ordinary `<a>`). The suffix
- *  check is case-sensitive to match `isWikiMarkdown` in main/files.ts, so a
- *  `Foo.MD` link falls through to a normal anchor instead of resolving to a
- *  wiki path the store would not treat as a concept. */
-function isConceptFileLink(href: string): boolean {
-  return /\.md$/.test(href);
-}
-
 /** The selection key for an archive citation — the same `${folder}/${rel}`
  *  form the Browser uses. The markdown link is bundle-relative
  *  (`/archive/<rel>`); the archive physically lives at `wiki/archive/<rel>`
  *  and is browsed as a subdirectory of the wiki folder, so the selection key
- *  is `wiki/archive/<rel>`. `isArchiveLink` already guarantees the `archive/`
- *  prefix (after any leading `/`), so we strip the leading slash and prepend
- *  `wiki/`. */
+ *  is `wiki/archive/<rel>`. */
 function toArchivePath(href: string): string {
   return `wiki/${href.replace(/^\//, "")}`;
+}
+
+/** Browser selection key (`${folder}/${rel}`) for an internal file link.
+ *  Archive and input links are anchored at their folder root — they are
+ *  absolute references regardless of which concept cites them; everything
+ *  else follows the wiki resolution rules (see `resolveWikiPath`). */
+function toSelectionKey(href: string, basePath: string | undefined): string {
+  if (isArchiveLink(href)) return toArchivePath(href);
+  if (isInputLink(href)) return href.replace(/^\//, "");
+  return resolveWikiPath(href, basePath).wikiPath;
 }
 
 /** Safely percent-decode a markdown link href so that spaces (and other
@@ -131,54 +146,42 @@ const chipStyle: Readonly<React.CSSProperties> = {
  * turns internal wiki links into clickable chips.
  */
 export function MarkdownView(props: MarkdownViewProps): JSX.Element {
+  const t = useT();
   const setView = useSetAtom(viewAtom);
   const setSelected = useSetAtom(selectedFileAtom);
   const setBrowserFolder = useSetAtom(browserFolderAtom);
+  const setBrowserMode = useSetAtom(browserModeAtom);
+  const setToast = useSetAtom(toastAtom);
 
-  function openConcept(wikiPath: string): void {
-    setSelected(wikiPath);
-    setBrowserFolder("wiki");
-    setView("browser");
-  }
-
-  /** Open a citation into the OKF archive. The link is bundle-relative
-   *  (`/archive/<rel>`); the archive lives at `wiki/archive/<rel>` and is
-   *  browsed as the `archive/` subdirectory of the wiki folder, so we route
-   *  the browser to the `wiki` folder and set the selection key to
-   *  `wiki/archive/<rel>` so the existing preview path picks up the archived
-   *  original (`.md.orig` rendered as markdown, or a binary placeholder for
-   *  pdf/docx/…).
+  /** Open an internal file link in the Browser: select it (which highlights
+   *  it in the tree and expands its ancestors) and show whatever preview is
+   *  possible — markdown rendered, binaries a placeholder with a
+   *  reveal-in-file-manager action.
    *
-   *  The three setStates are flushed as one batched re-render (React 18
+   *  Existence is checked here rather than at render time so the chip stays a
+   *  synchronous render; a citation whose file was moved or deleted reports
+   *  that instead of navigating to an empty preview.
+   *
+   *  The state updates are flushed as one batched re-render (React 18
    *  auto-batches event-handler updates), so Browser sees a consistent
-   *  `[folder, selected]` pair. `getPreview` is additionally robust to any
-   *  folder-atom staleness: it sniffs the `wiki/archive/` prefix on the
-   *  selection key itself, so the translation does not depend on
-   *  `browserFolder` having propagated first. */
-  function openArchiveCitation(href: string): void {
-    setSelected(toArchivePath(href));
-    setBrowserFolder("wiki");
+   *  `[folder, selected]` pair. `browserMode` is set explicitly: without it a
+   *  click coming from the chat would land on whichever mode the Browser was
+   *  left in — the graph, not the file. */
+  async function openFile(selectionKey: string): Promise<void> {
+    const result = await api.fileExists(selectionKey);
+    if (!result.success || !result.data) {
+      setToast({ message: t("browser.fileMissing", { path: selectionKey }), kind: "warning" });
+      return;
+    }
+    setSelected(selectionKey);
+    setBrowserFolder(selectionKey.startsWith("input/") ? "input" : "wiki");
+    setBrowserMode("files");
     setView("browser");
   }
 
   const components: Components = {
     a({ href, children }) {
       const h = href ?? "";
-      if (isArchiveLink(h)) {
-        const archiveHref = decodeHref(h);
-        return (
-          <button
-            type="button"
-            className="chip"
-            style={chipStyle}
-            title={toArchivePath(archiveHref)}
-            onClick={() => openArchiveCitation(archiveHref)}
-          >
-            <FileText size={12} />
-            {children}
-          </button>
-        );
-      }
       if (isExternal(h)) {
         return (
           <a href={h} target="_blank" rel="noreferrer noopener">
@@ -186,38 +189,41 @@ export function MarkdownView(props: MarkdownViewProps): JSX.Element {
           </a>
         );
       }
-      // Internal concept/folder link. Bare names (no slash, no .md) are not
-      // concept links — fall through to an ordinary external anchor.
-      if (!isFolderLink(h) && !isConceptFileLink(h)) {
-        return (
-          <a href={h} target="_blank" rel="noreferrer noopener">
-            {children}
-          </a>
-        );
-      }
-      const resolved = resolveWikiPath(decodeHref(h), props.basePath);
-      if (resolved.kind === "folder") {
+      const decoded = decodeHref(h);
+      if (isFolderLink(h)) {
+        const wikiDir = resolveWikiPath(decoded, props.basePath).wikiPath;
         if (!props.onOpenFolder) return <span>{children}</span>;
         return (
           <button
             type="button"
             className="chip"
             style={chipStyle}
-            title={resolved.wikiPath}
-            onClick={() => props.onOpenFolder!(resolved.wikiPath)}
+            title={wikiDir}
+            onClick={() => props.onOpenFolder!(wikiDir)}
           >
             <FolderIcon size={12} />
             {children}
           </button>
         );
       }
+      // Anything without a file extension (a bare name, an in-repo reference
+      // the agent invented) is not a workspace file — leave it as a plain
+      // anchor rather than promising a navigation we cannot deliver.
+      if (!isFileLink(decoded)) {
+        return (
+          <a href={h} target="_blank" rel="noreferrer noopener">
+            {children}
+          </a>
+        );
+      }
+      const selectionKey = toSelectionKey(decoded, props.basePath);
       return (
         <button
           type="button"
           className="chip"
           style={chipStyle}
-          title={resolved.wikiPath}
-          onClick={() => openConcept(resolved.wikiPath)}
+          title={selectionKey}
+          onClick={() => void openFile(selectionKey)}
         >
           <FileText size={12} />
           {children}

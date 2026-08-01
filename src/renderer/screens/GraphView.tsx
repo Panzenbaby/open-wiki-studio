@@ -1,7 +1,7 @@
-// Wiki graph view: renders concepts as a force-directed graph (nodes) with
-// their cross-references as edges. Uses react-force-graph-2d (canvas) so it
-// scales to thousands of concepts. Clicking a node opens the concept in the
-// browser view.
+// Wiki graph view: renders concepts and the archived originals they cite as a
+// force-directed graph (nodes) with their cross-references as edges. Uses
+// react-force-graph-2d (canvas) so it scales to thousands of concepts.
+// Clicking a node opens the file in the browser view.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSetAtom } from "jotai";
 import ForceGraph2D, {
@@ -11,7 +11,7 @@ import ForceGraph2D, {
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import { browserFolderAtom, browserModeAtom, selectedFileAtom } from "../store.ts";
-import type { GraphNode, Result, WikiGraph } from "../../shared/ipc-types.ts";
+import type { GraphNode, GraphNodeKind, Result, WikiGraph } from "../../shared/ipc-types.ts";
 
 // Distinct palette for concept types. Concrete hex values because the graph
 // renders on a canvas (CSS variables are not resolvable there).
@@ -28,9 +28,13 @@ const TYPE_PALETTE = [
   "#84cc16", // lime
 ];
 const FALLBACK_COLOR = "#9ca3af";
+/** Sources keep one fixed colour outside the rotating palette so an archived
+ *  original always looks the same, whatever concept types exist. */
+const SOURCE_COLOR = "#d6bd7a";
 
 interface GraphScreenNode extends NodeObject {
   id: string;
+  kind: GraphNodeKind;
   title: string;
   type: string;
   tags: readonly string[];
@@ -42,10 +46,11 @@ interface GraphScreenLink {
   target: string;
 }
 
-/** Last path segment of a conceptId — the filename without `.md`. */
-function basename(conceptId: string): string {
-  const idx = conceptId.lastIndexOf("/");
-  return idx >= 0 ? conceptId.slice(idx + 1) : conceptId;
+/** Last path segment of a node id — the concept filename without `.md`, or
+ *  the archived original's filename with its extension. */
+function basename(nodeId: string): string {
+  const idx = nodeId.lastIndexOf("/");
+  return idx >= 0 ? nodeId.slice(idx + 1) : nodeId;
 }
 
 export function GraphView(): JSX.Element {
@@ -99,6 +104,10 @@ export function GraphView(): JSX.Element {
     if (!graph) return map;
     let i = 0;
     for (const node of graph.nodes) {
+      if (node.kind === "source") {
+        map.set(node.type, SOURCE_COLOR);
+        continue;
+      }
       if (!map.has(node.type)) {
         map.set(node.type, TYPE_PALETTE[i % TYPE_PALETTE.length] ?? FALLBACK_COLOR);
         i++;
@@ -112,6 +121,7 @@ export function GraphView(): JSX.Element {
     if (!graph) return { nodes: [], links: [] };
     const nodes: GraphScreenNode[] = graph.nodes.map((n: GraphNode) => ({
       id: n.id,
+      kind: n.kind,
       title: n.title,
       type: n.type,
       tags: n.tags,
@@ -124,8 +134,12 @@ export function GraphView(): JSX.Element {
     return { nodes, links };
   }, [graph]);
 
-  function openConcept(conceptId: string): void {
-    setSelected(`wiki/${conceptId}.md`);
+  // Concept ids carry no extension, source ids do. Both live under the wiki
+  // folder, so the selection key only differs in the `.md` suffix. Sources
+  // are mostly binaries: the preview may only be able to show a placeholder,
+  // but the file is selected and highlighted in the tree either way.
+  function openNode(node: GraphScreenNode): void {
+    setSelected(node.kind === "source" ? `wiki/${node.id}` : `wiki/${node.id}.md`);
     setBrowserFolder("wiki");
     setBrowserMode("files");
   }
@@ -270,7 +284,7 @@ export function GraphView(): JSX.Element {
             cooldownTicks={120}
             onNodeClick={(node: NodeObject<GraphScreenNode>) => {
               const n = node as GraphScreenNode;
-              if (typeof n.id === "string") openConcept(n.id);
+              if (typeof n.id === "string") openNode(n);
             }}
             onNodeHover={(node: NodeObject<GraphScreenNode> | null) => {
               setHoveredId(node ? (node as GraphScreenNode).id ?? null : null);
