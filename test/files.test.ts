@@ -6,7 +6,13 @@ import { afterAll, describe, expect, it } from "vitest";
 import { mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addInputFiles, getPreview, listFolder } from "../src/main/files.ts";
+import {
+  MAX_TEXT_PREVIEW_BYTES,
+  MAX_WALK_DEPTH,
+  addInputFiles,
+  getPreview,
+  listFolder,
+} from "../src/main/files.ts";
 
 async function freshWorkspace(): Promise<string> {
   return mkdir(
@@ -292,5 +298,93 @@ describe("ConceptStore archive exclusion (pi-okf-wiki 0.2.0)", () => {
     } finally {
       await rm(workspace, { recursive: true, force: true });
     }
+  });
+});
+// Hot-path guards in `walk` and `getPreview`: a listing of a pathologically
+// deep tree stops at MAX_WALK_DEPTH, and a text preview never loads more than
+// MAX_TEXT_PREVIEW_BYTES into memory (the rest is reported as truncated).
+describe("walk depth cap and preview truncation", () => {
+  const workspaces: string[] = [];
+
+  async function newWorkspace(): Promise<string> {
+    const workspace = await mkdir(
+      join(tmpdir(), `files-limits-${Date.now()}-${Math.random().toString(36).slice(2)}`),
+      { recursive: true },
+    );
+    workspaces.push(workspace);
+    return workspace;
+  }
+
+  afterAll(async () => {
+    await Promise.all(workspaces.map((workspace) => rm(workspace, { recursive: true, force: true })));
+  });
+
+  it("listFolder stops descending past the depth cap", async () => {
+    const workspace = await newWorkspace();
+    await writeFileRel(join(workspace, "input"), "shallow.md", "shallow");
+    const deepRelative = `${Array.from({ length: 40 }, (_, index) => `level${index}`).join("/")}/deep.md`;
+    await writeFileRel(join(workspace, "input"), deepRelative, "deep");
+
+    const result = await listFolder(workspace, "input");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const paths = result.data.map((node) => node.relativePath);
+    expect(paths).toContain("shallow.md");
+    expect(paths).not.toContain(deepRelative);
+  });
+
+  it("listFolder still returns files just inside the depth cap", async () => {
+    const workspace = await newWorkspace();
+    const relative = `${Array.from({ length: MAX_WALK_DEPTH }, (_, index) => `level${index}`).join("/")}/edge.md`;
+    await writeFileRel(join(workspace, "input"), relative, "edge");
+
+    const result = await listFolder(workspace, "input");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.map((node) => node.relativePath)).toContain(relative);
+  });
+
+  it("listFolder no longer reports a file size", async () => {
+    const workspace = await newWorkspace();
+    await writeFileRel(join(workspace, "input"), "note.md", "hello");
+
+    const result = await listFolder(workspace, "input");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data[0]).toEqual({
+      relativePath: "note.md",
+      name: "note.md",
+      isDirectory: false,
+    });
+  });
+
+  it("getPreview truncates a text file larger than the preview cap", async () => {
+    const workspace = await newWorkspace();
+    const oversized = "a".repeat(MAX_TEXT_PREVIEW_BYTES + 5000);
+    await writeFileRel(join(workspace, "input"), "big.log", oversized);
+
+    const result = await getPreview(workspace, "input/big.log");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.kind).toBe("text");
+    expect(result.data.truncated).toBe(true);
+    expect(result.data.content.length).toBe(MAX_TEXT_PREVIEW_BYTES);
+  });
+
+  it("getPreview returns a normal-sized text file in full and untruncated", async () => {
+    const workspace = await newWorkspace();
+    await writeFileRel(join(workspace, "input"), "small.txt", "plain content");
+
+    const result = await getPreview(workspace, "input/small.txt");
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.kind).toBe("text");
+    expect(result.data.content).toBe("plain content");
+    expect(result.data.truncated).toBeUndefined();
   });
 });

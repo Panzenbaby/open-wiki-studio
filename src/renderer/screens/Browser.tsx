@@ -171,6 +171,14 @@ export function Browser(): JSX.Element {
     await api.revealInFileManager(folder, node.relativePath, node.isDirectory);
   }
 
+  /** Reveal the previewed file. `selected` is the selection key
+   *  (`${folder}/${rel}`); the IPC call takes the folder-relative path. */
+  async function revealSelectedFile(): Promise<void> {
+    const prefix = `${folder}/`;
+    if (!selected || !selected.startsWith(prefix)) return;
+    await api.revealInFileManager(folder, selected.slice(prefix.length), false);
+  }
+
   /** Ask what a removal would affect and open the confirmation. Nothing moves
    *  until the user confirms. */
   async function startRemoval(node: TreeNode): Promise<void> {
@@ -322,6 +330,14 @@ export function Browser(): JSX.Element {
                     <span className="badge mono">{preview.frontmatter.title}</span>
                   </div>
                 )}
+                {preview.truncated && (
+                  <div className="row wrap" style={{ gap: "var(--space-2)", alignItems: "center" }}>
+                    <span className="muted" style={{ fontSize: "var(--text-xs)" }}>{t("preview.truncated")}</span>
+                    <button className="btn btn-sm" onClick={() => void revealSelectedFile()}>
+                      <ExternalLink size={14} /> {t(revealLabelKey(platform))}
+                    </button>
+                  </div>
+                )}
                 <div className="pv-body">
                   {preview.kind === "markdown" ? (
                     <MarkdownView
@@ -339,13 +355,7 @@ export function Browser(): JSX.Element {
                       <button
                         className="btn btn-sm btn-primary"
                         style={{ marginTop: "var(--space-3)" }}
-                        onClick={() => {
-                          const prefix = `${folder}/`;
-                          const relativePath = selected && selected.startsWith(prefix)
-                            ? selected.slice(prefix.length)
-                            : "";
-                          void api.revealInFileManager(folder, relativePath, false);
-                        }}
+                        onClick={() => void revealSelectedFile()}
                       >
                         <ExternalLink size={14} /> {t(revealLabelKey(platform))}
                       </button>

@@ -244,6 +244,7 @@ export const messages: Record<Locale, Dict> = {
     "migrate.failed": "Upgrade failed: {detail}",
     "preview.binaryPlaceholder": "{path} is a binary file — preview not available. Use \"Reveal in file manager\" to open it.",
     "preview.binaryTitle": "Binary file",
+    "preview.truncated": "This file is too large to preview in full — only the first part is shown.",
 
     // ── sidebar ───────────────────────────────────────────────────
     "sidebar.sessions": "Sessions",
@@ -597,6 +598,7 @@ export const messages: Record<Locale, Dict> = {
     "migrate.failed": "Upgrade fehlgeschlagen: {detail}",
     "preview.binaryPlaceholder": "{path} ist eine Binärdatei — keine Vorschau verfügbar. \"Im Dateimanager anzeigen\" zum Öffnen verwenden.",
     "preview.binaryTitle": "Binärdatei",
+    "preview.truncated": "Diese Datei ist zu groß für eine vollständige Vorschau — nur der Anfang wird angezeigt.",
 
     // ── sidebar ───────────────────────────────────────────────────
     "sidebar.sessions": "Sessions",

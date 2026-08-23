@@ -2,13 +2,13 @@
 //
 // Concept reading (wiki .md: conceptId derivation, frontmatter metadata) is
 // delegated to ConceptStore. This module keeps the non-concern parts:
-//   - listFolder: listing input/wiki as FileNode (with size — a broader
-//     shape than concepts, any file type). The OKF archive lives under
-//     wiki/archive/ and shows up in the wiki listing.
+//   - listFolder: listing input/wiki as FileNode (a broader shape than
+//     concepts, any file type). The OKF archive lives under wiki/archive/
+//     and shows up in the wiki listing.
 //   - getPreview: single-file preview — wiki .md delegates to the store; text
 //     and binary stay here
 //   - addInputFiles / revealInFileManager: input-folder writes + OS integration
-import { copyFile, lstat, mkdir, open, readFile, readdir, stat } from "node:fs/promises";
+import { copyFile, lstat, mkdir, open, readdir, stat } from "node:fs/promises";
 import type { Dirent, Stats } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { shell } from "electron";
@@ -64,27 +64,31 @@ function isWikiMarkdown(relativePath: string): boolean {
   return relativePath.startsWith("wiki/") && relativePath.endsWith(".md");
 }
 
-async function walk(dir: string, root: string): Promise<FileNode[]> {
+/** How many directory levels below the folder root `walk` descends. Files at
+ *  the root are depth 0. `Dirent.isDirectory()` does not follow symlinks, so a
+ *  symlink cycle is unreachable; this bounds a pathologically deep real tree,
+ *  which would otherwise recurse without limit on every watcher event. */
+export const MAX_WALK_DEPTH = 32;
+
+async function walk(dir: string, root: string, depth: number): Promise<FileNode[]> {
   const out: FileNode[] = [];
   let entries: Dirent[];
   try {
-    entries = await (await import("node:fs/promises")).readdir(dir, { withFileTypes: true });
+    entries = await readdir(dir, { withFileTypes: true });
   } catch {
     return out;
   }
   for (const entry of entries) {
     if (entry.name.startsWith(".")) continue;
-    const abs = join(dir, entry.name);
+    const absolute = join(dir, entry.name);
     if (entry.isDirectory()) {
-      out.push(...(await walk(abs, root)));
+      if (depth >= MAX_WALK_DEPTH) continue;
+      out.push(...(await walk(absolute, root, depth + 1)));
     } else if (entry.isFile()) {
-      const rel = relative(root, abs).split(sep).join("/");
-      const stats = await stat(abs).catch(() => null);
       out.push({
-        relativePath: rel,
+        relativePath: relative(root, absolute).split(sep).join("/"),
         name: entry.name,
         isDirectory: false,
-        size: stats?.size,
       });
     }
   }
@@ -96,7 +100,7 @@ export async function listFolder(
   folder: Folder,
 ): Promise<Result<readonly FileNode[]>> {
   try {
-    const nodes = await walk(workspaceDir(workspace, folder), workspaceDir(workspace, folder));
+    const nodes = await walk(workspaceDir(workspace, folder), workspaceDir(workspace, folder), 0);
     return ok(nodes.sort((a, b) => a.relativePath.localeCompare(b.relativePath)));
   } catch (error) {
     return err<readonly FileNode[]>(mainT("error.listFolder", { folder, detail: errorMessage(error) }));
@@ -197,30 +201,33 @@ export async function getPreview(
   // originals (pdf, docx, …) yield garbage on a utf8 read; detect that and
   // return a `binary` placeholder instead.
   try {
-    const fd = await open(absolute, "r");
+    const fileHandle = await open(absolute, "r");
+    let content: string;
+    let truncated: boolean;
     try {
-      const sniff = Buffer.alloc(BINARY_SNIFF_BYTES);
-      const { bytesRead } = await fd.read(sniff, 0, BINARY_SNIFF_BYTES, 0);
-      if (looksBinary(sniff.subarray(0, bytesRead))) {
+      const { size } = await fileHandle.stat();
+      const readLength = Math.min(size, MAX_TEXT_PREVIEW_BYTES);
+      const buffer = Buffer.alloc(readLength);
+      const { bytesRead } = await fileHandle.read(buffer, 0, readLength, 0);
+      const head = buffer.subarray(0, bytesRead);
+      if (looksBinary(head.subarray(0, BINARY_SNIFF_BYTES))) {
         return ok({
           relativePath,
           kind: "binary",
           content: mainT("preview.binaryPlaceholder", { path: relativePath }),
         });
       }
+      content = head.toString("utf8");
+      truncated = size > MAX_TEXT_PREVIEW_BYTES;
     } finally {
-      await fd.close();
+      await fileHandle.close();
     }
-    // Sniffed as text — read the full content. For very large text files this
-    // still loads everything into memory, but text originals are the common
-    // small case; binary originals (the large-PDF risk) were handled above
-    // without reading the whole file.
-    const content = await readFile(absolute, "utf8");
     const isMarkdown = relativePath.endsWith(".md") || relativePath.endsWith(".md.orig");
     return ok({
       relativePath,
       kind: isMarkdown ? "markdown" : "text",
       content,
+      ...(truncated ? { truncated: true } : {}),
     });
   } catch (error) {
     return err<FilePreview>(mainT("error.readFile", { path: relativePath, detail: errorMessage(error) }), {
@@ -234,9 +241,16 @@ export async function getPreview(
  *  this; text files (incl. `.md.orig`) do not. Limitation: UTF-16 text files
  *  contain NUL bytes in their encoding and would be misclassified as binary —
  *  acceptable here because archive originals are pdf/docx/png, not UTF-16
- *  text. The sniff reads only the first `BINARY_SNIFF_BYTES` from disk (via
+ *  text. Only the first `MAX_TEXT_PREVIEW_BYTES` are read from disk (via
  *  `open`+`read`) so a multi-hundred-MB PDF never enters the heap. */
 const BINARY_SNIFF_BYTES = 8 * 1024;
+
+/** Upper bound on how much of a text file is loaded for a preview. A large
+ *  `.log` or `.csv` would otherwise be pulled into the heap and shipped over
+ *  IPC in full; past this point the preview is marked `truncated` and the UI
+ *  points the user at the file manager instead. */
+export const MAX_TEXT_PREVIEW_BYTES = 1024 * 1024;
+
 function looksBinary(buffer: Buffer): boolean {
   const len = Math.min(buffer.length, BINARY_SNIFF_BYTES);
   for (let i = 0; i < len; i++) {

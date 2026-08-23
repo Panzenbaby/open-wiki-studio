@@ -10,7 +10,6 @@ export interface TreeNode {
   readonly relativePath: string;
   readonly name: string;
   readonly isDirectory: boolean;
-  readonly size?: number;
   readonly children: readonly TreeNode[];
   /** Total number of files reachable through this node (recursive).
    *  For a file node this is always 1; for a directory it counts every
@@ -31,7 +30,6 @@ export function buildFileTree(files: readonly FileNode[]): TreeNode {
     relativePath: string;
     name: string;
     isDirectory: boolean;
-    size?: number;
     children: Mutable[];
     fileCount: number;
   };
@@ -72,7 +70,6 @@ export function buildFileTree(files: readonly FileNode[]): TreeNode {
       relativePath: file.relativePath,
       name: file.name,
       isDirectory: false,
-      size: file.size,
       children: [],
       fileCount: 1,
     };
@@ -99,7 +96,6 @@ export function buildFileTree(files: readonly FileNode[]): TreeNode {
       relativePath: node.relativePath,
       name: node.name,
       isDirectory: node.isDirectory,
-      size: node.size,
       children,
       fileCount,
     };
