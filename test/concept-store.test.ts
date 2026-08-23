@@ -156,3 +156,46 @@ describe("ConceptStore.normalizeRef", () => {
     expect(store.normalizeRef("foo/bar.md?v=1")).toBe("foo/bar");
   });
 });
+describe("ConceptStore OKF v0.2 frontmatter", () => {
+  const V2_CONCEPT = [
+    "---",
+    "type: table",
+    "title: Orders",
+    "description: The orders table",
+    "tags: [db, sales]",
+    "generated:",
+    "  by: pi-okf-wiki/claude-sonnet-4",
+    "  at: 2026-08-23T10:00:00Z",
+    "sources:",
+    "  - id: spec-v2",
+    "    resource: /archive/notes/spec-v2.pdf",
+    "    title: Spec v2",
+    "  - id: site",
+    "    resource: https://example.org/orders",
+    "    title: Vendor page",
+    "---",
+    "",
+    "Body.",
+    "",
+  ].join("\n");
+
+  it("keeps the concept's own title/description when a source carries its own", async () => {
+    const dir = await workspace();
+    await writeWiki(dir, { path: "orders.md", content: V2_CONCEPT });
+    const concept = await new ConceptStore(dir).readConcept("wiki/orders.md");
+    expect(concept?.title).toBe("Orders");
+    expect(concept?.description).toBe("The orders table");
+    expect(concept?.type).toBe("table");
+    expect(concept?.tags).toEqual(["db", "sales"]);
+  });
+
+  it("exposes the sources[].resource values for link-following callers", async () => {
+    const dir = await workspace();
+    await writeWiki(dir, { path: "orders.md", content: V2_CONCEPT });
+    const concept = await new ConceptStore(dir).readConcept("wiki/orders.md");
+    expect(concept?.sourceResources).toEqual([
+      "/archive/notes/spec-v2.pdf",
+      "https://example.org/orders",
+    ]);
+  });
+});

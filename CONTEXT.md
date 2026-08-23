@@ -37,6 +37,13 @@ appending a `Removal` entry to `log.md`. Owned by pi-okf-wiki and called
 directly from the main process (`wiki-remove.ts`) — deterministic, no agent
 turn.
 
+**Migration** — rewriting legacy OKF v0.1 concepts to v0.2 (`timestamp` →
+`generated`, `status: current | superseded` → `stable | deprecated`, the body
+`# Citations` list → the `sources` frontmatter family). Owned by pi-okf-wiki
+and called from `wiki-migrate.ts`; deterministic, no agent turn. `planMigration`
+is the dry run behind the confirmation dialog, offered on the Dashboard
+whenever the wiki still holds legacy concepts.
+
 ## ConceptStore (the deepened module)
 
 **ConceptStore** — the module that owns concept identity, metadata, and body.
@@ -58,7 +65,10 @@ policy) and builds edges; `files.ts` previews `body` + metadata and keeps
 only the non-wiki/text fallback.
 
 The `Concept` record a store returns: `{ conceptId, kind, title, type,
-description, tags, body }`. `type` is `concept.untyped` for concepts without
+description, tags, sourceResources, body }`. `sourceResources` are the
+`sources[].resource` values — since OKF v0.2 a concept cites its archived
+originals there rather than in the body, so the graph reads provenance from
+the frontmatter too. `type` is `concept.untyped` for concepts without
 frontmatter `type`; `index`/`log` keep `type` as `concept.untyped` and let the
 graph caller localize them (graph-specific vocabulary stays out of the store).
 

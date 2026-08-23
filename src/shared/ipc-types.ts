@@ -133,6 +133,26 @@ export interface RemovalReport {
   readonly rewrittenConcepts: readonly string[];
 }
 
+// ─── Migration (OKF v0.1 → v0.2) ──────────────────────────────────
+/** What a migration would rewrite. Shown for confirmation before anything is
+ *  written, and used to decide whether to offer the migration at all. */
+export interface MigrationPlan {
+  /** Concepts still carrying v0.1 fields (`timestamp`, legacy `status`, a body
+   *  `# Citations` section). Empty when the bundle is already v0.2. */
+  readonly conceptIds: readonly string[];
+  /** Concepts that are already current and stay untouched. */
+  readonly upToDate: number;
+  /** `okf_version` declared in the bundle-root `index.md`, if any. */
+  readonly declaredVersion: string | undefined;
+  /** OKF version the bundled extension writes. */
+  readonly targetVersion: string;
+}
+
+export interface MigrationReport {
+  readonly migrated: readonly string[];
+  readonly alreadyCurrent: number;
+}
+
 export interface FilePreview {
   readonly relativePath: string;
   readonly kind: "markdown" | "text" | "binary";
@@ -308,6 +328,12 @@ export interface AgentApi {
   planRemoval(relativePath: string): Promise<Result<RemovalPlan>>;
   /** Move a concept (or a whole directory of concepts) to `wiki/trash/`. */
   removeFromWiki(relativePath: string): Promise<Result<RemovalReport>>;
+
+  // migration
+  /** Which concepts a v0.1 → v0.2 migration would rewrite. Does not mutate. */
+  planMigration(): Promise<Result<MigrationPlan>>;
+  /** Rewrite every legacy concept to OKF v0.2 and regenerate the index. */
+  migrateWiki(): Promise<Result<MigrationReport>>;
 
   // sessions
   listSessions(): Promise<Result<readonly SessionInfo[]>>;

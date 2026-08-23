@@ -63,13 +63,26 @@ function normalizeSourceRef(ref: string): string | null {
   return rel === "" ? null : rel;
 }
 
-/** Extract the node ids referenced in a markdown body: conceptIds (normalised
+/** Extract the node ids a concept references: conceptIds (normalised
  *  through the store so the wiki/ + .md rule is shared) and `archive/<rel>`
  *  source ids. Sources are recognised only in real markdown links — the bare
  *  path regex matches `.md` only, on purpose, so prose mentioning a pdf name
  *  does not become an edge. */
-function extractLinks(store: ConceptStore, body: string): readonly string[] {
+function extractLinks(store: ConceptStore, concept: Concept): readonly string[] {
   const refs = new Set<string>();
+  // OKF v0.2 moved provenance out of the body `# Citations` list into the
+  // `sources` frontmatter family, so an archived original is cited as
+  // `sources[].resource: /archive/<rel>` — without this the graph would show
+  // no source nodes at all for v0.2 concepts.
+  for (const resource of concept.sourceResources) {
+    const source = normalizeSourceRef(resource);
+    if (source) refs.add(`${SOURCE_PREFIX}${source}`);
+    else {
+      const id = store.normalizeRef(resource);
+      if (id) refs.add(id);
+    }
+  }
+  const body = concept.body;
   for (const match of body.matchAll(MD_LINK_RE)) {
     const target = match[2]!;
     const id = store.normalizeRef(target);
@@ -152,7 +165,7 @@ export async function buildWikiGraph(workspace: string): Promise<Result<WikiGrap
 
     const edges: GraphEdge[] = [];
     for (const concept of concepts) {
-      for (const target of extractLinks(store, concept.body)) {
+      for (const target of extractLinks(store, concept)) {
         if (!knownIds.has(target)) continue;
         if (target === concept.conceptId) continue; // no self-loops
         if (target.startsWith(SOURCE_PREFIX)) citedSources.add(target);

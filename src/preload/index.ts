@@ -34,6 +34,8 @@ const api: AgentApi = {
   revealInFileManager: (folder, relativePath, isDirectory) => ipcRenderer.invoke("okf:revealInFileManager", folder, relativePath, isDirectory),
   planRemoval: (relativePath) => ipcRenderer.invoke("okf:planRemoval", relativePath),
   removeFromWiki: (relativePath) => ipcRenderer.invoke("okf:removeFromWiki", relativePath),
+  planMigration: () => ipcRenderer.invoke("okf:planMigration"),
+  migrateWiki: () => ipcRenderer.invoke("okf:migrateWiki"),
 
   listSessions: () => ipcRenderer.invoke("okf:listSessions"),
   newSession: () => ipcRenderer.invoke("okf:newSession"),

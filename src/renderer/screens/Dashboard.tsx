@@ -1,9 +1,12 @@
-import { useState } from "react";
-import { useAtomValue } from "jotai";
-import { ArrowLeftRight, Download, FileText, Merge, Play, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useAtomValue, useSetAtom } from "jotai";
+import { ArrowLeftRight, ArrowUpCircle, Download, FileText, Merge, Play, Trash2 } from "lucide-react";
+import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import { MergeWorkspacesModal } from "../components/MergeWorkspacesModal.tsx";
-import { countsAtom, currentSessionAtom, ingestStateAtom, visibleSessionsAtom, workspaceAtom } from "../store.ts";
+import { MigrateWikiModal } from "../components/MigrateWikiModal.tsx";
+import { countsAtom, currentSessionAtom, folderVersionAtom, ingestStateAtom, toastAtom, visibleSessionsAtom, workspaceAtom } from "../store.ts";
+import type { MigrationPlan } from "../../shared/ipc-types.ts";
 
 interface DashboardProps {
   onAsk: () => void;
@@ -22,11 +25,40 @@ export function Dashboard(props: DashboardProps): JSX.Element {
   const ingestState = useAtomValue(ingestStateAtom);
   const sessions = useAtomValue(visibleSessionsAtom);
   const currentSession = useAtomValue(currentSessionAtom);
+  const folderVersion = useAtomValue(folderVersionAtom);
+  const setToast = useSetAtom(toastAtom);
   const [merging, setMerging] = useState<boolean>(false);
+  const [migrationPlan, setMigrationPlan] = useState<MigrationPlan | null>(null);
+  const [migrateOpen, setMigrateOpen] = useState<boolean>(false);
+  const [migrating, setMigrating] = useState<boolean>(false);
   const running = ingestState === "running";
   const inputPending = counts.input > 0;
   const showIngest = inputPending || running;
   const summaryKey = showIngest ? "dashboard.summaryShort" : "dashboard.summary";
+
+  // Re-checked whenever the wiki changes on disk: an ingest can add concepts,
+  // and a merge can pull legacy ones in from another workspace.
+  useEffect(() => {
+    void (async () => {
+      const result = await api.planMigration();
+      setMigrationPlan(result.success ? result.data : null);
+    })();
+  }, [folderVersion.wiki]);
+
+  const legacyConcepts = migrationPlan?.conceptIds.length ?? 0;
+
+  const confirmMigration = async (): Promise<void> => {
+    setMigrating(true);
+    const result = await api.migrateWiki();
+    setMigrating(false);
+    if (!result.success) {
+      setToast({ message: t("migrate.failed", { detail: result.error.message }), kind: "warning" });
+      return;
+    }
+    setMigrateOpen(false);
+    setMigrationPlan(null);
+    setToast({ message: t("migrate.done", { n: result.data.migrated.length }), kind: "info" });
+  };
 
   const confirmDelete = (path: string, e: React.MouseEvent): void => {
     e.stopPropagation();
@@ -53,6 +85,36 @@ export function Dashboard(props: DashboardProps): JSX.Element {
             <button className="btn btn-ghost" style={{ whiteSpace: "nowrap", flexShrink: 0 }} disabled={running} onClick={() => setMerging(true)}><Merge size={14} /> {t("merge.action")}</button>
           </div>
         </div>
+
+        {legacyConcepts > 0 && (
+          <div
+            className="migrate-hero"
+            style={{
+              border: "1px solid color-mix(in oklab, var(--warn), transparent 55%)",
+              background: "color-mix(in oklab, var(--warn), transparent 92%)",
+              borderRadius: "var(--radius-lg)",
+              padding: "var(--space-6)",
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--space-6)",
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "var(--text-xl)" }}>
+                {t("migrate.bannerTitle", { version: migrationPlan?.targetVersion ?? "" })}
+              </div>
+              <div className="fg2" style={{ marginTop: "var(--space-2)" }}>
+                {t("migrate.bannerSub", { n: legacyConcepts })}
+              </div>
+            </div>
+            {/* A migration rewrites the wiki as it is on disk — refuse while an
+                ingest is writing to it. */}
+            <button className="btn btn-primary" disabled={running} onClick={() => setMigrateOpen(true)}>
+              <ArrowUpCircle size={14} /> {t("migrate.action")}
+            </button>
+          </div>
+        )}
 
         {showIngest && (
           <div className="ingest-hero" style={{ border: "1px solid color-mix(in oklab, var(--accent), transparent 40%)", background: "linear-gradient(180deg, color-mix(in oklab, var(--accent), transparent 90%), var(--surface))", borderRadius: "var(--radius-lg)", padding: "var(--space-6)", display: "flex", alignItems: "center", gap: "var(--space-6)" }}>
@@ -113,6 +175,14 @@ export function Dashboard(props: DashboardProps): JSX.Element {
         </section>
       </div>
       {merging && <MergeWorkspacesModal onClose={() => setMerging(false)} />}
+      {migrateOpen && migrationPlan && (
+        <MigrateWikiModal
+          plan={migrationPlan}
+          busy={migrating}
+          onConfirm={() => void confirmMigration()}
+          onCancel={() => setMigrateOpen(false)}
+        />
+      )}
     </div>
   );
 }

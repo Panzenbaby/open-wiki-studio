@@ -119,3 +119,49 @@ describe("buildWikiGraph archive sources", () => {
     ]);
   });
 });
+
+describe("buildWikiGraph frontmatter sources (OKF v0.2)", () => {
+  it("turns a sources[] archive citation into a source node with an edge", async () => {
+    const workspace = await newWorkspace();
+    await writeWikiFile(
+      workspace,
+      "notes/spec.md",
+      [
+        "---",
+        "type: note",
+        "sources:",
+        "  - id: spec-v2",
+        "    resource: /archive/notes/spec-v2.pdf",
+        "---",
+        "",
+        "No citation in the body.",
+        "",
+      ].join("\n"),
+    );
+    await writeWikiFile(workspace, "archive/notes/spec-v2.pdf", "%PDF-1.4");
+
+    const graph = await build(workspace);
+
+    expect(graph.nodes.find((node) => node.kind === "source")?.id).toBe(
+      "archive/notes/spec-v2.pdf",
+    );
+    expect(graph.edges).toContainEqual({
+      source: "notes/spec",
+      target: "archive/notes/spec-v2.pdf",
+    });
+  });
+
+  it("links concepts cited as a sources[] resource", async () => {
+    const workspace = await newWorkspace();
+    await writeWikiFile(
+      workspace,
+      "orders.md",
+      ["---", "type: table", "sources:", "  - id: base", "    resource: /base.md", "---", "", "Body.", ""].join("\n"),
+    );
+    await writeWikiFile(workspace, "base.md", "---\ntype: table\n---\n\nBase.\n");
+
+    const graph = await build(workspace);
+
+    expect(graph.edges).toContainEqual({ source: "orders", target: "base" });
+  });
+});

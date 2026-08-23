@@ -11,15 +11,15 @@
 //
 // The moved concepts are what makes link rewriting necessary: every `[l](id.md)`,
 // `/id.md`, `wiki/id.md`, bare `id.md`, and `/archive/<path>` citation in a
-// concept BODY is rewritten to the post-merge path. Frontmatter is left
-// byte-for-byte alone (`resource:` holds a canonical URI, never a wiki path).
+// concept body is rewritten to the post-merge path, as are the frontmatter
+// `resource:` values (OKF v0.2 cites archived originals in `sources[]`).
 //
 // `index.md` is not merged but regenerated from the merged concepts (it is a
 // derived file); `log.md` entries of all sources are interleaved by date.
 import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { basename, join, relative, resolve, sep } from "node:path";
-import { parseDocument } from "./frontmatter.ts";
+import { loadAllConcepts, writeAllIndexMd } from "pi-okf-wiki/src/wiki.ts";
 import { ok, err, errorMessage } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
 import type { MergeReport, Result } from "../shared/ipc-types.ts";
@@ -197,8 +197,15 @@ function rewriteRef(
     : `${rootSlash}${wikiPrefix}${renamed}.md${suffix}`;
 }
 
-/** Rewrite only the BODY of a concept file; the frontmatter block is copied
- *  through byte-for-byte. */
+/** A frontmatter `resource:` value — the top-level one or a `sources[].resource`
+ *  entry (OKF v0.2 §5.1). Line-based, so every other frontmatter byte survives
+ *  a rewrite. Mirrors `FRONTMATTER_RESOURCE_RE` in pi-okf-wiki. */
+const FRONTMATTER_RESOURCE_RE = /^(\s*(?:-\s+)?resource:\s*)(\S.*?)\s*$/;
+
+/** Rewrite the body links of a concept file plus its frontmatter `resource:`
+ *  values. Since OKF v0.2 a concept cites its archived originals as
+ *  `sources[].resource: /archive/<rel>`, so a frontmatter copied byte-for-byte
+ *  would dangle whenever the merge renames the original. */
 export function rewriteConceptContent(
   content: string,
   concepts: ReadonlyMap<string, string>,
@@ -206,7 +213,36 @@ export function rewriteConceptContent(
   trash: ReadonlyMap<string, string> = new Map(),
 ): string {
   const { head, body } = splitFrontmatter(content);
-  return head + rewriteLinks(body, concepts, archive, trash);
+  return rewriteFrontmatterResources(head, concepts, archive, trash) + rewriteLinks(body, concepts, archive, trash);
+}
+
+function rewriteFrontmatterResources(
+  head: string,
+  concepts: ReadonlyMap<string, string>,
+  archive: ReadonlyMap<string, string>,
+  trash: ReadonlyMap<string, string>,
+): string {
+  if (head === "") return head;
+  return head
+    .split("\n")
+    .map((line) => {
+      const match = FRONTMATTER_RESOURCE_RE.exec(line);
+      if (match === null) return line;
+      const rewritten = rewriteRef(unquoteYaml(match[2]!), concepts, archive, trash);
+      return rewritten === null ? line : `${match[1]!}${quoteYamlIfNeeded(rewritten)}`;
+    })
+    .join("\n");
+}
+
+function unquoteYaml(value: string): string {
+  const quoted =
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")));
+  return quoted ? value.slice(1, -1) : value;
+}
+
+function quoteYamlIfNeeded(value: string): string {
+  return /[\s"'#]/.test(value) ? `"${value.replace(/"/g, '\\"')}"` : value;
 }
 
 function splitFrontmatter(content: string): { head: string; body: string } {
@@ -218,40 +254,6 @@ function splitFrontmatter(content: string): { head: string; body: string } {
     return { head: `${head}\n`, body: lines.slice(i + 1).join("\n") };
   }
   return { head: "", body: content };
-}
-
-// ─── index.md (pure) ──────────────────────────────────────────────────
-
-export interface IndexEntry {
-  readonly conceptId: string;
-  readonly title?: string;
-  readonly description?: string;
-}
-
-/** Regenerate the root index. Mirrors `generateIndexMd` in pi-okf-wiki so the
- *  merged wiki is byte-compatible with what the next ingest would produce. */
-export function generateIndexMd(concepts: readonly IndexEntry[]): string {
-  const groups = new Map<string, IndexEntry[]>();
-  for (const concept of concepts) {
-    const slash = concept.conceptId.lastIndexOf("/");
-    const dir = slash === -1 ? "." : concept.conceptId.slice(0, slash);
-    const bucket = groups.get(dir) ?? [];
-    bucket.push(concept);
-    groups.set(dir, bucket);
-  }
-  const lines: string[] = ["# Wiki Index", ""];
-  for (const dir of [...groups.keys()].sort()) {
-    lines.push(`## ${dir === "." ? "(root)" : dir}`, "");
-    for (const concept of groups
-      .get(dir)!
-      .sort((a, b) => a.conceptId.localeCompare(b.conceptId))) {
-      const title = concept.title ?? concept.conceptId;
-      const suffix = concept.description ? ` - ${concept.description}` : "";
-      lines.push(`* [${title}](${concept.conceptId}.md)${suffix}`);
-    }
-    lines.push("");
-  }
-  return lines.join("\n");
 }
 
 // ─── log.md (pure) ────────────────────────────────────────────────────
@@ -460,7 +462,6 @@ export async function mergeWorkspaces(
     await mkdir(join(targetPath, "wiki"), { recursive: true });
     await mkdir(join(targetPath, "input"), { recursive: true });
 
-    const indexEntries: IndexEntry[] = [];
     let renamed = 0;
     let deduplicated = 0;
 
@@ -484,14 +485,6 @@ export async function mergeWorkspaces(
         }
         const content = rewriteConceptContent(await readFile(from, "utf8"), concepts, archive, trash);
         await writeFileAt(to, content);
-        if (!RESERVED.has(basename(placement.target))) {
-          const parsed = parseDocument(content);
-          indexEntries.push({
-            conceptId: stripMd(placement.target),
-            title: parsed.frontmatter?.title,
-            description: parsed.frontmatter?.description,
-          });
-        }
       }
 
       for (const placement of archivePlans[i]!) {
@@ -531,7 +524,17 @@ export async function mergeWorkspaces(
       }
     }
 
-    await writeFileAt(join(targetPath, "wiki", "index.md"), generateIndexMd(indexEntries));
+    // `index.md` is derived, so it is regenerated from the merged concepts
+    // rather than merged — by the extension, which owns the OKF index shape
+    // (one index per directory, `okf_version` in the root one) and prunes the
+    // sub-indexes the sources brought along for directories that no longer
+    // qualify.
+    const targetWiki = join(targetPath, "wiki");
+    const mergedConcepts = await loadAllConcepts(targetWiki);
+    if (!mergedConcepts.success) throw new Error(mergedConcepts.error.message);
+    const indexed = await writeAllIndexMd(targetWiki, mergedConcepts.data);
+    if (!indexed.success) throw new Error(indexed.error.message);
+    const conceptCount = mergedConcepts.data.length;
 
     const today = new Date().toISOString().slice(0, 10);
     const mergeEntry = [
@@ -539,7 +542,7 @@ export async function mergeWorkspaces(
       "",
       `* **Merge**: ${mainT("merge.logEntry", {
         sources: names.join(", "),
-        concepts: indexEntries.length,
+        concepts: conceptCount,
         renamed,
         deduplicated,
       })}`,
@@ -560,7 +563,7 @@ export async function mergeWorkspaces(
 
     return ok({
       workspace: targetPath,
-      concepts: indexEntries.length,
+      concepts: conceptCount,
       renamed,
       deduplicated,
     });
