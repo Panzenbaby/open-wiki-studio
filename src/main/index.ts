@@ -12,6 +12,8 @@ import {
   getLlmConfig,
   listRecentWorkspaces,
   rememberWorkspace,
+  removeLlmApiKey,
+  toLlmConfigView,
 } from "./config.ts";
 import { mergeWorkspaces } from "./workspace-merge.ts";
 import { createUpdateRepository, type UpdateRepository } from "./update-repository.ts";
@@ -102,7 +104,14 @@ async function activateWorkspace(folderPath: string): Promise<Result<WorkspaceIn
 function registerGlobalHandlers(): void {
   ipcMain.handle("okf:listRecentWorkspaces", async () => listRecentWorkspaces());
 
-  ipcMain.handle("okf:getLlmConfig", async () => ok(await getLlmConfig()));
+  ipcMain.handle("okf:getLlmConfig", async () => {
+    const llm = await getLlmConfig();
+    return ok(llm ? toLlmConfigView(llm) : null);
+  });
+
+  // Revoking the key only touches config.json, so this is workspace-
+  // independent and stays available before a workspace is active.
+  ipcMain.handle("okf:removeLlmApiKey", async () => removeLlmApiKey());
 
 // App self-info is workspace-independent. Registered globally so the renderer
   // can call it at bootstrap, before any workspace is active.

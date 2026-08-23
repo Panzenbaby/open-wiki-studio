@@ -7,7 +7,8 @@ import { addInputFiles, fileExists, getPreview, listFolder, revealInFileManager 
 import { buildWikiGraph } from "./wiki-graph.ts";
 import { planRemoval, removeFromWiki } from "./wiki-remove.ts";
 import { migrateWiki, planMigration } from "./wiki-migrate.ts";
-import { setLlmConfig } from "./config.ts";
+import { getLlmConfig, resolveStoredApiKey, setLlmConfig, type ApiKeyRequest } from "./config.ts";
+import { askUnencryptedKeyChoice } from "./api-key-dialog.ts";
 import { FolderWatcher } from "./folder-watcher.ts";
 import { errorMessage, ok, err } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
@@ -31,6 +32,10 @@ const VALID_PROVIDERS: ReadonlyArray<ProviderId> = [
   "ollama",
   "github-copilot",
 ];
+
+async function storedApiKeyFor(request: ApiKeyRequest): Promise<string | undefined> {
+  return resolveStoredApiKey(await getLlmConfig(), request);
+}
 
 const BRIDGE_CHANNELS = [
   "configureLlm",
@@ -102,9 +107,12 @@ export class IpcBridge {
 
     const handlers: Record<string, (...args: never[]) => Promise<unknown>> = {
       configureLlm: async (config: LlmConfig) => {
-        const saved = await setLlmConfig(config);
+        // The renderer only sends a key when the user typed a new one; an
+        // untouched masked field must keep the stored key.
+        const effective = config.apiKey ? config : { ...config, apiKey: await storedApiKeyFor(config) };
+        const saved = await setLlmConfig(effective, askUnencryptedKeyChoice(webContents));
         if (!saved.success) return saved;
-        return repo.configureLlm(config);
+        return repo.configureLlm(effective);
       },
       listAvailableModels: async (provider: string) => {
         if (!VALID_PROVIDERS.includes(provider as ProviderId)) {
@@ -116,7 +124,8 @@ export class IpcBridge {
         if (!VALID_PROVIDERS.includes(provider as ProviderId)) {
           return err(mainT("error.unknownProvider", { provider }));
         }
-        return repo.loadModels(provider as ProviderId, apiKey, baseUrl);
+        const key = apiKey ?? (await storedApiKeyFor({ provider: provider as ProviderId, baseUrl }));
+        return repo.loadModels(provider as ProviderId, key, baseUrl);
       },
       loginCopilot: async () => repo.loginCopilot(),
       cancelCopilotLogin: async () => repo.cancelCopilotLogin(),

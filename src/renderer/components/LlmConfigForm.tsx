@@ -3,7 +3,8 @@ import { useSetAtom } from "jotai";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import { llmConfiguredAtom, toastAtom } from "../store.ts";
-import type { CopilotLoginEvent, LlmConfig, ModelOption, ProviderId } from "../../shared/ipc-types.ts";
+import { RemoveApiKeyModal } from "./RemoveApiKeyModal.tsx";
+import type { CopilotLoginEvent, LlmConfig, LlmConfigView, ModelOption, ProviderId } from "../../shared/ipc-types.ts";
 
 type ProviderDef = {
   id: ProviderId;
@@ -29,7 +30,7 @@ const PROVIDERS: ReadonlyArray<ProviderDef> = [
 type CopilotStatus = "idle" | "logging-in" | "logged-in";
 
 interface LlmConfigFormProps {
-  readonly initial: LlmConfig | null;
+  readonly initial: LlmConfigView | null;
   readonly submitLabel: string;
   readonly onSaved: () => void;
 }
@@ -38,7 +39,9 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   const t = useT();
   const [provider, setProvider] = useState<ProviderId>(props.initial?.provider ?? "anthropic");
   const [modelId, setModelId] = useState(props.initial?.modelId ?? "");
-  const [apiKey, setApiKey] = useState(props.initial?.apiKey ?? "");
+  // Always starts empty: the stored key never reaches the renderer. An empty
+  // field means "keep whatever is stored".
+  const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState(props.initial?.baseUrl ?? "");
   const [busy, setBusy] = useState(false);
   const setToast = useSetAtom(toastAtom);
@@ -61,18 +64,27 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Set once the stored key has actually been revoked in the main process, so
+  // the form stops claiming a key is stored.
+  const [storedKeyRemoved, setStoredKeyRemoved] = useState(false);
+  const [confirmingKeyRemoval, setConfirmingKeyRemoval] = useState(false);
 
   useEffect(() => {
     if (!props.initial) return;
     setProvider(props.initial.provider);
     setModelId(props.initial.modelId);
-    setApiKey(props.initial.apiKey ?? "");
+    setApiKey("");
     setBaseUrl(props.initial.baseUrl ?? "");
+    setStoredKeyRemoved(false);
   }, [props.initial]);
 
   const selected = PROVIDERS.find((p) => p.id === provider)!;
   const showKeyField = selected.keyMode !== "none";
   const isCopilot = selected.oauth === true;
+  // A key is already stored for the selected provider, so an empty field is
+  // still a valid save and models can be loaded without re-entering it.
+  const hasStoredKey =
+    props.initial?.hasApiKey === true && props.initial.provider === provider && !storedKeyRemoved;
 
   // Probe auth status when Copilot is selected: a non-empty model list =
   // already logged in (dropdown + logout); empty = show login button. State is
@@ -116,13 +128,14 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
       setLoadError(null);
       return;
     }
-    const hasCreds = !!saved.apiKey || !!saved.baseUrl || provider === "ollama";
+    const hasCreds = saved.hasApiKey || !!saved.baseUrl || provider === "ollama";
     if (!hasCreds) return;
     let cancelled = false;
     void (async () => {
       setLoadingModels(true);
       setLoadError(null);
-      const result = await api.loadModels(provider, saved.apiKey, saved.baseUrl);
+      // No key passed: main falls back to the stored one for this provider.
+      const result = await api.loadModels(provider, undefined, saved.baseUrl);
       if (cancelled) return;
       setLoadingModels(false);
       if (result.success) {
@@ -146,7 +159,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   // Save gate: required-key providers need an apiKey; OAuth (Copilot) needs a
   // completed login + selected model; other providers need a loaded model
   // list + a selected model.
-  const missingRequiredKey = selected.keyMode === "required" && !apiKey.trim();
+  const missingRequiredKey = selected.keyMode === "required" && !apiKey.trim() && !hasStoredKey;
   const copilotMissingModel = isCopilot && (copilotStatus !== "logged-in" || !modelId.trim());
   const nonCopilotMissingModel = !isCopilot && (!modelsLoaded || !modelId.trim());
   const canSave =
@@ -158,7 +171,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   // providers need a base URL (Ollama has a default, so it's always ready).
   const canLoadModels =
     !loadingModels &&
-    (selected.keyMode !== "required" || !!apiKey.trim()) &&
+    (selected.keyMode !== "required" || !!apiKey.trim() || hasStoredKey) &&
     (!selected.needsBaseUrl || !!baseUrl.trim());
 
   async function openInBrowser(url: string): Promise<void> {
@@ -238,12 +251,11 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
    */
   function selectProvider(next: ProviderId): void {
     setProvider(next);
+    setApiKey("");
     if (props.initial && props.initial.provider === next) {
-      setApiKey(props.initial.apiKey ?? "");
       setBaseUrl(props.initial.baseUrl ?? "");
       setModelId(props.initial.modelId);
     } else {
-      setApiKey("");
       setBaseUrl(next === "ollama" ? "http://localhost:11434/v1" : "");
       setModelId("");
     }
@@ -270,6 +282,30 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
     if (!result.data.some((m) => m.id === modelId)) {
       setModelId(result.data[0]?.id ?? "");
     }
+  }
+
+  /**
+   * Revoke the stored key. Applied immediately rather than on save: the field
+   * shows "a key is stored", and deferring would leave that label wrong until
+   * the user saves — or permanently, if they navigate away. It also cannot be
+   * deferred for required-key providers, where the save button is disabled
+   * until a key exists, so a pending removal could never be applied.
+   */
+  async function removeStoredKey(): Promise<void> {
+    setBusy(true);
+    const result = await api.removeLlmApiKey();
+    setBusy(false);
+    if (!result.success) {
+      setToast({ message: `${t("llf.removeApiKeyFailed")}: ${result.error.message}`, kind: "error" });
+      return;
+    }
+    setStoredKeyRemoved(true);
+    setApiKey("");
+    setModels([]);
+    setModelsLoaded(false);
+    setLoadError(null);
+    setLlmConfigured(false);
+    setToast({ message: t("llf.apiKeyRemoved"), kind: "info" });
   }
 
   /** Editing credentials invalidates a previously-loaded model list. */
@@ -385,8 +421,18 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
                 type="password"
                 value={apiKey}
                 onChange={(e) => onApiKeyChange(e.target.value)}
-                placeholder="sk-…"
+                placeholder={hasStoredKey ? t("llf.apiKeyStored") : "sk-…"}
               />
+              {hasStoredKey && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setConfirmingKeyRemoval(true)}
+                  disabled={busy}
+                  style={{ alignSelf: "flex-start" }}
+                >
+                  {t("llf.removeApiKey")}
+                </button>
+              )}
             </div>
           )}
 
@@ -440,6 +486,17 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
         <div className="hint" style={{ marginTop: "var(--space-3)", color: "var(--danger, #e06c75)" }}>
           {t("copilot.noModels")}
         </div>
+      )}
+
+      {confirmingKeyRemoval && (
+        <RemoveApiKeyModal
+          busy={busy}
+          onCancel={() => setConfirmingKeyRemoval(false)}
+          onConfirm={() => {
+            setConfirmingKeyRemoval(false);
+            void removeStoredKey();
+          }}
+        />
       )}
     </>
   );

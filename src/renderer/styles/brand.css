@@ -228,6 +228,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .btn-ghost:hover { background: var(--glass-bg); color: var(--fg); }
 .btn-ghost.active { background: var(--glass-bg); color: var(--fg); border-color: var(--border); }
 .btn-sm { height: 28px; padding: 0 var(--space-3); font-size: var(--text-xs); }
+.btn-danger { color: var(--danger); border-color: color-mix(in oklab, var(--danger), transparent 55%); }
+.btn-danger:hover { background: color-mix(in oklab, var(--danger), transparent 82%); color: var(--danger); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ---------- fields (border-led containment) ---------- */

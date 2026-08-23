@@ -48,10 +48,21 @@ export type ProviderId =
   | "ollama"
   | "github-copilot";
 
+/** Main-process shape. Carries the plaintext key and must never be sent to
+ *  the renderer — use `LlmConfigView` for that. */
 export interface LlmConfig {
   readonly provider: ProviderId;
   readonly modelId: string;
   readonly apiKey?: string;
+  readonly baseUrl?: string;
+}
+
+/** Renderer-facing shape: the key itself never leaves the main process, only
+ *  the fact that one is stored. */
+export interface LlmConfigView {
+  readonly provider: ProviderId;
+  readonly modelId: string;
+  readonly hasApiKey: boolean;
   readonly baseUrl?: string;
 }
 
@@ -255,7 +266,7 @@ export type UpdateEvent =
 export interface AgentApi {
   // workspace & app
   getAppSelf(): Promise<Result<AppSelfInfo>>;
-  getLlmConfig(): Promise<Result<LlmConfig | null>>;
+  getLlmConfig(): Promise<Result<LlmConfigView | null>>;
   listRecentWorkspaces(): Promise<Result<readonly WorkspaceInfo[]>>;
   openWorkspace(path: string): Promise<Result<WorkspaceInfo>>;
   pickWorkspace(): Promise<Result<WorkspaceInfo | null>>;
@@ -271,6 +282,9 @@ export interface AgentApi {
 
   // llm
   configureLlm(config: LlmConfig): Promise<Result<void>>;
+  /** Revoke the stored API key. Applied immediately, independent of saving
+   *  the rest of the configuration. */
+  removeLlmApiKey(): Promise<Result<void>>;
   /** Provider models with auth configured. For Copilot a non-empty list doubles
    *  as the "already logged in" probe. */
   listAvailableModels(provider: ProviderId): Promise<Result<readonly ModelOption[]>>;

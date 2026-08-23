@@ -14,6 +14,7 @@ const api: AgentApi = {
   mergeWorkspaces: (sources, target) => ipcRenderer.invoke("okf:mergeWorkspaces", sources, target),
 
   configureLlm: (config) => ipcRenderer.invoke("okf:configureLlm", config),
+  removeLlmApiKey: () => ipcRenderer.invoke("okf:removeLlmApiKey"),
   listAvailableModels: (provider) => ipcRenderer.invoke("okf:listAvailableModels", provider),
   loadModels: (provider, apiKey, baseUrl) => ipcRenderer.invoke("okf:loadModels", provider, apiKey, baseUrl),
   loginCopilot: () => ipcRenderer.invoke("okf:loginCopilot"),

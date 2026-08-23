@@ -3,14 +3,14 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import { currentVersionAtom, viewAtom } from "../store.ts";
-import type { LlmConfig } from "../../shared/ipc-types.ts";
+import type { LlmConfigView } from "../../shared/ipc-types.ts";
 import { LlmConfigForm } from "../components/LlmConfigForm.tsx";
 
 export function Settings(): JSX.Element {
   const t = useT();
   const setView = useSetAtom(viewAtom);
   const currentVersion = useAtomValue(currentVersionAtom);
-  const [initial, setInitial] = useState<LlmConfig | null | undefined>(undefined);
+  const [initial, setInitial] = useState<LlmConfigView | null | undefined>(undefined);
 
   useEffect(() => {
     void (async () => {

@@ -1,18 +1,42 @@
 // App config persisted in Electron userData: recent workspaces + last opened.
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { app } from "electron";
+import { app, safeStorage } from "electron";
 import { ok, err, errorMessage } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
-import type { LlmConfig, Result, WorkspaceInfo } from "../shared/ipc-types.ts";
+import type { LlmConfig, LlmConfigView, ProviderId, Result, WorkspaceInfo } from "../shared/ipc-types.ts";
 
 const MAX_RECENT = 12;
+
+/** What the user chose when the OS keychain was unavailable at save time. */
+export type UnencryptedKeyChoice = "store-plaintext" | "session-only";
+
+/** Asks the user how to handle an API key that cannot be encrypted. Injected
+ *  so the save path stays testable without an Electron dialog. */
+export type UnencryptedKeyDecider = () => Promise<UnencryptedKeyChoice>;
+
+/** On-disk shape of the LLM section. `apiKey` and `apiKeyEncrypted` are
+ *  separate fields so plaintext and ciphertext are distinguishable without
+ *  guessing from the value itself. */
+interface StoredLlmConfig {
+  readonly provider: ProviderId;
+  readonly modelId: string;
+  readonly baseUrl?: string;
+  /** Legacy plaintext key; migrated to `apiKeyEncrypted` on first read. */
+  readonly apiKey?: string;
+  /** Base64 of `safeStorage.encryptString(apiKey)`. */
+  readonly apiKeyEncrypted?: string;
+}
 
 interface ConfigShape {
   readonly recentWorkspaces: readonly WorkspaceInfo[];
   readonly lastWorkspace?: string;
-  readonly llm?: LlmConfig;
+  readonly llm?: StoredLlmConfig;
 }
+
+// Key the user chose not to persist. Lives for this process run only and is
+// never written to config.json.
+let sessionApiKey: string | undefined;
 
 function configPath(): string {
   return join(app.getPath("userData"), "config.json");
@@ -129,15 +153,150 @@ export async function rememberWorkspace(
   });
 }
 
-export async function getLlmConfig(): Promise<LlmConfig | undefined> {
-  return (await readConfig()).llm;
+function decryptApiKey(encrypted: string): string | undefined {
+  try {
+    return safeStorage.decryptString(Buffer.from(encrypted, "base64"));
+  } catch {
+    // Ciphertext from another machine/keychain entry — unrecoverable. Report
+    // "no key" so the user is prompted to enter it again.
+    return undefined;
+  }
 }
 
-export async function setLlmConfig(config: LlmConfig): Promise<Result<void>> {
+function toLlmConfig(stored: StoredLlmConfig, apiKey: string | undefined): LlmConfig {
+  return {
+    provider: stored.provider,
+    modelId: stored.modelId,
+    baseUrl: stored.baseUrl,
+    apiKey,
+  };
+}
+
+function normalizeBaseUrl(baseUrl: string | undefined): string | undefined {
+  const trimmed = baseUrl?.trim().replace(/\/+$/, "");
+  return trimmed ? trimmed : undefined;
+}
+
+/** A request from the renderer that may reuse the stored key instead of
+ *  carrying one. */
+export interface ApiKeyRequest {
+  readonly provider: ProviderId;
+  readonly baseUrl?: string;
+}
+
+/**
+ * The stored API key, but only when the request targets the stored
+ * configuration. The renderer can no longer see the key, so it must not be
+ * able to aim it somewhere else either: a `baseUrl` that differs from the
+ * stored one would send the credential to a host the user never configured.
+ * Such a request gets no key — the same position as configuring a new
+ * endpoint from scratch.
+ */
+export function resolveStoredApiKey(
+  stored: LlmConfig | undefined,
+  request: ApiKeyRequest,
+): string | undefined {
+  if (!stored || stored.provider !== request.provider) return undefined;
+  const requested = normalizeBaseUrl(request.baseUrl);
+  if (requested !== undefined && requested !== normalizeBaseUrl(stored.baseUrl)) {
+    return undefined;
+  }
+  return stored.apiKey;
+}
+
+/** Strip the API key for the renderer: only its presence crosses IPC. */
+export function toLlmConfigView(config: LlmConfig): LlmConfigView {
+  return {
+    provider: config.provider,
+    modelId: config.modelId,
+    baseUrl: config.baseUrl,
+    hasApiKey: !!config.apiKey,
+  };
+}
+
+export async function getLlmConfig(): Promise<LlmConfig | undefined> {
+  return withConfigLock(async () => {
+    const current = await readConfig();
+    const stored = current.llm;
+    if (!stored) return undefined;
+
+    // Migrate a legacy plaintext key in place. Inside the lock so a concurrent
+    // writer cannot lose the rewrite.
+    if (stored.apiKey !== undefined && safeStorage.isEncryptionAvailable()) {
+      const migrated: StoredLlmConfig = {
+        provider: stored.provider,
+        modelId: stored.modelId,
+        baseUrl: stored.baseUrl,
+        apiKeyEncrypted: safeStorage.encryptString(stored.apiKey).toString("base64"),
+      };
+      await writeConfig({ ...current, llm: migrated });
+      return toLlmConfig(migrated, stored.apiKey);
+    }
+
+    if (stored.apiKeyEncrypted !== undefined) {
+      return toLlmConfig(stored, decryptApiKey(stored.apiKeyEncrypted));
+    }
+    return toLlmConfig(stored, stored.apiKey ?? sessionApiKey);
+  });
+}
+
+async function toStoredLlmConfig(
+  config: LlmConfig,
+  decideUnencrypted: UnencryptedKeyDecider,
+): Promise<StoredLlmConfig> {
+  const base: StoredLlmConfig = {
+    provider: config.provider,
+    modelId: config.modelId,
+    baseUrl: config.baseUrl,
+  };
+  if (!config.apiKey) {
+    sessionApiKey = undefined;
+    return base;
+  }
+  if (safeStorage.isEncryptionAvailable()) {
+    sessionApiKey = undefined;
+    return { ...base, apiKeyEncrypted: safeStorage.encryptString(config.apiKey).toString("base64") };
+  }
+  const choice = await decideUnencrypted();
+  if (choice === "store-plaintext") {
+    sessionApiKey = undefined;
+    return { ...base, apiKey: config.apiKey };
+  }
+  sessionApiKey = config.apiKey;
+  return base;
+}
+
+/** Revoke the stored API key: drops it from disk and from the session,
+ *  keeping the rest of the LLM config (provider, model, base URL). */
+export async function removeLlmApiKey(): Promise<Result<void>> {
+  return withConfigLock(async () => {
+    try {
+      sessionApiKey = undefined;
+      const current = await readConfig();
+      const stored = current.llm;
+      if (!stored) return ok(undefined);
+      const llm: StoredLlmConfig = {
+        provider: stored.provider,
+        modelId: stored.modelId,
+        baseUrl: stored.baseUrl,
+      };
+      await writeConfig({ ...current, llm });
+      return ok(undefined);
+    } catch (error) {
+      return err<void>(mainT("error.removeApiKey", { detail: errorMessage(error) }));
+    }
+  });
+}
+
+export async function setLlmConfig(
+  config: LlmConfig,
+  decideUnencrypted: UnencryptedKeyDecider,
+): Promise<Result<void>> {
   return withConfigLock(async () => {
     try {
       const current = await readConfig();
-      await writeConfig({ ...current, llm: config });
+      const llm = await toStoredLlmConfig(config, decideUnencrypted);
+      await writeConfig({ ...current, llm });
       return ok(undefined);
     } catch (error) {
       return err<void>(mainT("error.saveLlmConfig", { detail: errorMessage(error) }));

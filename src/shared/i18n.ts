@@ -74,6 +74,17 @@ export const messages: Record<Locale, Dict> = {
     "llf.apiKey": "API key",
     "llf.apiKeyOptional": "optional",
     "llf.apiKeyRequired": "An API key is required for this provider.",
+    "llf.apiKeyStored": "Saved key — leave empty to keep it",
+    "llf.removeApiKey": "Remove saved key",
+    "llf.apiKeyRemoved": "Saved API key removed.",
+    "llf.removeApiKeyFailed": "Could not remove the saved key",
+    "removeKey.title": "Remove saved API key?",
+    "removeKey.body":
+      "The saved API key will be deleted from this device. To use this provider again you have to enter the key once more — from your password manager, or a newly issued one.",
+    "removeKey.notRevoked":
+      "This only removes the local copy. The key itself stays valid at the provider.",
+    "removeKey.cancel": "Cancel",
+    "removeKey.confirm": "Remove key",
     "llf.saveFailed": "Could not save configuration",
     "llf.loadModels": "Load models",
     "llf.loadModelsBusy": "Loading models",
@@ -290,6 +301,7 @@ export const messages: Record<Locale, Dict> = {
     "error.rememberWorkspace": "Failed to remember workspace: {detail}",
     "error.forgetWorkspace": "Failed to remove workspace: {detail}",
     "error.saveLlmConfig": "Failed to save LLM config: {detail}",
+    "error.removeApiKey": "Failed to remove the API key: {detail}",
     "error.invalidPath": "Invalid path: {path}",
     "error.openFolder": "Failed to open folder: {detail}",
     "error.invalidUrl": "Invalid URL",
@@ -310,6 +322,13 @@ export const messages: Record<Locale, Dict> = {
     "dialog.chooseWorkspace": "Choose a workspace folder",
     "dialog.mergeTarget": "Choose the folder for the merged workspace",
     "dialog.startupError": "Open Wiki Studio — startup error",
+    "keyFallback.title": "Open Wiki Studio — API key cannot be encrypted",
+    "keyFallback.message":
+      "This system offers no secure storage for the API key.",
+    "keyFallback.detail":
+      "Without an OS keychain the key can only be saved as readable text in the configuration file. Choose how to continue.",
+    "keyFallback.sessionOnly": "Do not save (this session only)",
+    "keyFallback.storePlaintext": "Save unencrypted anyway",
     "error.windowLoad": "Failed to load renderer window",
     "error.windowCreate": "Could not create window",
 
@@ -406,6 +425,17 @@ export const messages: Record<Locale, Dict> = {
     "llf.apiKey": "API-Key",
     "llf.apiKeyOptional": "optional",
     "llf.apiKeyRequired": "Für diesen Anbieter ist ein API-Schlüssel erforderlich.",
+    "llf.apiKeyStored": "Gespeicherter Schlüssel — zum Beibehalten leer lassen",
+    "llf.removeApiKey": "Gespeicherten Schlüssel entfernen",
+    "llf.apiKeyRemoved": "Gespeicherter API-Schlüssel wurde entfernt.",
+    "llf.removeApiKeyFailed": "Gespeicherter Schlüssel konnte nicht entfernt werden",
+    "removeKey.title": "Gespeicherten API-Schlüssel entfernen?",
+    "removeKey.body":
+      "Der gespeicherte API-Schlüssel wird von diesem Gerät gelöscht. Um den Anbieter wieder zu nutzen, muss der Schlüssel erneut eingegeben werden — aus dem Passwort-Manager oder ein neu erstellter.",
+    "removeKey.notRevoked":
+      "Es wird nur die lokale Kopie entfernt. Der Schlüssel selbst bleibt beim Anbieter gültig.",
+    "removeKey.cancel": "Abbrechen",
+    "removeKey.confirm": "Schlüssel entfernen",
     "llf.saveFailed": "Konfiguration konnte nicht gespeichert werden",
     "llf.loadModels": "Modelle laden",
     "llf.loadModelsBusy": "Lade Modelle",
@@ -625,6 +655,7 @@ export const messages: Record<Locale, Dict> = {
     "error.rememberWorkspace": "Workspace konnte nicht gespeichert werden: {detail}",
     "error.forgetWorkspace": "Workspace konnte nicht entfernt werden: {detail}",
     "error.saveLlmConfig": "LLM-Konfiguration konnte nicht gespeichert werden: {detail}",
+    "error.removeApiKey": "API-Schlüssel konnte nicht entfernt werden: {detail}",
     "error.invalidPath": "Ungültiger Pfad: {path}",
     "error.openFolder": "Ordner konnte nicht geöffnet werden: {detail}",
     "error.invalidUrl": "Ungültige URL",
@@ -646,6 +677,13 @@ export const messages: Record<Locale, Dict> = {
     "dialog.chooseWorkspace": "Workspace-Ordner wählen",
     "dialog.mergeTarget": "Ordner für den zusammengeführten Workspace wählen",
     "dialog.startupError": "Open Wiki Studio — Startfehler",
+    "keyFallback.title": "Open Wiki Studio — API-Schlüssel kann nicht verschlüsselt werden",
+    "keyFallback.message":
+      "Dieses System bietet keinen sicheren Speicher für den API-Schlüssel.",
+    "keyFallback.detail":
+      "Ohne Betriebssystem-Schlüsselbund kann der Schlüssel nur als lesbarer Text in der Konfigurationsdatei gespeichert werden. Bitte wählen, wie fortgefahren werden soll.",
+    "keyFallback.sessionOnly": "Nicht speichern (nur diese Sitzung)",
+    "keyFallback.storePlaintext": "Trotzdem unverschlüsselt speichern",
     "error.windowLoad": "Renderer-Fenster konnte nicht geladen werden",
     "error.windowCreate": "Fenster konnte nicht erstellt werden",
 
