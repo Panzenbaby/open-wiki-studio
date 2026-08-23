@@ -1,0 +1,30 @@
+name: CI
+
+# Pushes to main and every pull request. Version tags are deliberately not
+# covered here: release.yml already runs the same gates before it builds.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Static type-check (tsc --noEmit)
+      - run: npm run check
+
+      # ESLint (flat config, type-aware) — a lint error fails the job
+      - run: npm run lint
+
+      # Unit tests (vitest run, exits non-zero on failure)
+      - run: npm test

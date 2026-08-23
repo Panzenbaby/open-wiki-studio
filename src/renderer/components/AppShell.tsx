@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Menu as MenuIcon, Settings as SettingsIcon, X as CloseIcon } from "lucide-react";
 import { api } from "../ipc.ts";
@@ -37,6 +37,17 @@ import { Settings } from "../screens/Settings.tsx";
 import { IngestBar } from "./IngestBar.tsx";
 import { Modal } from "./Modal.tsx";
 import { UpdateBadge } from "./UpdateBadge.tsx";
+
+/** Count file entries in a folder result, excluding the OKF archive subtree
+ *  for the wiki folder. `listFolder("wiki")` walks `wiki/` recursively and
+ *  includes `wiki/archive/` (archived originals — pdf, .md.orig, …), which are
+ *  NOT concepts. The dashboard summary and `wikiExistsAtom` are meant to
+ *  reflect concept count, so drop entries whose path (relative to `wiki/`)
+ *  starts with `archive/`. */
+function countConcepts(folder: Folder, files: readonly FileNode[]): number {
+  if (folder !== "wiki") return files.length;
+  return files.filter((node) => !node.relativePath.startsWith("archive/")).length;
+}
 
 export function AppShell(): JSX.Element {
   const t = useT();
@@ -96,18 +107,7 @@ export function AppShell(): JSX.Element {
    *  (used on mount). With a `folder`, lists only that one and patches its
    *  count — used by the `onFolderChanged` handler so a single debounced
    *  burst costs one round-trip, not three. */
-  /** Count file entries in a folder result, excluding the OKF archive
-   *  subtree for the wiki folder. `listFolder("wiki")` walks `wiki/`
-   *  recursively and includes `wiki/archive/` (archived originals — pdf,
-   *  .md.orig, …), which are NOT concepts. The dashboard summary and
-   *  `wikiExistsAtom` are meant to reflect concept count, so drop entries
-   *  whose path (relative to `wiki/`) starts with `archive/`. */
-  function countConcepts(folder: Folder, files: readonly FileNode[]): number {
-    if (folder !== "wiki") return files.length;
-    return files.filter((node) => !node.relativePath.startsWith("archive/")).length;
-  }
-
-  async function refreshCounts(folder?: Folder): Promise<void> {
+  const refreshCounts = useCallback(async (folder?: Folder): Promise<void> => {
     if (folder) {
       const result = await api.listFolder(folder);
       setCounts((current) => ({
@@ -124,9 +124,9 @@ export function AppShell(): JSX.Element {
       input: input.success ? input.data.length : 0,
       wiki: wiki.success ? countConcepts("wiki", wiki.data) : 0,
     });
-  }
+  }, [setCounts]);
 
-  async function refreshSessions(): Promise<readonly SessionInfo[]> {
+  const refreshSessions = useCallback(async (): Promise<readonly SessionInfo[]> => {
     const list = await api.listSessions();
     const sessions = list.success ? list.data : [];
     setSessions(sessions);
@@ -135,7 +135,7 @@ export function AppShell(): JSX.Element {
       new Set(sessions.filter((session) => session.streaming).map((session) => session.path)),
     );
     return sessions;
-  }
+  }, [setSessions, setStreamingSessions]);
 
   async function loadMessages(path: string): Promise<void> {
     const result = await api.getMessages(path);
@@ -214,6 +214,9 @@ export function AppShell(): JSX.Element {
         }
       }
     })();
+    // Mount-only bootstrap: opens the most recent session (or creates one)
+    // exactly once. Re-running on any dependency change would reopen or
+    // recreate the session behind the user's back.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -230,21 +233,18 @@ export function AppShell(): JSX.Element {
   // cheap, view-local fallback.
   useEffect(() => {
     if (view === "dashboard") void refreshCounts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
+  }, [view, refreshCounts]);
 
   useEffect(() => {
     if (messages.length === 1) void refreshSessions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages.length]);
+  }, [messages.length, refreshSessions]);
 
   // Refresh the session list whenever a chat turn ends so the
   // most-recently-active session bubbles to the top.
   useEffect(() => {
     if (turnEnded === 0) return;
     void refreshSessions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turnEnded]);
+  }, [turnEnded, refreshSessions]);
 
   // External filesystem changes (OS-level add/delete/edit on input/wiki,
   //  including the wiki/archive/ subtree) arrive from the main-process
@@ -257,8 +257,7 @@ export function AppShell(): JSX.Element {
       void refreshCounts(folder);
     });
     return unsubscribe;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setFolderVersion, refreshCounts]);
 
   const navBtn = (target: "chat" | "dashboard" | "browser", label: string): JSX.Element => (
     <button
@@ -365,7 +364,12 @@ export function AppShell(): JSX.Element {
       <div className="body">
         {view === "chat" && (
           <Fragment>
-            <div className={`sidebar-backdrop${sidebarOpen ? " open" : ""}`} onClick={closeSidebar} />
+            <button
+              type="button"
+              className={`sidebar-backdrop${sidebarOpen ? " open" : ""}`}
+              aria-label={t("sidebar.close")}
+              onClick={closeSidebar}
+            />
             <Sidebar
               open={sidebarOpen}
               onAfterSelect={closeSidebar}

@@ -65,7 +65,7 @@ describe("addInputFiles", () => {
 
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.added.sort()).toEqual([
+    expect([...result.data.added].sort()).toEqual([
       "src/a.md",
       "src/sub/b.md",
       "src/sub/deep/c.md",

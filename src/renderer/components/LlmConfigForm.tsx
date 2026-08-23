@@ -153,6 +153,9 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
     return () => {
       cancelled = true;
     };
+    // `modelId` and `props.initial` excluded on purpose: this is the
+    // provider-switch auto-load. Re-running it when the user picks a model
+    // would re-fetch the list and fight their selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provider, isCopilot]);
 

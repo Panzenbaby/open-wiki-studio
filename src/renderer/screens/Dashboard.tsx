@@ -60,7 +60,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
     setToast({ message: t("migrate.done", { n: result.data.migrated.length }), kind: "info" });
   };
 
-  const confirmDelete = (path: string, e: React.MouseEvent): void => {
+  const confirmDelete = (path: string, e: React.SyntheticEvent): void => {
     e.stopPropagation();
     if (!window.confirm(t("session.confirmDelete"))) return;
     props.onDeleteSession(path);
@@ -149,11 +149,18 @@ export function Dashboard(props: DashboardProps): JSX.Element {
           ) : (
             <div className="recent-sessions">
               {sessions.map((session) => (
-                <button
+                <div
                   key={session.path}
                   className={`rs-item${currentSession?.path === session.path ? " active" : ""}`}
-                  style={{ width: "100%", textAlign: "left" }}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => props.onOpenSession(session.path)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      props.onOpenSession(session.path);
+                    }
+                  }}
                 >
                   <div>
                     <div className="rs-title">{session.name.length > 60 ? `${session.name.slice(0, 60)}${t("app.ellipsis")}` : session.name}</div>
@@ -161,13 +168,22 @@ export function Dashboard(props: DashboardProps): JSX.Element {
                   </div>
                   <span
                     className="session-delete-dash"
+                    role="button"
+                    tabIndex={0}
                     title={t("session.delete")}
                     aria-label={t("session.delete")}
                     onClick={(e) => confirmDelete(session.path, e)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        confirmDelete(session.path, e);
+                      }
+                    }}
                   >
                     <Trash2 size={14} />
                   </span>
-                </button>
+                </div>
               ))}
             </div>
           )}

@@ -61,7 +61,9 @@ export function ContextMenu(props: ContextMenuProps): JSX.Element | null {
   return (
     <div
       className="ctx-backdrop"
-      onClick={onClose}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
       onContextMenu={(event) => {
         event.preventDefault();
         onClose();
@@ -73,7 +75,6 @@ export function ContextMenu(props: ContextMenuProps): JSX.Element | null {
         className="ctx-menu"
         style={{ left: clamped.left, top: clamped.top }}
         role="menu"
-        onClick={(event) => event.stopPropagation()}
       >
         {items.map((item, index) => (
           <button

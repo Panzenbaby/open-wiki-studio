@@ -4,7 +4,7 @@
 // rules) is exercised deterministically.
 import { describe, expect, it } from "vitest";
 import { applyUpdateEvent } from "../src/renderer/update-state.ts";
-import type { UpdateEvent, UpdateInfo, UpdateStatus } from "../src/shared/ipc-types.ts";
+import type { UpdateInfo, UpdateStatus } from "../src/shared/ipc-types.ts";
 
 const info = (version: string): UpdateInfo => ({
   version,

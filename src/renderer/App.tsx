@@ -26,8 +26,7 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     document.title = t("app.name");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locale]);
+  }, [t]);
 
   useEffect(() => {
     void (async () => {

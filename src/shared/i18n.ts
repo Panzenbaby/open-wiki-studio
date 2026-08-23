@@ -251,6 +251,7 @@ export const messages: Record<Locale, Dict> = {
     "sidebar.noSessions": "No sessions yet.",
     "sidebar.newQuestion": "New question",
     "sidebar.toggle": "Show sessions",
+    "sidebar.close": "Close sessions",
 
     // ── ingest bar ────────────────────────────────────────────────
     "ingestbar.running": "/wiki-update running",
@@ -605,6 +606,7 @@ export const messages: Record<Locale, Dict> = {
     "sidebar.noSessions": "Noch keine Sessions.",
     "sidebar.newQuestion": "Neue Frage",
     "sidebar.toggle": "Sessions anzeigen",
+    "sidebar.close": "Sessions schließen",
 
     // ── ingest bar ────────────────────────────────────────────────
     "ingestbar.running": "/wiki-update läuft",

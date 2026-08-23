@@ -23,14 +23,14 @@ export function Modal({ title, onClose, children, footer }: ModalProps): JSX.Ele
   }, [onClose]);
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="presentation">
-      <div
-        className="modal-card"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        onClick={(event) => event.stopPropagation()}
-      >
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="modal-card" role="dialog" aria-modal="true" aria-label={title}>
         <h2 className="modal-title">{title}</h2>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}

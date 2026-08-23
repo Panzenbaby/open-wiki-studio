@@ -14,6 +14,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ChatSessionPool,
+  extractText,
   type AgentMessageLike,
   type ChatSessionManager,
   type ChatSessionPoolDeps,
@@ -205,8 +206,8 @@ describe("ChatSessionPool — LRU eviction", () => {
   it("touches a pooled session to most-recently-used on openSession (reuse)", async () => {
     const pool = new TestPool(3);
     const s1 = (await pool.newSession()).path;
-    const _s2 = (await pool.newSession()).path;
-    const s3 = (await pool.newSession()).path; // current=s3, order [s1, s2, s3]
+    const s2 = (await pool.newSession()).path;
+    await pool.newSession(); // current=s3, order [s1, s2, s3]
     // Reopen s1 → reuse: current=s1, touch moves it to the back (MRU).
     await pool.openSession(s1);
     expect(pool.getCurrentPath()).toBe(s1);
@@ -214,7 +215,7 @@ describe("ChatSessionPool — LRU eviction", () => {
     // would be evicted; with the touch, s2 is now the oldest → evicted instead.
     const s4 = (await pool.newSession()).path;
     expect(pool.has(s1)).toBe(true);
-    expect(pool.has(_s2)).toBe(false);
+    expect(pool.has(s2)).toBe(false);
     expect(pool.getCurrentPath()).toBe(s4);
   });
 });
@@ -353,5 +354,29 @@ describe("ChatSessionPool — accessors", () => {
     expect(pool.get(s1)?.path).toBe(s1);
     expect(pool.has("/unknown")).toBe(false);
     expect(pool.get("/unknown")).toBeUndefined();
+  });
+});
+
+describe("extractText", () => {
+  it("returns a string content block as-is", () => {
+    expect(extractText("hello")).toBe("hello");
+  });
+
+  it("concatenates the text blocks and drops the non-text ones", () => {
+    expect(
+      extractText([
+        { type: "text", text: "one " },
+        { type: "tool_use" },
+        { type: "text", text: "two" },
+      ]),
+    ).toBe("one two");
+  });
+
+  it("ignores text blocks whose text is missing", () => {
+    expect(extractText([{ type: "text" }, { type: "text", text: "kept" }])).toBe("kept");
+  });
+
+  it("returns an empty string for undefined content", () => {
+    expect(extractText(undefined)).toBe("");
   });
 });

@@ -389,13 +389,20 @@ export class ChatSessionPool {
  *  `extractMessages` (caller-facing) can share it without a pool->agent import
  *  (which would create a cycle: the agent imports the pool, not the reverse).
  *  Kept here because the pool's streaming-text subscribe is its primary user. */
+function isTextBlock(block: unknown): block is { type: "text"; text: string } {
+  if (typeof block !== "object" || block === null) return false;
+  const candidate = block as { type?: unknown; text?: unknown };
+  return candidate.type === "text" && typeof candidate.text === "string";
+}
+
 export function extractText(
   content: string | ReadonlyArray<{ type: string; text?: string }> | undefined,
 ): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
-  return content
-    .filter((block) => block.type === "text" && typeof block.text === "string")
-    .map((block) => block.text ?? "")
+  const blocks: readonly unknown[] = content;
+  return blocks
+    .filter(isTextBlock)
+    .map((block) => block.text)
     .join("");
 }

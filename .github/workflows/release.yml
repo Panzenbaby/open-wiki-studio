@@ -31,6 +31,9 @@ jobs:
       # Static type-check (tsc --noEmit)
       - run: npm run check
 
+      # ESLint (flat config, type-aware)
+      - run: npm run lint
+
       # Unit tests (vitest run, exits non-zero on failure)
       - run: npm test
 

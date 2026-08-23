@@ -51,6 +51,24 @@ async function readRawConfig(): Promise<string> {
   return readFile(configPath(), "utf8");
 }
 
+/** The on-disk config shape the assertions inspect. Typed so the tests read
+ *  the persisted file without `any` flowing out of `JSON.parse`. */
+interface RawConfigFile {
+  readonly llm?: {
+    readonly provider?: string;
+    readonly modelId?: string;
+    readonly baseUrl?: string;
+    readonly apiKey?: string;
+    readonly apiKeyEncrypted?: string;
+  };
+  readonly lastWorkspace?: string;
+  readonly recentWorkspaces?: readonly string[];
+}
+
+function parseRawConfig(raw: string): RawConfigFile {
+  return JSON.parse(raw) as RawConfigFile;
+}
+
 const SECRET = "sk-super-secret-value";
 
 const baseConfig: LlmConfig = {
@@ -81,8 +99,8 @@ describe("LLM API key at rest", () => {
 
     const raw = await readRawConfig();
     expect(raw).not.toContain(SECRET);
-    expect(JSON.parse(raw).llm.apiKeyEncrypted).toBeTruthy();
-    expect(JSON.parse(raw).llm.apiKey).toBeUndefined();
+    expect(parseRawConfig(raw).llm?.apiKeyEncrypted).toBeTruthy();
+    expect(parseRawConfig(raw).llm?.apiKey).toBeUndefined();
 
     const loaded = await config.getLlmConfig();
     expect(loaded?.apiKey).toBe(SECRET);
@@ -94,7 +112,7 @@ describe("LLM API key at rest", () => {
     await config.rememberWorkspace("/tmp/some-workspace");
     await config.setLlmConfig(baseConfig, neverAsked);
 
-    const parsed = JSON.parse(await readRawConfig());
+    const parsed = parseRawConfig(await readRawConfig());
     expect(parsed.lastWorkspace).toBe("/tmp/some-workspace");
     expect(parsed.recentWorkspaces).toHaveLength(1);
   });
@@ -116,9 +134,9 @@ describe("LLM API key at rest", () => {
 
     const raw = await readRawConfig();
     expect(raw).not.toContain(SECRET);
-    const parsed = JSON.parse(raw);
-    expect(parsed.llm.apiKey).toBeUndefined();
-    expect(parsed.llm.apiKeyEncrypted).toBeTruthy();
+    const parsed = parseRawConfig(raw);
+    expect(parsed.llm?.apiKey).toBeUndefined();
+    expect(parsed.llm?.apiKeyEncrypted).toBeTruthy();
     expect(parsed.lastWorkspace).toBe("/tmp/ws");
 
     // Second read goes through the ciphertext path and still returns the key.
@@ -158,9 +176,9 @@ describe("LLM API key at rest", () => {
       expect(saved.success).toBe(true);
       expect(decider).toHaveBeenCalledOnce();
 
-      const parsed = JSON.parse(await readRawConfig());
-      expect(parsed.llm.apiKey).toBe(SECRET);
-      expect(parsed.llm.apiKeyEncrypted).toBeUndefined();
+      const parsed = parseRawConfig(await readRawConfig());
+      expect(parsed.llm?.apiKey).toBe(SECRET);
+      expect(parsed.llm?.apiKeyEncrypted).toBeUndefined();
       expect((await config.getLlmConfig())?.apiKey).toBe(SECRET);
     });
 
@@ -174,9 +192,9 @@ describe("LLM API key at rest", () => {
 
       const raw = await readRawConfig();
       expect(raw).not.toContain(SECRET);
-      const parsed = JSON.parse(raw);
-      expect(parsed.llm.apiKey).toBeUndefined();
-      expect(parsed.llm.apiKeyEncrypted).toBeUndefined();
+      const parsed = parseRawConfig(raw);
+      expect(parsed.llm?.apiKey).toBeUndefined();
+      expect(parsed.llm?.apiKeyEncrypted).toBeUndefined();
 
       // Served from memory for the rest of the run.
       expect((await config.getLlmConfig())?.apiKey).toBe(SECRET);
@@ -208,7 +226,7 @@ describe("LLM API key at rest", () => {
       const config = await loadConfigModule();
 
       expect((await config.getLlmConfig())?.apiKey).toBe(SECRET);
-      expect(JSON.parse(await readRawConfig()).llm.apiKey).toBe(SECRET);
+      expect(parseRawConfig(await readRawConfig()).llm?.apiKey).toBe(SECRET);
     });
   });
 });
@@ -230,12 +248,12 @@ describe("removeLlmApiKey", () => {
     const removed = await config.removeLlmApiKey();
     expect(removed.success).toBe(true);
 
-    const parsed = JSON.parse(await readRawConfig());
-    expect(parsed.llm.apiKeyEncrypted).toBeUndefined();
-    expect(parsed.llm.apiKey).toBeUndefined();
-    expect(parsed.llm.provider).toBe("anthropic");
-    expect(parsed.llm.modelId).toBe("claude-opus-4-7");
-    expect(parsed.llm.baseUrl).toBe("https://trusted.example/v1");
+    const parsed = parseRawConfig(await readRawConfig());
+    expect(parsed.llm?.apiKeyEncrypted).toBeUndefined();
+    expect(parsed.llm?.apiKey).toBeUndefined();
+    expect(parsed.llm?.provider).toBe("anthropic");
+    expect(parsed.llm?.modelId).toBe("claude-opus-4-7");
+    expect(parsed.llm?.baseUrl).toBe("https://trusted.example/v1");
 
     const loaded = await config.getLlmConfig();
     expect(loaded?.apiKey).toBeUndefined();

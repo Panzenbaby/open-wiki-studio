@@ -108,7 +108,13 @@ across components. Do not inline `"…"` or `"..."`.
 
 ## 6. Build
 - **Build**: `npm run build`
-- **Type-check**: `npx tsc --noEmit -p tsconfig.json`
+- **Type-check**: `npm run check`
+- **Lint**: `npm run lint` (flat ESLint config, type-aware; `react-hooks`
+  and `jsx-a11y` findings are errors)
+- **Test**: `npm test`
+
+CI (`.github/workflows/ci.yml`) runs all four on every push and pull
+request.
 
 ---
 

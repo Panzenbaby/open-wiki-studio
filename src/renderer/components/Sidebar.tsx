@@ -29,7 +29,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
     props.onAfterSelect?.();
   };
 
-  const confirmDelete = (path: string, e: React.MouseEvent): void => {
+  const confirmDelete = (path: string, e: React.SyntheticEvent): void => {
     e.stopPropagation();
     if (!window.confirm(t("session.confirmDelete"))) return;
     props.onDeleteSession(path);
@@ -50,44 +50,45 @@ export function Sidebar(props: SidebarProps): JSX.Element {
           <li className="muted" style={{ padding: "var(--space-3)", fontSize: "var(--text-xs)" }}>{t("sidebar.noSessions")}</li>
         )}
         {sessions.map((session) => (
-          <li
-            key={session.path}
-            className={`session-item${current?.path === session.path ? " active" : ""}`}
-            role="button"
-            tabIndex={0}
-            onClick={() => openSession(session.path)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                openSession(session.path);
-              }
-            }}
-          >
-            <div className="s-content">
-              <div className="s-title">{session.name}</div>
-              <div className="s-meta">{new Date(session.lastModified).toLocaleString()}</div>
-            </div>
-            {streamingSessions.has(session.path) && (
-              <span
-                className="session-streaming"
-                role="status"
-                aria-label={t("session.streaming")}
-                title={t("session.streaming")}
-              >
-                <span className="stream-dot" />
-              </span>
-            )}
-            <span
-              className="session-delete-dash"
+          <li key={session.path}>
+            <div
+              className={`session-item${current?.path === session.path ? " active" : ""}`}
               role="button"
               tabIndex={0}
-              title={t("session.delete")}
-              aria-label={t("session.delete")}
-              onClick={(e) => confirmDelete(session.path, e)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); confirmDelete(session.path, e as unknown as React.MouseEvent); } }}
+              onClick={() => openSession(session.path)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openSession(session.path);
+                }
+              }}
             >
-              <Trash2 size={14} />
-            </span>
+              <div className="s-content">
+                <div className="s-title">{session.name}</div>
+                <div className="s-meta">{new Date(session.lastModified).toLocaleString()}</div>
+              </div>
+              {streamingSessions.has(session.path) && (
+                <span
+                  className="session-streaming"
+                  role="status"
+                  aria-label={t("session.streaming")}
+                  title={t("session.streaming")}
+                >
+                  <span className="stream-dot" />
+                </span>
+              )}
+              <span
+                className="session-delete-dash"
+                role="button"
+                tabIndex={0}
+                title={t("session.delete")}
+                aria-label={t("session.delete")}
+                onClick={(e) => confirmDelete(session.path, e)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); confirmDelete(session.path, e); } }}
+              >
+                <Trash2 size={14} />
+              </span>
+            </div>
           </li>
         ))}
       </ul>

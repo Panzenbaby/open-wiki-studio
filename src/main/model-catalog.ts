@@ -216,8 +216,13 @@ export class ModelCatalog {
     }
     const json = (await response.json()) as OpenAiModelList;
     if (!Array.isArray(json.data)) return [];
-    return json.data
-      .map((entry) => entry?.id)
+    const entries: readonly unknown[] = json.data;
+    return entries
+      .map((entry) =>
+        typeof entry === "object" && entry !== null
+          ? (entry as { id?: unknown }).id
+          : undefined,
+      )
       .filter((id): id is string => typeof id === "string" && id.length > 0);
   }
 

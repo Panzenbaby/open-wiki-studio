@@ -7,7 +7,7 @@
 // (plain objects) stand in for them — no `any`, no real services, no disk.
 import { describe, expect, it } from "vitest";
 import { ModelCatalog, type ModelCatalogDeps } from "../src/main/model-catalog.ts";
-import type { LlmConfig, ModelOption, ProviderId, Result } from "../src/shared/ipc-types.ts";
+import type { LlmConfig, ModelOption, Result } from "../src/shared/ipc-types.ts";
 
 // ─── Minimal typed fakes ────────────────────────────────────────────────
 // Shapes follow the `Pick` slices in ModelCatalogDeps. Deriving the model and
@@ -112,7 +112,7 @@ interface FetchRoute {
 
 function makeFetch(routes: readonly FetchRoute[]): typeof fetch {
   const map = new Map(routes.map((r) => [r.url, r] as const));
-  return (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+  return (async (input: string | URL | Request): Promise<Response> => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     const route = map.get(url);
     if (!route) throw new Error(`Unexpected fetch URL: ${url}`);

@@ -287,7 +287,7 @@ async function createWindow(): Promise<BrowserWindow> {
   return win;
 }
 
-app.whenReady().then(async () => {
+void app.whenReady().then(async () => {
   log("ready");
   registerGlobalHandlers();
   try {
@@ -317,10 +317,18 @@ app.whenReady().then(async () => {
     log("updater init failed (ignored):", errorMessage(error));
   }
 
-  app.on("activate", async () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      state.window = await createWindow();
-    }
+  // Not an async listener: `app.on` ignores the returned promise, so a
+  // createWindow() failure here would surface as an unhandled rejection
+  // instead of the startup error dialog.
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length > 0) return;
+    void (async () => {
+      try {
+        state.window = await createWindow();
+      } catch (error) {
+        fatal(mainT("error.windowCreate"), error);
+      }
+    })();
   });
 });
 
