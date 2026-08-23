@@ -6,3 +6,6 @@ dist/
 .vscode/
 .idea/
 release/
+# Local agent / tooling artifacts
+.claude/
+.playwright-cli/

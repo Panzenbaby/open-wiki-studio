@@ -12,6 +12,17 @@ import { askUnencryptedKeyChoice } from "./api-key-dialog.ts";
 import { FolderWatcher } from "./folder-watcher.ts";
 import { errorMessage, ok, err } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
+import {
+  expectPath,
+  expectProvider,
+  isBoolean,
+  isFolder,
+  isLlmConfig,
+  isNonEmptyString,
+  isNonEmptyStringArray,
+  isOptionalString,
+  type ArgumentValidator,
+} from "./validate.ts";
 import type { Folder, LlmConfig, ProviderId } from "../shared/ipc-types.ts";
 import type { AgentRepository } from "./agent.ts";
 
@@ -22,16 +33,6 @@ const COPILOT_LOGIN_CHANNEL = "okf:copilot-login-event";
 /** Pushed to the renderer whenever a workspace folder changes on disk (OS
  *  edit, external delete, …) so views can re-list without polling. */
 const FOLDER_CHANGED_CHANNEL = "okf:folder-changed";
-
-/** Known `ProviderId` values — used to validate IPC payloads before forwarding. */
-const VALID_PROVIDERS: ReadonlyArray<ProviderId> = [
-  "anthropic",
-  "openai",
-  "google",
-  "openai-compatible",
-  "ollama",
-  "github-copilot",
-];
 
 async function storedApiKeyFor(request: ApiKeyRequest): Promise<string | undefined> {
   return resolveStoredApiKey(await getLlmConfig(), request);
@@ -66,6 +67,36 @@ const BRIDGE_CHANNELS = [
   "abortChat",
   "abort",
 ] as const;
+
+type BridgeChannel = (typeof BRIDGE_CHANNELS)[number];
+
+/** Runtime shape check per channel. Channels without an entry take no
+ *  arguments, so there is nothing to validate. */
+const VALIDATORS: Partial<Record<BridgeChannel, ArgumentValidator>> = {
+  configureLlm: (args) => (isLlmConfig(args[0]) ? null : mainT("error.invalidPayload", { channel: "configureLlm" })),
+  listAvailableModels: expectProvider,
+  loadModels: (args) =>
+    expectProvider(args) ??
+    (isOptionalString(args[1]) && isOptionalString(args[2])
+      ? null
+      : mainT("error.invalidPayload", { channel: "loadModels" })),
+  listFolder: (args) => (isFolder(args[0]) ? null : mainT("error.invalidPayload", { channel: "listFolder" })),
+  getPreview: expectPath,
+  fileExists: expectPath,
+  addInputFiles: (args) =>
+    isNonEmptyStringArray(args[0]) ? null : mainT("error.invalidPayload", { channel: "addInputFiles" }),
+  revealInFileManager: (args) =>
+    isFolder(args[0]) && isNonEmptyString(args[1]) && isBoolean(args[2])
+      ? null
+      : mainT("error.invalidPayload", { channel: "revealInFileManager" }),
+  planRemoval: expectPath,
+  removeFromWiki: expectPath,
+  openSession: expectPath,
+  deleteSession: expectPath,
+  getMessages: expectPath,
+  ask: (args) => (isNonEmptyString(args[0]) ? null : mainT("error.invalidPayload", { channel: "ask" })),
+  retryChat: (args) => (isNonEmptyString(args[0]) ? null : mainT("error.invalidPayload", { channel: "retryChat" })),
+};
 
 export class IpcBridge {
   private readonly watcher: FolderWatcher;
@@ -114,18 +145,10 @@ export class IpcBridge {
         if (!saved.success) return saved;
         return repo.configureLlm(effective);
       },
-      listAvailableModels: async (provider: string) => {
-        if (!VALID_PROVIDERS.includes(provider as ProviderId)) {
-          return err(mainT("error.unknownProvider", { provider }));
-        }
-        return repo.listAvailableModels(provider as ProviderId);
-      },
-      loadModels: async (provider: string, apiKey: string | undefined, baseUrl: string | undefined) => {
-        if (!VALID_PROVIDERS.includes(provider as ProviderId)) {
-          return err(mainT("error.unknownProvider", { provider }));
-        }
-        const key = apiKey ?? (await storedApiKeyFor({ provider: provider as ProviderId, baseUrl }));
-        return repo.loadModels(provider as ProviderId, key, baseUrl);
+      listAvailableModels: async (provider: ProviderId) => repo.listAvailableModels(provider),
+      loadModels: async (provider: ProviderId, apiKey: string | undefined, baseUrl: string | undefined) => {
+        const key = apiKey ?? (await storedApiKeyFor({ provider, baseUrl }));
+        return repo.loadModels(provider, key, baseUrl);
       },
       loginCopilot: async () => repo.loginCopilot(),
       cancelCopilotLogin: async () => repo.cancelCopilotLogin(),
@@ -168,8 +191,10 @@ export class IpcBridge {
     for (const name of BRIDGE_CHANNELS) {
       const channel = `okf:${name}`;
       ipcMain.removeHandler(channel);
-      ipcMain.handle(channel, async (_event, ...args) => {
+      ipcMain.handle(channel, async (_event, ...args: unknown[]) => {
         try {
+          const invalid = VALIDATORS[name]?.(args);
+          if (invalid) return err(invalid);
           return await handlers[name](...(args as never[]));
         } catch (error) {
           return { success: false, error: { message: errorMessage(error) } };

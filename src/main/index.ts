@@ -169,7 +169,10 @@ function registerGlobalHandlers(): void {
 
   ipcMain.handle(
     "okf:pickMergeFolder",
-    async (_event, role: string): Promise<Result<string | null>> => {
+    async (_event, role: unknown): Promise<Result<string | null>> => {
+      if (role !== "source" && role !== "target") {
+        return err<string | null>(mainT("error.invalidPayload", { channel: "pickMergeFolder" }));
+      }
       if (!state.window) return ok(null);
       const result = await dialog.showOpenDialog(state.window, {
         properties: ["openDirectory", "createDirectory"],
