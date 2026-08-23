@@ -362,8 +362,8 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   }
 
   return (
-    <>
-      <div className="field" style={{ marginBottom: "var(--space-5)" }}>
+    <div className="llm-form">
+      <div className="field">
         <label>{t("llf.provider")}</label>
         <div className="provider-grid">
           {PROVIDERS.map((p) => (
@@ -398,7 +398,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
       ) : (
         <>
           {selected.needsBaseUrl && (
-            <div className="field" style={{ marginBottom: "var(--space-4)" }}>
+            <div className="field">
               <label>{t("llf.baseUrl")}</label>
               <input
                 className="input"
@@ -410,13 +410,11 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
           )}
 
           {showKeyField && (
-            <div className="field" style={{ marginBottom: "var(--space-4)" }}>
+            <div className="field">
               <label>
                 {t("llf.apiKey")}
                 {selected.keyMode === "optional" && (
-                  <span className="hint" style={{ marginLeft: "var(--space-2)", fontWeight: 400 }}>
-                    {t("llf.apiKeyOptional")}
-                  </span>
+                  <span className="hint">{t("llf.apiKeyOptional")}</span>
                 )}
               </label>
               <input
@@ -431,7 +429,6 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
                   className="btn btn-ghost btn-sm"
                   onClick={() => setConfirmingKeyRemoval(true)}
                   disabled={busy}
-                  style={{ alignSelf: "flex-start" }}
                 >
                   {t("llf.removeApiKey")}
                 </button>
@@ -440,21 +437,20 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
           )}
 
           {!modelsLoaded && (
-            <div className="field" style={{ marginBottom: "var(--space-4)" }}>
+            <div className="field">
               <button
-                className="btn"
+                className="btn btn-block"
                 onClick={() => void loadModelsAction()}
                 disabled={!canLoadModels}
-                style={{ width: "100%", justifyContent: "center" }}
               >
                 {loadingModels ? `${t("llf.loadModelsBusy")}${t("app.ellipsis")}` : t("llf.loadModels")}
               </button>
-              {loadError && <span className="hint" style={{ color: "var(--error)" }}>{loadError}</span>}
+              {loadError && <span className="hint err">{loadError}</span>}
             </div>
           )}
 
           {modelsLoaded && (
-            <div className="field" style={{ marginBottom: "var(--space-6)" }}>
+            <div className="field">
               <label>{t("llf.selectModel")}</label>
               {models.length > 0 ? (
                 <select className="input" value={modelId} onChange={(e) => setModelId(e.target.value)}>
@@ -473,23 +469,14 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
       )}
 
       <button
-        className="btn btn-primary"
+        className="btn btn-primary btn-block"
         disabled={!canSave}
         onClick={() => void save()}
-        style={{ width: "100%", justifyContent: "center", marginTop: "var(--space-4)" }}
       >
-        {busy ? `${t("settings.save")}…` : props.submitLabel}
+        {busy ? `${t("settings.save")}${t("app.ellipsis")}` : props.submitLabel}
       </button>
-      {missingRequiredKey && (
-        <div className="hint" style={{ marginTop: "var(--space-3)", color: "var(--danger, #e06c75)" }}>
-          {t("llf.apiKeyRequired")}
-        </div>
-      )}
-      {isCopilot && copilotMissingModel && (
-        <div className="hint" style={{ marginTop: "var(--space-3)", color: "var(--danger, #e06c75)" }}>
-          {t("copilot.noModels")}
-        </div>
-      )}
+      {missingRequiredKey && <div className="hint err">{t("llf.apiKeyRequired")}</div>}
+      {isCopilot && copilotMissingModel && <div className="hint err">{t("copilot.noModels")}</div>}
 
       {confirmingKeyRemoval && (
         <RemoveApiKeyModal
@@ -501,7 +488,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
           }}
         />
       )}
-    </>
+    </div>
   );
 }
 
@@ -527,7 +514,7 @@ function CopilotSection(props: CopilotSectionProps): JSX.Element {
   if (status === "logged-in") {
     return (
       <>
-        <div className="field" style={{ marginBottom: "var(--space-4)" }}>
+        <div className="field">
           <label>{t("copilot.selectModel")}</label>
           {models.length > 0 ? (
             <select className="input" value={modelId} onChange={(e) => props.onModelChange(e.target.value)}>
@@ -541,9 +528,9 @@ function CopilotSection(props: CopilotSectionProps): JSX.Element {
             <div className="hint">{t("copilot.noModels")}</div>
           )}
         </div>
-        <div className="row" style={{ alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-4)" }}>
+        <div className="row between">
           <span className="hint">{t("copilot.loggedIn")}</span>
-          <button className="btn btn-ghost" onClick={props.onLogout} style={{ justifyContent: "center" }}>
+          <button className="btn btn-ghost" onClick={props.onLogout}>
             {t("copilot.logout")}
           </button>
         </div>
@@ -553,17 +540,12 @@ function CopilotSection(props: CopilotSectionProps): JSX.Element {
 
   if (status === "logging-in") {
     return (
-      <div className="field" style={{ marginBottom: "var(--space-6)" }}>
+      <div className="field">
         {deviceCode ? (
           <>
             <label>{t("copilot.deviceCode")}</label>
             <div className="copilot-code-row">
-              <div
-                className="copilot-device-code mono"
-                style={{ fontSize: "var(--space-5)", letterSpacing: "0.2em", userSelect: "text" }}
-              >
-                {deviceCode.userCode}
-              </div>
+              <div className="copilot-device-code mono">{deviceCode.userCode}</div>
               <button
                 className="btn btn-ghost copilot-copy-btn"
                 onClick={() => void props.onCopyCode(deviceCode.userCode)}
@@ -573,13 +555,10 @@ function CopilotSection(props: CopilotSectionProps): JSX.Element {
                 {t("copilot.copyCode")}
               </button>
             </div>
-            <span className="hint" style={{ display: "block", marginBottom: "var(--space-3)" }}>
-              {t("copilot.deviceCodeHint")}
-            </span>
+            <span className="hint">{t("copilot.deviceCodeHint")}</span>
             <button
-              className="btn"
+              className="btn btn-block"
               onClick={() => void props.onOpenUrl(deviceCode.verificationUri)}
-              style={{ marginBottom: "var(--space-3)", justifyContent: "center", width: "100%" }}
             >
               {t("copilot.openUrl")}
             </button>
@@ -587,12 +566,11 @@ function CopilotSection(props: CopilotSectionProps): JSX.Element {
         ) : (
           <div className="hint">{t("copilot.loggingIn")}</div>
         )}
-        <div className="hint" style={{ marginTop: "var(--space-2)" }}>{t("copilot.progress")}</div>
+        <div className="hint">{t("copilot.progress")}</div>
         <button
-          className="btn btn-ghost"
+          className="btn btn-ghost btn-block"
           onClick={props.onCancel}
           disabled={!busy}
-          style={{ marginTop: "var(--space-3)", justifyContent: "center", width: "100%" }}
         >
           {t("copilot.cancel")}
         </button>
@@ -602,12 +580,11 @@ function CopilotSection(props: CopilotSectionProps): JSX.Element {
 
   // idle
   return (
-    <div className="field" style={{ marginBottom: "var(--space-6)" }}>
+    <div className="field">
       <button
-        className="btn btn-primary"
+        className="btn btn-primary btn-block"
         onClick={props.onLogin}
         disabled={busy}
-        style={{ width: "100%", justifyContent: "center" }}
       >
         {busy ? `${t("copilot.loggingIn")}${t("app.ellipsis")}` : t("copilot.login")}
       </button>

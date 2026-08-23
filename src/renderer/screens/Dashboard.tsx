@@ -71,40 +71,28 @@ export function Dashboard(props: DashboardProps): JSX.Element {
       <div className="ws-inner">
         <div className="ws-hero">
           <div>
-            <span className="kicker" style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: ".12em", color: "var(--accent)" }}>
+            <span className="kicker">
               {t("dashboard.kicker", { name: workspace?.name ?? "" })}
             </span>
-            <h1 style={{ marginTop: "var(--space-2)" }}>{t("dashboard.title", { name: workspace?.name ?? "" })}</h1>
+            <h1>{t("dashboard.title", { name: workspace?.name ?? "" })}</h1>
             <p>{t(summaryKey, showIngest ? { wiki: counts.wiki } : { wiki: counts.wiki, input: counts.input })}</p>
           </div>
-          <div className="row" style={{ flexWrap: "wrap" }}>
-            <button className="btn btn-primary" style={{ whiteSpace: "nowrap", flexShrink: 0 }} onClick={props.onAsk}>{t("dashboard.newQuestion")}</button>
-            <button className="btn btn-ghost" style={{ whiteSpace: "nowrap", flexShrink: 0 }} onClick={props.onSwitchWorkspace}><ArrowLeftRight size={14} /> {t("nav.switchWorkspace")}</button>
+          <div className="row wrap">
+            <button className="btn btn-primary" onClick={props.onAsk}>{t("dashboard.newQuestion")}</button>
+            <button className="btn btn-ghost" onClick={props.onSwitchWorkspace}><ArrowLeftRight size={14} /> {t("nav.switchWorkspace")}</button>
             {/* A merge copies the wiki as it is on disk — refuse while an ingest
                 is rewriting it. */}
-            <button className="btn btn-ghost" style={{ whiteSpace: "nowrap", flexShrink: 0 }} disabled={running} onClick={() => setMerging(true)}><Merge size={14} /> {t("merge.action")}</button>
+            <button className="btn btn-ghost" disabled={running} onClick={() => setMerging(true)}><Merge size={14} /> {t("merge.action")}</button>
           </div>
         </div>
 
         {legacyConcepts > 0 && (
-          <div
-            className="migrate-hero"
-            style={{
-              border: "1px solid color-mix(in oklab, var(--warn), transparent 55%)",
-              background: "color-mix(in oklab, var(--warn), transparent 92%)",
-              borderRadius: "var(--radius-lg)",
-              padding: "var(--space-6)",
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--space-6)",
-              flexWrap: "wrap",
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: "var(--text-xl)" }}>
+          <div className="migrate-hero">
+            <div className="grow">
+              <div className="hero-title">
                 {t("migrate.bannerTitle", { version: migrationPlan?.targetVersion ?? "" })}
               </div>
-              <div className="fg2" style={{ marginTop: "var(--space-2)" }}>
+              <div className="hero-sub fg2">
                 {t("migrate.bannerSub", { n: legacyConcepts })}
               </div>
             </div>
@@ -117,12 +105,12 @@ export function Dashboard(props: DashboardProps): JSX.Element {
         )}
 
         {showIngest && (
-          <div className="ingest-hero" style={{ border: "1px solid color-mix(in oklab, var(--accent), transparent 40%)", background: "linear-gradient(180deg, color-mix(in oklab, var(--accent), transparent 90%), var(--surface))", borderRadius: "var(--radius-lg)", padding: "var(--space-6)", display: "flex", alignItems: "center", gap: "var(--space-6)" }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: "var(--text-xl)", display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <div className="ingest-hero">
+            <div className="grow">
+              <div className="hero-title row">
                 <span className="pulse" /> {running ? t("dashboard.ingestRunning") : t("dashboard.inputWaiting", { n: counts.input })}
               </div>
-              <div className="fg2" style={{ marginTop: "var(--space-2)" }}>{running ? t("dashboard.ingestRunningSub") : t("dashboard.ingestHint")}</div>
+              <div className="hero-sub fg2">{running ? t("dashboard.ingestRunningSub") : t("dashboard.ingestHint")}</div>
             </div>
             <div className="row">
               {running ? (
@@ -143,9 +131,9 @@ export function Dashboard(props: DashboardProps): JSX.Element {
         </div>
 
         <section>
-          <div className="side-title" style={{ marginBottom: "var(--space-3)" }}>{t("sidebar.sessions")}</div>
+          <div className="side-title">{t("sidebar.sessions")}</div>
           {sessions.length === 0 ? (
-            <div className="muted" style={{ fontSize: "var(--text-sm)" }}>{t("sidebar.noSessions")}</div>
+            <div className="no-sessions">{t("sidebar.noSessions")}</div>
           ) : (
             <div className="recent-sessions">
               {sessions.map((session) => (
@@ -162,8 +150,8 @@ export function Dashboard(props: DashboardProps): JSX.Element {
                     }
                   }}
                 >
-                  <div>
-                    <div className="rs-title">{session.name.length > 60 ? `${session.name.slice(0, 60)}${t("app.ellipsis")}` : session.name}</div>
+                  <div className="rs-content">
+                    <div className="rs-title" title={session.name}>{session.name}</div>
                     <div className="rs-prev mono">{new Date(session.lastModified).toLocaleString()}</div>
                   </div>
                   <span

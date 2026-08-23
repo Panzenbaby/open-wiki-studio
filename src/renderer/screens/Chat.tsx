@@ -167,7 +167,7 @@ export function Chat(): JSX.Element {
     <section className="chat">
       <div className="chat-head">
         <div>
-          <div className="h-title">{title.length > 60 ? `${title.slice(0, 60)}${t("app.ellipsis")}` : title}</div>
+          <div className="h-title" title={title}>{title}</div>
           <div className="h-sub">{t("chat.command")}</div>
         </div>
       </div>

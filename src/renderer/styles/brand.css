@@ -175,6 +175,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* lucide svg icons: block in icon-only containers so grid centering isn't
    offset by the inline text baseline. */
 .iconbtn svg, .fc-icon svg, .glyph svg, .send svg, .chip svg { display: block; }
+.badge svg { display: block; flex-shrink: 0; }
 
 /* Force-flex centering for icon-only containers (lucide svg). */
 .appbar .iconbtn, .folder-card .fc-icon, .composer .send, .empty .glyph {
@@ -228,6 +229,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .btn-ghost:hover { background: var(--glass-bg); color: var(--fg); }
 .btn-ghost.active { background: var(--glass-bg); color: var(--fg); border-color: var(--border); }
 .btn-sm { height: 28px; padding: 0 var(--space-3); font-size: var(--text-xs); }
+.btn-block { width: 100%; justify-content: center; }
 .btn-danger { color: var(--danger); border-color: color-mix(in oklab, var(--danger), transparent 55%); }
 .btn-danger:hover { background: color-mix(in oklab, var(--danger), transparent 82%); color: var(--danger); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
@@ -236,6 +238,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .field { display: flex; flex-direction: column; gap: var(--space-2); }
 .field > label { font-size: var(--text-sm); color: var(--fg-2); font-weight: 600; }
 .field > .hint { font-size: var(--text-xs); color: var(--muted); }
+.field > label .hint { margin-left: var(--space-2); font-size: var(--text-xs); color: var(--muted); font-weight: 400; }
+/* A button inside a field is an affordance, not a form control — it must not
+   stretch to the field width unless it opts in via .btn-block. */
+.field > .btn { align-self: flex-start; }
+.hint.err { font-size: var(--text-xs); color: var(--danger); }
+
+/* Vertical stack shared by FirstRun and Settings (LlmConfigForm). */
+.llm-form { display: flex; flex-direction: column; gap: var(--space-4); }
 .input, select.input, textarea.input {
   height: 38px; padding: 0 var(--space-3);
   background: color-mix(in oklab, var(--bg), #000 18%); color: var(--fg); border: 1px solid var(--border);
@@ -300,20 +310,33 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 
 /* ---------- file preview ---------- */
 .preview { padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); }
-.preview .pv-head { display: flex; align-items: baseline; gap: var(--space-3); }
+.preview .pv-head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
 .preview .pv-id { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--info); }
-.preview .pv-title { font-size: var(--text-xl); }
+.preview .pv-title { font-size: var(--text-xl); min-width: 0; overflow-wrap: anywhere; }
+.preview .pv-tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.preview .pv-note { font-size: var(--text-xs); color: var(--muted); }
+/* Plain-text preview: readable prose, not the code block .pv-body pre gives. */
+.preview .pv-body pre.pv-text { white-space: pre-wrap; font-family: var(--font-body); color: var(--fg-2); background: transparent; border: none; padding: 0; }
 .preview .pv-body { font-size: var(--text-sm); color: var(--fg-2); line-height: 1.7; }
 .preview .pv-body h3 { font-size: var(--text-base); margin-top: var(--space-5); margin-bottom: var(--space-2); color: var(--fg); }
 .preview .pv-body code { font-family: var(--font-mono); font-size: .9em; background: var(--glass-bg); padding: 1px 6px; border-radius: 4px; }
 .preview .pv-body pre { font-family: var(--font-mono); background: color-mix(in oklab, var(--bg), #000 24%); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-4); overflow: auto; font-size: var(--text-xs); }
 .thumb { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--glass-bg); height: 160px; display: grid; place-items: center; color: var(--muted); font-family: var(--font-mono); font-size: var(--text-xs); }
 
+/* ---------- browser (file tree + preview) ---------- */
+.browser { height: 100%; }
+.browser-sidebar { width: 280px; }
+.browser-tree { flex: 1; overflow: auto; padding: var(--space-2); }
+.browser-empty { flex: 1; padding: var(--space-3); font-size: var(--text-xs); color: var(--muted); }
+
 /* ---------- chat ---------- */
 .chat { flex: 1; height: 100%; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
 .chat-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--border-soft); }
-.chat-head .h-title { font-size: var(--text-lg); }
-.chat-head .h-sub { font-size: var(--text-xs); color: var(--muted); font-family: var(--font-mono); }
+/* min-width: 0 so the flex child may shrink below its content width and the
+   title's text-overflow actually engages. */
+.chat-head > div { min-width: 0; }
+.chat-head .h-title { font-size: var(--text-lg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-head .h-sub { font-size: var(--text-xs); color: var(--muted); font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chat-stream { flex: 1; min-height: 0; overflow: auto; padding: var(--space-8) var(--space-6); display: flex; flex-direction: column; gap: var(--space-8); }
 .thread { max-width: 760px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: var(--space-8); }
 
@@ -499,7 +522,10 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .badge.accent { background: color-mix(in oklab, var(--accent), transparent 82%); color: var(--accent); border-color: color-mix(in oklab, var(--accent), transparent 55%); }
 .badge.ok { color: var(--success); border-color: color-mix(in oklab, var(--success), transparent 60%); }
 .badge.warn { color: var(--warn); border-color: color-mix(in oklab, var(--warn), transparent 60%); }
-.badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+/* Folder/graph switch in the Browser sidebar: a badge used as a tab, so it
+   keeps a hairline outline and no fill even when active. */
+.badge.folder-tab { border-color: var(--border); background: transparent; }
 
 /* ---------- first-run ---------- */
 .setup { flex: 1; display: grid; place-items: center; padding: var(--space-12); overflow: auto; }
@@ -529,7 +555,7 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .provider .p-sub { font-size: var(--text-xs); color: var(--muted); }
 
 .copilot-code-row { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-2) 0; }
-.copilot-device-code { flex: 1; min-width: 0; }
+.copilot-device-code { flex: 1; min-width: 0; font-size: var(--text-lg); letter-spacing: 0.2em; user-select: text; }
 .copilot-copy-btn { flex-shrink: 0; }
 
 /* ---------- workspace dashboard (C) ---------- */
@@ -538,6 +564,28 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .ws-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-6); }
 .ws-hero h1 { font-size: var(--text-3xl); }
 .ws-hero p { color: var(--fg-2); margin-top: var(--space-2); max-width: 560px; }
+.ws-hero .btn { white-space: nowrap; flex-shrink: 0; }
+.kicker { display: block; margin-bottom: var(--space-2); font-family: var(--font-mono); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .12em; color: var(--accent); }
+.ws-inner .side-title { margin-bottom: var(--space-3); }
+.ws-inner .no-sessions { font-size: var(--text-sm); color: var(--muted); }
+
+/* Dashboard call-out banners: pending migration (warn) and pending/running
+   ingest (accent). Same skeleton, different signal colour. */
+.migrate-hero, .ingest-hero {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-6);
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+}
+.migrate-hero {
+  border: 1px solid color-mix(in oklab, var(--warn), transparent 55%);
+  background: color-mix(in oklab, var(--warn), transparent 92%);
+}
+.ingest-hero {
+  border: 1px solid color-mix(in oklab, var(--accent), transparent 40%);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--accent), transparent 90%), var(--surface));
+}
+.migrate-hero .hero-title, .ingest-hero .hero-title { font-size: var(--text-xl); }
+.migrate-hero .hero-sub, .ingest-hero .hero-sub { margin-top: var(--space-2); }
 .folder-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
 .folder-cards.single { grid-template-columns: 1fr; }
 .folder-card { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-6); background: var(--glass-bg); cursor: pointer; transition: border-color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard); }
@@ -557,10 +605,13 @@ button.folder-card:focus-visible { outline: 2px solid var(--accent); outline-off
 .rs-item { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4); border: 1px solid var(--border-soft); border-radius: var(--radius-md); background: var(--glass-bg); cursor: pointer; transition: border-color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard); }
 .rs-item:hover { border-color: var(--accent); background: var(--glass-bg-hover); }
 .rs-item.active { border-color: var(--accent); background: color-mix(in oklab, var(--accent), transparent 88%); }
-.rs-item .rs-title { font-size: var(--text-sm); font-weight: 600; }
-.rs-item .rs-prev { font-size: var(--text-xs); color: var(--fg-2); }
+/* min-width: 0 so the row may shrink below its content width and the title's
+   text-overflow actually engages. */
+.rs-item .rs-content { flex: 1; min-width: 0; }
+.rs-item .rs-title { font-size: var(--text-sm); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs-item .rs-prev { font-size: var(--text-xs); color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rs-item .rs-time { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
-.session-delete-dash { opacity: 0; padding: 4px; border: 0; background: transparent; border-radius: var(--radius-sm); color: var(--muted); transition: opacity var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
+.session-delete-dash { opacity: 0; padding: 4px; border: 0; background: transparent; border-radius: var(--radius-sm); color: var(--muted); flex-shrink: 0; transition: opacity var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
 .rs-item:hover .session-delete-dash { opacity: 1; }
 .session-delete-dash:hover { color: var(--danger); background: color-mix(in oklab, var(--danger), transparent 88%); }
 .rs-item.rs-item-missing { cursor: default; border-color: color-mix(in oklab, var(--warn), transparent 60%); }
@@ -612,6 +663,7 @@ button.folder-card:focus-visible { outline: 2px solid var(--accent); outline-off
     box-shadow: var(--elev-raised, 0 8px 24px rgba(0,0,0,.4));
   }
   .sidebar.open { transform: translateX(0); }
+  .browser-sidebar { width: 80vw; }
 
   /* backdrop fades in alongside the sidebar */
   .sidebar-backdrop {

@@ -272,16 +272,16 @@ export function Browser(): JSX.Element {
     : [];
 
   return (
-    <div className="body" style={{ flex: 1, height: "100%" }}>
-      <aside className="sidebar" style={{ width: 280 }}>
+    <div className="body browser">
+      <aside className="sidebar browser-sidebar">
         <div className="side-head row wrap">
           {FOLDERS.map((f) => (
-            <button key={f.id} className={`badge mono${mode === "files" && folder === f.id ? " accent" : ""}`} style={{ border: "1px solid var(--border)", background: "transparent" }} onClick={() => { setFolder(f.id); setMode("files"); setSelected(null); setExpanded(new Set()); }}>
-              <span className={`dot`} style={{ display: "inline-block", flexShrink: 0, width: "8px", height: "8px", borderRadius: "50%", background: "currentColor" }} /> {t(f.labelKey)}
+            <button key={f.id} className={`badge folder-tab mono${mode === "files" && folder === f.id ? " accent" : ""}`} onClick={() => { setFolder(f.id); setMode("files"); setSelected(null); setExpanded(new Set()); }}>
+              <span className="dot" /> {t(f.labelKey)}
             </button>
           ))}
-          <button className={`badge mono${mode === "graph" ? " accent" : ""}`} style={{ border: "1px solid var(--border)", background: "transparent" }} onClick={() => { setMode("graph"); setSelected(null); }} title={t("nav.graph")}>
-            <Share2 size={12} style={{ display: "inline-block", flexShrink: 0 }} /> {t("nav.graph")}
+          <button className={`badge folder-tab mono${mode === "graph" ? " accent" : ""}`} onClick={() => { setMode("graph"); setSelected(null); }} title={t("nav.graph")}>
+            <Share2 size={12} /> {t("nav.graph")}
           </button>
         </div>
         {mode === "files" && (
@@ -291,9 +291,9 @@ export function Browser(): JSX.Element {
               <span className="count">{nodes.length}</span>
             </div>
             {nodes.length === 0 ? (
-              <div className="muted" style={{ flex: 1, padding: "var(--space-3)", fontSize: "var(--text-xs)" }}>{t("browser.emptyFiles")}</div>
+              <div className="browser-empty">{t("browser.emptyFiles")}</div>
             ) : (
-              <div style={{ flex: 1, overflow: "auto", padding: "var(--space-2)" }}>
+              <div className="browser-tree">
                 <FileTree
                   nodes={tree.children}
                   folder={folder}
@@ -307,7 +307,7 @@ export function Browser(): JSX.Element {
             )}
             {folder === "input" && (
               <div className="side-head">
-                <button className="btn btn-sm btn-primary" style={{ width: "100%", justifyContent: "center" }} onClick={() => void addFiles()}><Plus size={14} /> {t("browser.addFiles")}</button>
+                <button className="btn btn-sm btn-primary btn-block" onClick={() => void addFiles()}><Plus size={14} /> {t("browser.addFiles")}</button>
               </div>
             )}
           </>
@@ -322,17 +322,17 @@ export function Browser(): JSX.Element {
             {preview && (
               <>
                 <div className="pv-head">
+                  {preview.frontmatter && <h2 className="pv-title">{preview.frontmatter.title}</h2>}
                   <div className="pv-id mono">{preview.relativePath}</div>
                 </div>
                 {preview.frontmatter && (
-                  <div className="row wrap" style={{ gap: "var(--space-2)" }}>
+                  <div className="pv-tags">
                     <span className="badge accent mono">{preview.frontmatter.type}</span>
-                    <span className="badge mono">{preview.frontmatter.title}</span>
                   </div>
                 )}
                 {preview.truncated && (
-                  <div className="row wrap" style={{ gap: "var(--space-2)", alignItems: "center" }}>
-                    <span className="muted" style={{ fontSize: "var(--text-xs)" }}>{t("preview.truncated")}</span>
+                  <div className="pv-tags">
+                    <span className="pv-note">{t("preview.truncated")}</span>
                     <button className="btn btn-sm" onClick={() => void revealSelectedFile()}>
                       <ExternalLink size={14} /> {t(revealLabelKey(platform))}
                     </button>
@@ -346,22 +346,19 @@ export function Browser(): JSX.Element {
                       onOpenFolder={openFolderLink}
                     />
                   ) : preview.kind === "binary" ? (
-                    <div className="empty" style={{ flex: 1 }}>
+                    <div className="empty grow">
                       <div className="glyph"><FileText size={28} /></div>
                       <div className="e-title">{t("preview.binaryTitle")}</div>
-                      <div className="muted" style={{ maxWidth: 480, textAlign: "center" }}>
-                        {preview.content}
-                      </div>
+                      <div className="e-sub">{preview.content}</div>
                       <button
                         className="btn btn-sm btn-primary"
-                        style={{ marginTop: "var(--space-3)" }}
                         onClick={() => void revealSelectedFile()}
                       >
                         <ExternalLink size={14} /> {t(revealLabelKey(platform))}
                       </button>
                     </div>
                   ) : (
-                    <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--font-body)", color: "var(--fg-2)", background: "transparent", border: "none", padding: 0 }}>{preview.content}</pre>
+                    <pre className="pv-text">{preview.content}</pre>
                   )}
                 </div>
               </>
