@@ -95,7 +95,6 @@ export interface FileNode {
   readonly relativePath: string; // posix, with extension
   readonly name: string;
   readonly isDirectory: boolean;
-  readonly size?: number;
 }
 
 export interface ConceptInfo {
@@ -158,6 +157,7 @@ export interface FilePreview {
   readonly kind: "markdown" | "text" | "binary";
   readonly content: string; // rendered-ready (frontmatter stripped for concepts)
   readonly frontmatter?: ConceptInfo;
+  readonly truncated?: boolean;
 }
 
 // ─── Sessions ────────────────────────────────────────────────────────

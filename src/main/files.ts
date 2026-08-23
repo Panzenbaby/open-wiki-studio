@@ -64,11 +64,13 @@ function isWikiMarkdown(relativePath: string): boolean {
   return relativePath.startsWith("wiki/") && relativePath.endsWith(".md");
 }
 
-async function walk(dir: string, root: string): Promise<FileNode[]> {
+async function walk(dir: string, root: string, depth = 0): Promise<FileNode[]> {
   const out: FileNode[] = [];
+  if (depth >= 100) return out;
+
   let entries: Dirent[];
   try {
-    entries = await (await import("node:fs/promises")).readdir(dir, { withFileTypes: true });
+    entries = await readdir(dir, { withFileTypes: true });
   } catch {
     return out;
   }
@@ -76,15 +78,13 @@ async function walk(dir: string, root: string): Promise<FileNode[]> {
     if (entry.name.startsWith(".")) continue;
     const abs = join(dir, entry.name);
     if (entry.isDirectory()) {
-      out.push(...(await walk(abs, root)));
+      out.push(...(await walk(abs, root, depth + 1)));
     } else if (entry.isFile()) {
       const rel = relative(root, abs).split(sep).join("/");
-      const stats = await stat(abs).catch(() => null);
       out.push({
         relativePath: rel,
         name: entry.name,
         isDirectory: false,
-        size: stats?.size,
       });
     }
   }
@@ -215,12 +215,32 @@ export async function getPreview(
     // still loads everything into memory, but text originals are the common
     // small case; binary originals (the large-PDF risk) were handled above
     // without reading the whole file.
-    const content = await readFile(absolute, "utf8");
+    const MAX_PREVIEW_BYTES = 1024 * 1024; // 1 MB
+    const statInfo = await stat(absolute);
+    
+    let content: string;
+    let truncated = false;
+
+    if (statInfo.size > MAX_PREVIEW_BYTES) {
+      truncated = true;
+      const fileHandle = await open(absolute, "r");
+      try {
+        const buf = Buffer.alloc(MAX_PREVIEW_BYTES);
+        const { bytesRead } = await fileHandle.read(buf, 0, MAX_PREVIEW_BYTES, 0);
+        content = buf.toString("utf8", 0, bytesRead);
+      } finally {
+        await fileHandle.close();
+      }
+    } else {
+      content = await readFile(absolute, "utf8");
+    }
+
     const isMarkdown = relativePath.endsWith(".md") || relativePath.endsWith(".md.orig");
     return ok({
       relativePath,
       kind: isMarkdown ? "markdown" : "text",
       content,
+      truncated,
     });
   } catch (error) {
     return err<FilePreview>(mainT("error.readFile", { path: relativePath, detail: errorMessage(error) }), {

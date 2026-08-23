@@ -322,6 +322,23 @@ export function Browser(): JSX.Element {
                     <span className="badge mono">{preview.frontmatter.title}</span>
                   </div>
                 )}
+                {preview.truncated && (
+                  <div className="alert warning" style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", marginBottom: "var(--space-3)" }}>
+                    <div style={{ flex: 1 }}>{t("preview.truncated", { defaultValue: "Preview truncated (file too large). Open in file manager to view entirely." })}</div>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => {
+                        const prefix = `${folder}/`;
+                        const relativePath = selected && selected.startsWith(prefix)
+                          ? selected.slice(prefix.length)
+                          : "";
+                        void api.revealInFileManager(folder, relativePath, false);
+                      }}
+                    >
+                      <ExternalLink size={14} /> {t(revealLabelKey(platform))}
+                    </button>
+                  </div>
+                )}
                 <div className="pv-body">
                   {preview.kind === "markdown" ? (
                     <MarkdownView
