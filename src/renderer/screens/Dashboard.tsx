@@ -159,7 +159,6 @@ export function Dashboard(props: DashboardProps): JSX.Element {
                     <div className="rs-title">{session.name.length > 60 ? `${session.name.slice(0, 60)}${t("app.ellipsis")}` : session.name}</div>
                     <div className="rs-prev mono">{new Date(session.lastModified).toLocaleString()}</div>
                   </div>
-                  <span className="rs-time">{new Date(session.lastModified).toLocaleDateString()}</span>
                   <span
                     className="session-delete-dash"
                     title={t("session.delete")}

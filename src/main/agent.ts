@@ -431,28 +431,6 @@ export class AgentRepository {
     }
   }
 
-  /**
-   * Retry the last chat turn by re-prompting with the same question.
-   *
-   * Intentionally NON-destructive (no session branching): Pi sessions do not
-   * persist the leaf pointer across restarts, so a branch-based retry targeted
-   * the wrong message and wiped the conversation. Re-prompting appends a fresh
-   * user+assistant pair; `extractMessages` drops the empty failed assistant
-   * and collapses consecutive duplicate user messages, so the UI stays clean
-   * after restart without destructive session mutation.
-   */
-  async retryChat(question: string): Promise<Result<void>> {
-    try {
-      const live = this.pool.getCurrent();
-      if (!live) {
-        return err<void>(mainT("error.noActiveSession"));
-      }
-      await live.session.prompt(`/wiki-query ${question}`);
-      return ok(undefined);
-    } catch (error) {
-      return err<void>(errorMessage(error));
-    }
-  }
 
   async ingest(): Promise<Result<void>> {
     try {

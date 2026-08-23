@@ -1,7 +1,7 @@
 // Reusable modal: a full-screen backdrop that catches outside clicks and
 // Escape, with a centred card. Mirrors the lightweight overlay pattern used
-// by ContextMenu but for dialog-style content. Keeps focus inside the card
-// while open. No hardcoded strings — callers bring their own i18n titles.
+// by ContextMenu but for dialog-style content. No hardcoded strings — callers
+// bring their own i18n titles.
 import { useEffect, type ReactNode } from "react";
 
 interface ModalProps {

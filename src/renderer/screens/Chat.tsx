@@ -72,7 +72,7 @@ export function Chat(): JSX.Element {
     return () => cancelAnimationFrame(rafId);
   }, [current?.path]);
 
-  // Shared turn runner: evaluates the Result of `ask`/`retryChat` and surfaces
+  // Shared turn runner: evaluates the Result of `ask` and surfaces
   // synchronous failures as the chat error banner. `chatStreamingAtom` is
   // NOT touched here — it is driven solely by the `agent_start`/`agent_end`
   // events handled in App.tsx, so a command that starts no turn does not leave
@@ -140,7 +140,7 @@ export function Chat(): JSX.Element {
       return prev;
     });
     try {
-      await runTurn(api.retryChat(lastUser.text));
+      await runTurn(api.ask(lastUser.text));
     } finally {
       setPending(false);
     }
