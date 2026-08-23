@@ -18,6 +18,15 @@ const FOLDERS: ReadonlyArray<{ id: Folder; labelKey: string }> = [
   { id: "wiki", labelKey: "folder.wiki.name" },
 ];
 
+type BrowserTab = Folder | "graph";
+
+const TABS: ReadonlyArray<BrowserTab> = [...FOLDERS.map((folder) => folder.id), "graph"];
+const PANEL_ID = "browser-tabpanel";
+
+function tabId(tab: BrowserTab): string {
+  return `browser-tab-${tab}`;
+}
+
 /** OS-adaptive i18n key for the "reveal in file manager" action. */
 function revealLabelKey(platform: string): string {
   if (platform === "darwin") return "browser.reveal.finder";
@@ -77,6 +86,34 @@ export function Browser(): JSX.Element {
   const refreshToken = useRef(0);
   /** Same stale-response guard as `refreshToken`, for the preview read. */
   const previewToken = useRef(0);
+  const tabRefs = useRef<Map<BrowserTab, HTMLButtonElement | null>>(new Map());
+  const activeTab: BrowserTab = mode === "graph" ? "graph" : folder;
+
+  const selectTab = (tab: BrowserTab): void => {
+    setSelected(null);
+    if (tab === "graph") {
+      setMode("graph");
+      return;
+    }
+    setFolder(tab);
+    setMode("files");
+    setExpanded(new Set());
+  };
+
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>): void => {
+    const current = TABS.indexOf(activeTab);
+    const target =
+      event.key === "ArrowRight" ? (current + 1) % TABS.length
+      : event.key === "ArrowLeft" ? (current - 1 + TABS.length) % TABS.length
+      : event.key === "Home" ? 0
+      : event.key === "End" ? TABS.length - 1
+      : null;
+    if (target === null) return;
+    event.preventDefault();
+    const tab = TABS[target]!;
+    selectTab(tab);
+    tabRefs.current.get(tab)?.focus();
+  };
 
   // Memoized on `folder` so the effect below can depend on it honestly
   // (no eslint-disable) without re-running on every render.
@@ -274,13 +311,37 @@ export function Browser(): JSX.Element {
   return (
     <div className="body browser">
       <aside className="sidebar browser-sidebar">
-        <div className="side-head row wrap">
+        <div className="side-head row wrap" role="tablist" aria-label={t("browser.viewTabs")}>
           {FOLDERS.map((f) => (
-            <button key={f.id} className={`badge folder-tab mono${mode === "files" && folder === f.id ? " accent" : ""}`} onClick={() => { setFolder(f.id); setMode("files"); setSelected(null); setExpanded(new Set()); }}>
+            <button
+              key={f.id}
+              type="button"
+              role="tab"
+              id={tabId(f.id)}
+              aria-selected={activeTab === f.id}
+              aria-controls={PANEL_ID}
+              tabIndex={activeTab === f.id ? 0 : -1}
+              ref={(element) => { tabRefs.current.set(f.id, element); }}
+              className={`badge folder-tab mono${activeTab === f.id ? " accent" : ""}`}
+              onClick={() => selectTab(f.id)}
+              onKeyDown={handleTabKeyDown}
+            >
               <span className="dot" /> {t(f.labelKey)}
             </button>
           ))}
-          <button className={`badge folder-tab mono${mode === "graph" ? " accent" : ""}`} onClick={() => { setMode("graph"); setSelected(null); }} title={t("nav.graph")}>
+          <button
+            type="button"
+            role="tab"
+            id={tabId("graph")}
+            aria-selected={activeTab === "graph"}
+            aria-controls={PANEL_ID}
+            tabIndex={activeTab === "graph" ? 0 : -1}
+            ref={(element) => { tabRefs.current.set("graph", element); }}
+            className={`badge folder-tab mono${activeTab === "graph" ? " accent" : ""}`}
+            onClick={() => selectTab("graph")}
+            onKeyDown={handleTabKeyDown}
+            title={t("nav.graph")}
+          >
             <Share2 size={12} /> {t("nav.graph")}
           </button>
         </div>
@@ -313,58 +374,66 @@ export function Browser(): JSX.Element {
           </>
         )}
       </aside>
-      <main className={`pane grow${mode === "graph" ? "" : " preview"}`}>
-        {mode === "graph" ? (
-          <GraphView />
-        ) : (
-          <>
-            {!preview && <div className="empty"><div className="glyph"><FileText size={28} /></div><div className="e-title">{t("browser.selectFile")}</div></div>}
-            {preview && (
-              <>
-                <div className="pv-head">
-                  {preview.frontmatter && <h2 className="pv-title">{preview.frontmatter.title}</h2>}
-                  <div className="pv-id mono">{preview.relativePath}</div>
-                </div>
-                {preview.frontmatter && (
-                  <div className="pv-tags">
-                    <span className="badge accent mono">{preview.frontmatter.type}</span>
+      <main className="pane grow">
+        <div
+          className={`browser-panel${mode === "graph" ? "" : " preview"}`}
+          id={PANEL_ID}
+          role="tabpanel"
+          aria-labelledby={tabId(activeTab)}
+          tabIndex={0}
+        >
+          {mode === "graph" ? (
+            <GraphView />
+          ) : (
+            <>
+              {!preview && <div className="empty"><div className="glyph"><FileText size={28} /></div><div className="e-title">{t("browser.selectFile")}</div></div>}
+              {preview && (
+                <>
+                  <div className="pv-head">
+                    {preview.frontmatter && <h2 className="pv-title">{preview.frontmatter.title}</h2>}
+                    <div className="pv-id mono">{preview.relativePath}</div>
                   </div>
-                )}
-                {preview.truncated && (
-                  <div className="pv-tags">
-                    <span className="pv-note">{t("preview.truncated")}</span>
-                    <button className="btn btn-sm" onClick={() => void revealSelectedFile()}>
-                      <ExternalLink size={14} /> {t(revealLabelKey(platform))}
-                    </button>
-                  </div>
-                )}
-                <div className="pv-body">
-                  {preview.kind === "markdown" ? (
-                    <MarkdownView
-                      source={preview.content}
-                      basePath={preview.relativePath}
-                      onOpenFolder={openFolderLink}
-                    />
-                  ) : preview.kind === "binary" ? (
-                    <div className="empty grow">
-                      <div className="glyph"><FileText size={28} /></div>
-                      <div className="e-title">{t("preview.binaryTitle")}</div>
-                      <div className="e-sub">{preview.content}</div>
-                      <button
-                        className="btn btn-sm btn-primary"
-                        onClick={() => void revealSelectedFile()}
-                      >
+                  {preview.frontmatter && (
+                    <div className="pv-tags">
+                      <span className="badge accent mono">{preview.frontmatter.type}</span>
+                    </div>
+                  )}
+                  {preview.truncated && (
+                    <div className="pv-tags">
+                      <span className="pv-note">{t("preview.truncated")}</span>
+                      <button className="btn btn-sm" onClick={() => void revealSelectedFile()}>
                         <ExternalLink size={14} /> {t(revealLabelKey(platform))}
                       </button>
                     </div>
-                  ) : (
-                    <pre className="pv-text">{preview.content}</pre>
                   )}
-                </div>
-              </>
-            )}
-          </>
-        )}
+                  <div className="pv-body">
+                    {preview.kind === "markdown" ? (
+                      <MarkdownView
+                        source={preview.content}
+                        basePath={preview.relativePath}
+                        onOpenFolder={openFolderLink}
+                      />
+                    ) : preview.kind === "binary" ? (
+                      <div className="empty grow">
+                        <div className="glyph"><FileText size={28} /></div>
+                        <div className="e-title">{t("preview.binaryTitle")}</div>
+                        <div className="e-sub">{preview.content}</div>
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => void revealSelectedFile()}
+                        >
+                          <ExternalLink size={14} /> {t(revealLabelKey(platform))}
+                        </button>
+                      </div>
+                    ) : (
+                      <pre className="pv-text">{preview.content}</pre>
+                    )}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
       </main>
       {ctx && <ContextMenu position={ctx.position} items={ctxItems} onClose={() => setCtx(null)} />}
       {removal && (

@@ -199,6 +199,7 @@ export const messages: Record<Locale, Dict> = {
     "chat.noWikiHint": "Chat unavailable — build the wiki first",
 
     // ── browser ───────────────────────────────────────────────────
+    "browser.viewTabs": "Browser views",
     "browser.emptyFiles": "No files.",
     "browser.selectFile": "Select a file",
     "browser.addFiles": "Add",
@@ -557,6 +558,7 @@ export const messages: Record<Locale, Dict> = {
     "chat.noWikiHint": "Chat nicht verfügbar — erst das Wiki aufbauen",
 
     // ── browser ───────────────────────────────────────────────────
+    "browser.viewTabs": "Browser-Ansichten",
     "browser.emptyFiles": "Keine Dateien.",
     "browser.selectFile": "Datei auswählen",
     "browser.addFiles": "Hinzufügen",

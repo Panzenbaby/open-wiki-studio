@@ -269,7 +269,9 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .sidebar .side-title { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .session-list { list-style: none; margin: 0; padding: var(--space-2); display: flex; flex-direction: column; gap: 2px; overflow: auto; flex: 1; }
 .session-item {
-  padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid transparent;
+  width: 100%; font: inherit; color: inherit; text-align: left;
+  padding: var(--space-3); padding-right: var(--space-8); border-radius: var(--radius-sm); border: 1px solid transparent;
+  background: transparent;
   cursor: pointer; display: flex; align-items: center; gap: var(--space-2);
   transition: background var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
 }
@@ -281,17 +283,23 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .session-item .s-meta { font-size: var(--text-xs); color: var(--muted); font-family: var(--font-mono); }
 .session-item .s-prev { font-size: var(--text-xs); color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.session-item .session-delete-dash { opacity: 0; padding: 4px; border-radius: var(--radius-sm); color: var(--muted); flex-shrink: 0; transition: opacity var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
-.session-item:hover .session-delete-dash { opacity: 1; }
-.session-item .session-delete-dash:hover { color: var(--danger); background: color-mix(in oklab, var(--danger), transparent 88%); }
+/* The row and its actions are siblings: nesting a button inside the row button
+   would be invalid HTML and unreachable by keyboard. */
+.session-row { position: relative; display: flex; }
+.session-row-actions { position: absolute; right: var(--space-2); top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 2px; }
+/* The streaming dot widens the overlay, so the row must reserve more room for
+   it or the truncated title runs underneath. */
+.session-row:has(.session-streaming) .session-item { padding-right: var(--space-12); }
+.session-delete-dash { opacity: 0; display: inline-flex; align-items: center; justify-content: center; padding: 4px; border: 0; background: transparent; border-radius: var(--radius-sm); color: var(--muted); cursor: pointer; flex-shrink: 0; transition: opacity var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
+.session-row:hover .session-delete-dash { opacity: 1; }
+.session-delete-dash:hover { color: var(--danger); background: color-mix(in oklab, var(--danger), transparent 88%); }
 /* The delete affordance is hover-revealed (opacity 0). Keyboard focus must
    reveal it too, or it is a focusable but invisible control. */
-.session-item .session-delete-dash:focus-visible,
-.rs-item .session-delete-dash:focus-visible { opacity: 1; outline: 2px solid var(--accent); outline-offset: -2px; }
+.session-delete-dash:focus-visible { opacity: 1; outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* Live "answer in progress" indicator on a session row. */
-.session-item .session-streaming { display: inline-flex; align-items: center; flex-shrink: 0; padding-left: var(--space-1); }
-.session-item .session-streaming .stream-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: stream-pulse 1.4s ease-in-out infinite; }
+.session-streaming { display: inline-flex; align-items: center; flex-shrink: 0; }
+.session-streaming .stream-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: stream-pulse 1.4s ease-in-out infinite; }
 @keyframes stream-pulse { 0%, 100% { transform: scale(0.7); opacity: 0.35; } 50% { transform: scale(1); opacity: 1; } }
 
 /* ---------- folder tree ---------- */
@@ -326,6 +334,11 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 /* ---------- browser (file tree + preview) ---------- */
 .browser { height: 100%; }
 .browser-sidebar { width: 280px; }
+/* Tabpanel wrapper inside the pane: fills it so the graph still gets a full
+   height, and grows past it so the preview keeps scrolling on the pane. */
+.browser-panel { display: flex; flex-direction: column; min-height: 100%; }
+.browser-panel > .graph-view { flex: 1; }
+.browser-panel:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .browser-tree { flex: 1; overflow: auto; padding: var(--space-2); }
 .browser-empty { flex: 1; padding: var(--space-3); font-size: var(--text-xs); color: var(--muted); }
 
@@ -607,17 +620,19 @@ button.folder-card:focus-visible { outline: 2px solid var(--accent); outline-off
 .rs-item.active { border-color: var(--accent); background: color-mix(in oklab, var(--accent), transparent 88%); }
 /* min-width: 0 so the row may shrink below its content width and the title's
    text-overflow actually engages. */
-.rs-item .rs-content { flex: 1; min-width: 0; }
+.rs-item .rs-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .rs-item .rs-title { font-size: var(--text-sm); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rs-item .rs-prev { font-size: var(--text-xs); color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rs-item .rs-time { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); }
-.session-delete-dash { opacity: 0; padding: 4px; border: 0; background: transparent; border-radius: var(--radius-sm); color: var(--muted); flex-shrink: 0; transition: opacity var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
-.rs-item:hover .session-delete-dash { opacity: 1; }
-.session-delete-dash:hover { color: var(--danger); background: color-mix(in oklab, var(--danger), transparent 88%); }
 .rs-item.rs-item-missing { cursor: default; border-color: color-mix(in oklab, var(--warn), transparent 60%); }
 .rs-item.rs-item-missing:hover { border-color: color-mix(in oklab, var(--warn), transparent 60%); background: transparent; }
 .rs-item.rs-item-missing .rs-title { color: var(--fg-2); }
+.rs-item:hover .session-delete-dash { opacity: 1; }
 .rs-item.rs-item-missing .session-delete-dash { opacity: 1; }
+
+/* Dashboard variant: the row itself is the button and the delete control
+   overlays its right edge, so it needs the button reset plus room to clear. */
+.session-row .rs-item { width: 100%; font: inherit; color: inherit; text-align: left; padding-right: var(--space-8); }
 
 /* ---------- annotations (IA sketch) ---------- */
 .anno { position: absolute; font-family: var(--font-mono); font-size: 11px; color: var(--accent); background: color-mix(in oklab, var(--accent), transparent 82%); border: 1px dashed color-mix(in oklab, var(--accent), transparent 50%); border-radius: var(--radius-sm); padding: 3px 7px; white-space: nowrap; z-index: 5; pointer-events: none; }
@@ -765,3 +780,26 @@ button.folder-card:focus-visible { outline: 2px solid var(--accent); outline-off
 .addfiles-section li { font-size: var(--text-xs); color: var(--fg-2); word-break: break-all; }
 .addfiles-section li .reason { color: var(--fg-3, color-mix(in oklab, var(--fg-2) 70%, transparent)); }
 .settings-version { margin: var(--space-4) 0 0; text-align: center; font-size: var(--text-xs); }
+
+/* ---------- reduced motion ---------- */
+/* Mirrors the splash-screen handling in index.html: no infinite animation and
+   no slide-in survives "reduce motion". */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .pulse,
+  .ingest-bar .pulse,
+  .session-streaming .stream-dot,
+  .update-badge.available,
+  .caret-blink::after {
+    animation: none !important;
+  }
+  .working .dots span { animation: none !important; opacity: 0.6; }
+  /* modal-fade animates opacity 0 → 1 with `forwards`; killing it must not
+     leave the modal invisible. */
+  .modal-backdrop { animation: none !important; opacity: 1; }
+}

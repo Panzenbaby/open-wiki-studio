@@ -62,8 +62,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
     setToast({ message: t("migrate.done", { n: result.data.migrated.length }), kind: "info" });
   };
 
-  const askDelete = (path: string, e: React.SyntheticEvent): void => {
-    e.stopPropagation();
+  const askDelete = (path: string): void => {
     setPendingDeletePath(path);
   };
 
@@ -144,39 +143,27 @@ export function Dashboard(props: DashboardProps): JSX.Element {
           ) : (
             <div className="recent-sessions">
               {sessions.map((session) => (
-                <div
-                  key={session.path}
-                  className={`rs-item${currentSession?.path === session.path ? " active" : ""}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => props.onOpenSession(session.path)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      props.onOpenSession(session.path);
-                    }
-                  }}
-                >
-                  <div className="rs-content">
-                    <div className="rs-title" title={session.name}>{session.name}</div>
-                    <div className="rs-prev mono">{new Date(session.lastModified).toLocaleString()}</div>
-                  </div>
-                  <span
-                    className="session-delete-dash"
-                    role="button"
-                    tabIndex={0}
-                    title={t("session.delete")}
-                    aria-label={t("session.delete")}
-                    onClick={(e) => askDelete(session.path, e)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        askDelete(session.path, e);
-                      }
-                    }}
+                <div key={session.path} className="session-row">
+                  <button
+                    type="button"
+                    className={`rs-item${currentSession?.path === session.path ? " active" : ""}`}
+                    onClick={() => props.onOpenSession(session.path)}
                   >
-                    <Trash2 size={14} />
+                    <span className="rs-content">
+                      <span className="rs-title" title={session.name}>{session.name}</span>
+                      <span className="rs-prev mono">{new Date(session.lastModified).toLocaleString()}</span>
+                    </span>
+                  </button>
+                  <span className="session-row-actions">
+                    <button
+                      type="button"
+                      className="session-delete-dash"
+                      title={t("session.delete")}
+                      aria-label={t("session.delete")}
+                      onClick={() => askDelete(session.path)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </span>
                 </div>
               ))}

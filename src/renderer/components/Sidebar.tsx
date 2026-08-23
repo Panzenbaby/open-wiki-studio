@@ -32,8 +32,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
     props.onAfterSelect?.();
   };
 
-  const askDelete = (path: string, e: React.SyntheticEvent): void => {
-    e.stopPropagation();
+  const askDelete = (path: string): void => {
     setPendingDeletePath(path);
   };
 
@@ -58,23 +57,18 @@ export function Sidebar(props: SidebarProps): JSX.Element {
           <li className="muted" style={{ padding: "var(--space-3)", fontSize: "var(--text-xs)" }}>{t("sidebar.noSessions")}</li>
         )}
         {sessions.map((session) => (
-          <li key={session.path}>
-            <div
+          <li key={session.path} className="session-row">
+            <button
+              type="button"
               className={`session-item${current?.path === session.path ? " active" : ""}`}
-              role="button"
-              tabIndex={0}
               onClick={() => openSession(session.path)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  openSession(session.path);
-                }
-              }}
             >
-              <div className="s-content">
-                <div className="s-title">{session.name}</div>
-                <div className="s-meta">{new Date(session.lastModified).toLocaleString()}</div>
-              </div>
+              <span className="s-content">
+                <span className="s-title">{session.name}</span>
+                <span className="s-meta">{new Date(session.lastModified).toLocaleString()}</span>
+              </span>
+            </button>
+            <span className="session-row-actions">
               {streamingSessions.has(session.path) && (
                 <span
                   className="session-streaming"
@@ -85,18 +79,16 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                   <span className="stream-dot" />
                 </span>
               )}
-              <span
+              <button
+                type="button"
                 className="session-delete-dash"
-                role="button"
-                tabIndex={0}
                 title={t("session.delete")}
                 aria-label={t("session.delete")}
-                onClick={(e) => askDelete(session.path, e)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); askDelete(session.path, e); } }}
+                onClick={() => askDelete(session.path)}
               >
                 <Trash2 size={14} />
-              </span>
-            </div>
+              </button>
+            </span>
           </li>
         ))}
       </ul>

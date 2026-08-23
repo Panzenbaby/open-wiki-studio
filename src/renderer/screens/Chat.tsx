@@ -172,7 +172,7 @@ export function Chat(): JSX.Element {
         </div>
       </div>
       <div className="chat-stream" ref={streamRef} onScroll={handleScroll}>
-        <div className="thread">
+        <div className="thread" aria-live="polite">
           {indicator === "noWikiEmpty" && (
             <div className="empty">
               <div className="glyph"><AlertTriangle size={28} /></div>
