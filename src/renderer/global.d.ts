@@ -5,10 +5,6 @@ declare global {
   interface Window {
     readonly api: AgentApi;
   }
-
-  interface File {
-    readonly path: string;
-  }
 }
 
 export {};

@@ -78,7 +78,9 @@ export function AppShell(): JSX.Element {
     const paths: string[] = [];
     for (let index = 0; index < fileList.length; index++) {
       const file = fileList.item(index);
-      if (file && file.path) paths.push(file.path);
+      if (!file) continue;
+      const path = api.getPathForFile(file);
+      if (path) paths.push(path);
     }
     if (paths.length === 0) return;
     const result = await api.addInputFiles(paths);

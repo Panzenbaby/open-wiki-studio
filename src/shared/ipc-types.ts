@@ -333,6 +333,10 @@ export interface AgentApi {
   /** Whether the selection key (`${folder}/${rel}`) names an existing file. */
   fileExists(relativePath: string): Promise<Result<boolean>>;
   addInputFiles(filePaths: readonly string[]): Promise<Result<AddFilesSummary>>;
+  /** Filesystem path behind a dropped `File`. Synchronous and IPC-free: the
+   *  preload resolves it via `webUtils`, because the renderer cannot. Returns
+   *  `""` for `File` objects not backed by a file on disk. */
+  getPathForFile(file: File): string;
   addInputFilesDialog(): Promise<Result<AddFilesSummary>>;
   /** Reveal a file/folder in the OS file manager (Finder / Explorer / file manager). */
   revealInFileManager(folder: Folder, relativePath: string, isDirectory: boolean): Promise<Result<void>>;

@@ -1,6 +1,6 @@
 // Preload: exposes a strictly-typed AgentApi to the renderer via contextBridge.
 // Event methods subscribe to the streaming channels from the main process.
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { AgentApi, AgentEvent, CopilotLoginEvent, Folder, IngestSummary, UpdateEvent } from "../shared/ipc-types.ts";
 
 const api: AgentApi = {
@@ -31,6 +31,7 @@ const api: AgentApi = {
   getPreview: (relativePath) => ipcRenderer.invoke("okf:getPreview", relativePath),
   fileExists: (relativePath) => ipcRenderer.invoke("okf:fileExists", relativePath),
   addInputFiles: (filePaths) => ipcRenderer.invoke("okf:addInputFiles", filePaths),
+  getPathForFile: (file) => webUtils.getPathForFile(file),
   addInputFilesDialog: () => ipcRenderer.invoke("okf:addInputFilesDialog"),
   revealInFileManager: (folder, relativePath, isDirectory) => ipcRenderer.invoke("okf:revealInFileManager", folder, relativePath, isDirectory),
   planRemoval: (relativePath) => ipcRenderer.invoke("okf:planRemoval", relativePath),
