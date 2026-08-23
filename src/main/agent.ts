@@ -462,78 +462,7 @@ export class AgentRepository {
 
       const before = await snapshotWiki(this.workspace);
 
-      // /wiki-update hands non-conformant input files to the agent via
-      // `pi.sendUserMessage(...)`, which is fire-and-forget: `prompt()` resolves
-      // BEFORE the agent turn finishes. The concept writing + input→archive
-      // moving happens during that turn and is finalized in the `agent_end`
-      // extension handler (finalizePendingUpdate), which runs BEFORE session
-      // event listeners receive `agent_end`. So we must wait for the turn to
-      // complete before snapshotting — otherwise the after-snapshot shows no
-      // new concepts and `leftover` still lists the input files.
-      //
-      // For conformant-only (or empty) input no turn starts, so if no
-      // `agent_start` arrives within a grace window the state is already final.
-      // The wait is a race so a mid-turn failure or a stuck turn (hard timeout)
-      // rejects instead of hanging IngestView on "running" forever.
-      const TURN_GRACE_MS = 3000; // wait for agent_start after prompt
-      const TURN_TIMEOUT_MS = 5 * 60 * 1000; // hard cap for a single turn
-
-      let sawStart = false;
-      let resolveStart: () => void = () => {};
-      let rejectStart: (error: Error) => void = () => {};
-      let resolveEnd: () => void = () => {};
-      let rejectEnd: (error: Error) => void = () => {};
-      const startedPromise = new Promise<void>((res, rej) => {
-        resolveStart = res;
-        rejectStart = rej;
-      });
-      const endedPromise = new Promise<void>((res, rej) => {
-        resolveEnd = res;
-        rejectEnd = rej;
-      });
-
-      const off = this.ingestSession.subscribe((event) => {
-        if (event.type === "agent_start") {
-          if (!sawStart) {
-            sawStart = true;
-            resolveStart();
-          }
-        } else if (event.type === "agent_end" && sawStart) {
-          const errorMessage = lastAssistantErrorMessage(event.messages);
-          if (errorMessage) rejectEnd(new Error(errorMessage));
-          else resolveEnd();
-        } else if (event.type === "auto_retry_end" && !event.success) {
-          const e = new Error(event.finalError ?? mainT("error.allRetriesFailed"));
-          rejectStart(e);
-          rejectEnd(e);
-        }
-      });
-      try {
-        await this.ingestSession.prompt("/wiki-update");
-        // Race agent_start against a grace window. sendUserMessage is async,
-        // so agent_start may fire a few ticks after the command handler returns.
-        const noTurn = new Promise<false>((resolve) =>
-          setTimeout(() => resolve(false), TURN_GRACE_MS),
-        );
-        const started = await Promise.race([
-          startedPromise.then(() => true as const),
-          noTurn,
-        ]);
-        if (started) {
-          // Turn started — wait for agent_end, error, or hard timeout.
-          await Promise.race([
-            endedPromise,
-            new Promise<never>((_, reject) =>
-              setTimeout(
-                () => reject(new Error(mainT("error.ingestTimeout"))),
-                TURN_TIMEOUT_MS,
-              ),
-            ),
-          ]);
-        }
-      } finally {
-        off();
-      }
+      const sawStart = await awaitIngestTurn(this.ingestSession);
 
       const after = await snapshotWiki(this.workspace);
       const diff = diffSnapshots(before, after);
@@ -602,6 +531,117 @@ export class AgentRepository {
       /* ignore */
     }
   }
+}
+
+/** Timing for one ingest turn. `idleMs` is silence between session events,
+ *  NOT total turn duration. */
+export interface IngestTurnTiming {
+  /** Window to wait for `agent_start` after the prompt resolves. */
+  graceMs: number;
+  /** Fail the turn after this much silence (no session events at all). */
+  idleMs: number;
+}
+
+export const DEFAULT_INGEST_TURN_TIMING: IngestTurnTiming = {
+  graceMs: 3000,
+  idleMs: 5 * 60 * 1000,
+};
+
+/**
+ * Prompt `/wiki-update` and wait for the resulting agent turn. Resolves with
+ * whether a turn actually started; rejects on turn failure or idle timeout.
+ *
+ * /wiki-update hands non-conformant input files to the agent via
+ * `pi.sendUserMessage(...)`, which is fire-and-forget: `prompt()` resolves
+ * BEFORE the agent turn finishes. The concept writing + input→archive moving
+ * happens during that turn and is finalized in the `agent_end` extension
+ * handler (finalizePendingUpdate), which runs BEFORE session event listeners
+ * receive `agent_end`. So the caller must wait for the turn to complete before
+ * snapshotting — otherwise the after-snapshot shows no new concepts and
+ * `leftover` still lists the input files.
+ *
+ * For conformant-only (or empty) input no turn starts, so if no `agent_start`
+ * arrives within the grace window the state is already final.
+ *
+ * The idle timeout is deliberately not a cap on total duration: a large ingest
+ * (dozens of PDFs, a rate-limited provider) legitimately runs far longer than
+ * any fixed cap while emitting events the whole time. Only true silence — a
+ * stuck turn — fails, so IngestView never hangs on "running" forever.
+ *
+ * Exported as a module-level free function so it can be tested without an
+ * Electron app or a real agent session (same convention as
+ * `forwardAgentEvents`).
+ */
+export async function awaitIngestTurn(
+  session: AgentSession,
+  timing: IngestTurnTiming = DEFAULT_INGEST_TURN_TIMING,
+): Promise<boolean> {
+  let sawStart = false;
+  let resolveStart: () => void = () => {};
+  let rejectStart: (error: Error) => void = () => {};
+  let resolveEnd: () => void = () => {};
+  let rejectEnd: (error: Error) => void = () => {};
+  const startedPromise = new Promise<void>((res, rej) => {
+    resolveStart = res;
+    rejectStart = rej;
+  });
+  const endedPromise = new Promise<void>((res, rej) => {
+    resolveEnd = res;
+    rejectEnd = rej;
+  });
+
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  let onIdle: () => void = () => {};
+  const clearIdleTimer = (): void => {
+    if (idleTimer !== undefined) clearTimeout(idleTimer);
+    idleTimer = undefined;
+  };
+  const restartIdleTimer = (): void => {
+    clearIdleTimer();
+    idleTimer = setTimeout(() => onIdle(), timing.idleMs);
+  };
+
+  const off = session.subscribe((event) => {
+    // Any event at all counts as progress, including tool and message updates.
+    if (idleTimer !== undefined) restartIdleTimer();
+    if (event.type === "agent_start") {
+      if (!sawStart) {
+        sawStart = true;
+        resolveStart();
+      }
+    } else if (event.type === "agent_end" && sawStart) {
+      const errorMessage = lastAssistantErrorMessage(event.messages);
+      if (errorMessage) rejectEnd(new Error(errorMessage));
+      else resolveEnd();
+    } else if (event.type === "auto_retry_end" && !event.success) {
+      const failure = new Error(event.finalError ?? mainT("error.allRetriesFailed"));
+      rejectStart(failure);
+      rejectEnd(failure);
+    }
+  });
+  try {
+    await session.prompt("/wiki-update");
+    // Race agent_start against a grace window. sendUserMessage is async, so
+    // agent_start may fire a few ticks after the command handler returns.
+    const noTurn = new Promise<false>((resolve) =>
+      setTimeout(() => resolve(false), timing.graceMs),
+    );
+    const started = await Promise.race([
+      startedPromise.then(() => true as const),
+      noTurn,
+    ]);
+    if (started) {
+      const idlePromise = new Promise<never>((_, reject) => {
+        onIdle = () => reject(new Error(mainT("error.ingestTimeout")));
+      });
+      restartIdleTimer();
+      await Promise.race([endedPromise, idlePromise]);
+    }
+  } finally {
+    clearIdleTimer();
+    off();
+  }
+  return sawStart;
 }
 
 /**
