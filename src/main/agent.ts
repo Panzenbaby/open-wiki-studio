@@ -442,16 +442,7 @@ export class AgentRepository {
    * after restart without destructive session mutation.
    */
   async retryChat(question: string): Promise<Result<void>> {
-    try {
-      const live = this.pool.getCurrent();
-      if (!live) {
-        return err<void>(mainT("error.noActiveSession"));
-      }
-      await live.session.prompt(`/wiki-query ${question}`);
-      return ok(undefined);
-    } catch (error) {
-      return err<void>(errorMessage(error));
-    }
+    return this.ask(question);
   }
 
   async ingest(): Promise<Result<void>> {

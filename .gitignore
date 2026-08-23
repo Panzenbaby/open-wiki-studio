@@ -9,3 +9,4 @@ release/
 # Local agent / tooling artifacts
 .claude/
 .playwright-cli/
+graphify-out/
