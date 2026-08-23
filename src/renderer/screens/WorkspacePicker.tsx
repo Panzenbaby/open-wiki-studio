@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useAtom, useSetAtom } from "jotai";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
+import { ConfirmModal } from "../components/ConfirmModal.tsx";
 import {
   recentWorkspacesAtom,
   screenAtom,
@@ -17,6 +19,8 @@ export function WorkspacePicker(): JSX.Element {
   const setLlmConfigured = useSetAtom(llmConfiguredAtom);
   const [, setScreen] = useAtom(screenAtom);
   const setToast = useSetAtom(toastAtom);
+  const [forgettingPath, setForgettingPath] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function activate(path: string): Promise<void> {
     const result = await api.openWorkspace(path);
@@ -57,13 +61,16 @@ export function WorkspacePicker(): JSX.Element {
 
   // Remove a workspace from the recent list. Only the stored reference is
   // dropped — the folder on disk stays untouched.
-  async function forget(path: string): Promise<void> {
-    if (!window.confirm(t("picker.confirmForget"))) return;
-    const result = await api.forgetWorkspace(path);
+  async function forget(): Promise<void> {
+    if (!forgettingPath) return;
+    setBusy(true);
+    const result = await api.forgetWorkspace(forgettingPath);
+    setBusy(false);
     if (!result.success) {
       setToast({ message: `${t("picker.forgetFailed")}: ${result.error.message}`, kind: "error" });
       return;
     }
+    setForgettingPath(null);
     await refreshRecent();
   }
 
@@ -126,7 +133,7 @@ export function WorkspacePicker(): JSX.Element {
                       className="session-delete-dash"
                       title={t("picker.forget")}
                       aria-label={t("picker.forget")}
-                      onClick={() => void forget(w.path)}
+                      onClick={() => setForgettingPath(w.path)}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -137,6 +144,19 @@ export function WorkspacePicker(): JSX.Element {
           </>
         )}
       </div>
+
+      {forgettingPath && (
+        <ConfirmModal
+          title={t("picker.forget")}
+          description={t("picker.confirmForget")}
+          confirmLabel={t("picker.forget")}
+          cancelLabel={t("remove.cancel")}
+          icon={<Trash2 size={14} />}
+          busy={busy}
+          onConfirm={() => void forget()}
+          onCancel={() => setForgettingPath(null)}
+        />
+      )}
     </main>
   );
 }

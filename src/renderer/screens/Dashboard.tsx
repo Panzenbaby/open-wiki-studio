@@ -5,6 +5,7 @@ import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import { MergeWorkspacesModal } from "../components/MergeWorkspacesModal.tsx";
 import { MigrateWikiModal } from "../components/MigrateWikiModal.tsx";
+import { ConfirmModal } from "../components/ConfirmModal.tsx";
 import { countsAtom, currentSessionAtom, folderVersionAtom, ingestStateAtom, toastAtom, visibleSessionsAtom, workspaceAtom } from "../store.ts";
 import type { MigrationPlan } from "../../shared/ipc-types.ts";
 
@@ -31,6 +32,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
   const [migrationPlan, setMigrationPlan] = useState<MigrationPlan | null>(null);
   const [migrateOpen, setMigrateOpen] = useState<boolean>(false);
   const [migrating, setMigrating] = useState<boolean>(false);
+  const [deletingSessionPath, setDeletingSessionPath] = useState<string | null>(null);
   const running = ingestState === "running";
   const inputPending = counts.input > 0;
   const showIngest = inputPending || running;
@@ -62,8 +64,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
 
   const confirmDelete = (path: string, e: React.MouseEvent): void => {
     e.stopPropagation();
-    if (!window.confirm(t("session.confirmDelete"))) return;
-    props.onDeleteSession(path);
+    setDeletingSessionPath(path);
   };
 
   return (
@@ -180,6 +181,20 @@ export function Dashboard(props: DashboardProps): JSX.Element {
           busy={migrating}
           onConfirm={() => void confirmMigration()}
           onCancel={() => setMigrateOpen(false)}
+        />
+      )}
+      {deletingSessionPath && (
+        <ConfirmModal
+          title={t("session.delete")}
+          description={t("session.confirmDelete")}
+          confirmLabel={t("session.delete")}
+          cancelLabel={t("remove.cancel")}
+          icon={<Trash2 size={14} />}
+          onConfirm={() => {
+            props.onDeleteSession(deletingSessionPath);
+            setDeletingSessionPath(null);
+          }}
+          onCancel={() => setDeletingSessionPath(null)}
         />
       )}
     </div>

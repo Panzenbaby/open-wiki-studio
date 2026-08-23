@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { Plus, Trash2 } from "lucide-react";
 import { useT } from "../i18n.ts";
+import { ConfirmModal } from "./ConfirmModal.tsx";
 import { currentSessionAtom, streamingSessionsAtom, visibleSessionsAtom } from "../store.ts";
 
 interface SidebarProps {
@@ -18,6 +20,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
   const sessions = useAtomValue(visibleSessionsAtom);
   const streamingSessions = useAtomValue(streamingSessionsAtom);
   const [current] = useAtom(currentSessionAtom);
+  const [deletingSessionPath, setDeletingSessionPath] = useState<string | null>(null);
 
   const openSession = (path: string): void => {
     props.onOpenSession(path);
@@ -31,8 +34,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
 
   const confirmDelete = (path: string, e: React.MouseEvent): void => {
     e.stopPropagation();
-    if (!window.confirm(t("session.confirmDelete"))) return;
-    props.onDeleteSession(path);
+    setDeletingSessionPath(path);
   };
 
   return (
@@ -91,6 +93,21 @@ export function Sidebar(props: SidebarProps): JSX.Element {
           </li>
         ))}
       </ul>
+
+      {deletingSessionPath && (
+        <ConfirmModal
+          title={t("session.delete")}
+          description={t("session.confirmDelete")}
+          confirmLabel={t("session.delete")}
+          cancelLabel={t("remove.cancel")}
+          icon={<Trash2 size={14} />}
+          onConfirm={() => {
+            props.onDeleteSession(deletingSessionPath);
+            setDeletingSessionPath(null);
+          }}
+          onCancel={() => setDeletingSessionPath(null)}
+        />
+      )}
     </aside>
   );
 }
