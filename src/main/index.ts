@@ -258,10 +258,10 @@ async function createWindow(): Promise<BrowserWindow> {
     autoHideMenuBar: true,
     icon: getAppIconPath(),
     webPreferences: {
-      preload: join(__dirname, "../preload/index.mjs"),
+      preload: join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
 

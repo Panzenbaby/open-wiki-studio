@@ -20,6 +20,10 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, "src/preload/index.ts") },
+        // Sandboxed preload scripts run without an ESM context, so the bundle
+        // must be CommonJS. `"type": "module"` in package.json makes plain
+        // `.js` ESM here — hence the explicit `.cjs` extension.
+        output: { format: "cjs", entryFileNames: "[name].cjs" },
       },
     },
   },
