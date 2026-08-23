@@ -11,6 +11,7 @@ export const messages: Record<Locale, Dict> = {
     "app.loading": "Loading…",
     "app.avatar": "O",
     "app.ellipsis": "…",
+    "action.cancel": "Cancel",
 
     // ── navigation ─────────────────────────────────────────────────
     "nav.chat": "Chat",
@@ -28,6 +29,7 @@ export const messages: Record<Locale, Dict> = {
     "picker.openFailed": "Could not open workspace",
     "picker.pickFailed": "Could not choose folder",
     "picker.forget": "Remove from list",
+    "picker.confirmForgetTitle": "Remove from list?",
     "picker.confirmForget":
       "Remove this workspace from the recent list? The folder itself stays untouched.",
     "picker.forgetFailed": "Could not remove workspace",
@@ -337,6 +339,7 @@ export const messages: Record<Locale, Dict> = {
 
     // ── session actions ──────────────────────────────────────────
     "session.delete": "Delete",
+    "session.confirmDeleteTitle": "Delete session?",
     "session.confirmDelete":
       "Delete this session? This cannot be undone.",
     "session.streaming": "Generating answer…",
@@ -364,6 +367,7 @@ export const messages: Record<Locale, Dict> = {
     "app.loading": "Lade…",
     "app.avatar": "O",
     "app.ellipsis": "…",
+    "action.cancel": "Abbrechen",
 
     // ── navigation ─────────────────────────────────────────────────
     "nav.chat": "Chat",
@@ -381,6 +385,7 @@ export const messages: Record<Locale, Dict> = {
     "picker.openFailed": "Workspace konnte nicht geöffnet werden",
     "picker.pickFailed": "Ordner konnte nicht gewählt werden",
     "picker.forget": "Aus Liste entfernen",
+    "picker.confirmForgetTitle": "Aus Liste entfernen?",
     "picker.confirmForget":
       "Diesen Workspace aus der Liste entfernen? Der Ordner selbst bleibt unangetastet.",
     "picker.forgetFailed": "Workspace konnte nicht entfernt werden",
@@ -695,6 +700,7 @@ export const messages: Record<Locale, Dict> = {
 
     // ── session actions ──────────────────────────────────────────
     "session.delete": "Löschen",
+    "session.confirmDeleteTitle": "Session löschen?",
     "session.confirmDelete":
       "Diese Session löschen? Dies kann nicht rückgängig gemacht werden.",
     "session.streaming": "Antwort wird erstellt…",

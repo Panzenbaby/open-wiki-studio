@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { Plus, Trash2 } from "lucide-react";
 import { useT } from "../i18n.ts";
+import { ConfirmModal } from "./ConfirmModal.tsx";
 import { currentSessionAtom, streamingSessionsAtom, visibleSessionsAtom } from "../store.ts";
 
 interface SidebarProps {
@@ -18,6 +20,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
   const sessions = useAtomValue(visibleSessionsAtom);
   const streamingSessions = useAtomValue(streamingSessionsAtom);
   const [current] = useAtom(currentSessionAtom);
+  const [pendingDeletePath, setPendingDeletePath] = useState<string | null>(null);
 
   const openSession = (path: string): void => {
     props.onOpenSession(path);
@@ -29,10 +32,15 @@ export function Sidebar(props: SidebarProps): JSX.Element {
     props.onAfterSelect?.();
   };
 
-  const confirmDelete = (path: string, e: React.SyntheticEvent): void => {
+  const askDelete = (path: string, e: React.SyntheticEvent): void => {
     e.stopPropagation();
-    if (!window.confirm(t("session.confirmDelete"))) return;
-    props.onDeleteSession(path);
+    setPendingDeletePath(path);
+  };
+
+  const confirmDelete = (): void => {
+    if (pendingDeletePath === null) return;
+    props.onDeleteSession(pendingDeletePath);
+    setPendingDeletePath(null);
   };
 
   return (
@@ -83,8 +91,8 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                 tabIndex={0}
                 title={t("session.delete")}
                 aria-label={t("session.delete")}
-                onClick={(e) => confirmDelete(session.path, e)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); confirmDelete(session.path, e); } }}
+                onClick={(e) => askDelete(session.path, e)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); askDelete(session.path, e); } }}
               >
                 <Trash2 size={14} />
               </span>
@@ -92,6 +100,16 @@ export function Sidebar(props: SidebarProps): JSX.Element {
           </li>
         ))}
       </ul>
+      {pendingDeletePath !== null && (
+        <ConfirmModal
+          title={t("session.confirmDeleteTitle")}
+          message={t("session.confirmDelete")}
+          confirmLabel={t("session.delete")}
+          cancelLabel={t("action.cancel")}
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDeletePath(null)}
+        />
+      )}
     </aside>
   );
 }

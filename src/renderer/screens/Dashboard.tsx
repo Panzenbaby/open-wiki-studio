@@ -3,6 +3,7 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { ArrowLeftRight, ArrowUpCircle, Download, FileText, Merge, Play, Trash2 } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
+import { ConfirmModal } from "../components/ConfirmModal.tsx";
 import { MergeWorkspacesModal } from "../components/MergeWorkspacesModal.tsx";
 import { MigrateWikiModal } from "../components/MigrateWikiModal.tsx";
 import { countsAtom, currentSessionAtom, folderVersionAtom, ingestStateAtom, toastAtom, visibleSessionsAtom, workspaceAtom } from "../store.ts";
@@ -31,6 +32,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
   const [migrationPlan, setMigrationPlan] = useState<MigrationPlan | null>(null);
   const [migrateOpen, setMigrateOpen] = useState<boolean>(false);
   const [migrating, setMigrating] = useState<boolean>(false);
+  const [pendingDeletePath, setPendingDeletePath] = useState<string | null>(null);
   const running = ingestState === "running";
   const inputPending = counts.input > 0;
   const showIngest = inputPending || running;
@@ -60,10 +62,15 @@ export function Dashboard(props: DashboardProps): JSX.Element {
     setToast({ message: t("migrate.done", { n: result.data.migrated.length }), kind: "info" });
   };
 
-  const confirmDelete = (path: string, e: React.SyntheticEvent): void => {
+  const askDelete = (path: string, e: React.SyntheticEvent): void => {
     e.stopPropagation();
-    if (!window.confirm(t("session.confirmDelete"))) return;
-    props.onDeleteSession(path);
+    setPendingDeletePath(path);
+  };
+
+  const confirmDelete = (): void => {
+    if (pendingDeletePath === null) return;
+    props.onDeleteSession(pendingDeletePath);
+    setPendingDeletePath(null);
   };
 
   return (
@@ -160,12 +167,12 @@ export function Dashboard(props: DashboardProps): JSX.Element {
                     tabIndex={0}
                     title={t("session.delete")}
                     aria-label={t("session.delete")}
-                    onClick={(e) => confirmDelete(session.path, e)}
+                    onClick={(e) => askDelete(session.path, e)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         e.stopPropagation();
-                        confirmDelete(session.path, e);
+                        askDelete(session.path, e);
                       }
                     }}
                   >
@@ -184,6 +191,16 @@ export function Dashboard(props: DashboardProps): JSX.Element {
           busy={migrating}
           onConfirm={() => void confirmMigration()}
           onCancel={() => setMigrateOpen(false)}
+        />
+      )}
+      {pendingDeletePath !== null && (
+        <ConfirmModal
+          title={t("session.confirmDeleteTitle")}
+          message={t("session.confirmDelete")}
+          confirmLabel={t("session.delete")}
+          cancelLabel={t("action.cancel")}
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDeletePath(null)}
         />
       )}
     </div>

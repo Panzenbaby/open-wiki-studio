@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useAtom, useSetAtom } from "jotai";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
+import { ConfirmModal } from "../components/ConfirmModal.tsx";
 import {
   recentWorkspacesAtom,
   screenAtom,
@@ -17,6 +19,8 @@ export function WorkspacePicker(): JSX.Element {
   const setLlmConfigured = useSetAtom(llmConfiguredAtom);
   const [, setScreen] = useAtom(screenAtom);
   const setToast = useSetAtom(toastAtom);
+  const [pendingForgetPath, setPendingForgetPath] = useState<string | null>(null);
+  const [forgetting, setForgetting] = useState<boolean>(false);
 
   async function activate(path: string): Promise<void> {
     const result = await api.openWorkspace(path);
@@ -58,8 +62,10 @@ export function WorkspacePicker(): JSX.Element {
   // Remove a workspace from the recent list. Only the stored reference is
   // dropped — the folder on disk stays untouched.
   async function forget(path: string): Promise<void> {
-    if (!window.confirm(t("picker.confirmForget"))) return;
+    setForgetting(true);
     const result = await api.forgetWorkspace(path);
+    setForgetting(false);
+    setPendingForgetPath(null);
     if (!result.success) {
       setToast({ message: `${t("picker.forgetFailed")}: ${result.error.message}`, kind: "error" });
       return;
@@ -126,7 +132,7 @@ export function WorkspacePicker(): JSX.Element {
                       className="session-delete-dash"
                       title={t("picker.forget")}
                       aria-label={t("picker.forget")}
-                      onClick={() => void forget(w.path)}
+                      onClick={() => setPendingForgetPath(w.path)}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -137,6 +143,17 @@ export function WorkspacePicker(): JSX.Element {
           </>
         )}
       </div>
+      {pendingForgetPath !== null && (
+        <ConfirmModal
+          title={t("picker.confirmForgetTitle")}
+          message={t("picker.confirmForget")}
+          confirmLabel={t("picker.forget")}
+          cancelLabel={t("action.cancel")}
+          busy={forgetting}
+          onConfirm={() => void forget(pendingForgetPath)}
+          onCancel={() => setPendingForgetPath(null)}
+        />
+      )}
     </main>
   );
 }
