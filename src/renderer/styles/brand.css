@@ -85,6 +85,11 @@
   --radius-lg:   10px;
   --radius-pill: 999px;
 
+  /* Mixed into --bg for recessed surfaces (sidebar, inputs, code blocks).
+     Dark recedes toward black; light needs a warm grey instead, or every
+     recess turns muddy. */
+  --recess: #000;
+
   /* ─── Elevation — glass, not heavy shadow ─────────────────────── */
   --elev-flat:   none;
   --elev-ring:   0 0 0 1px var(--border);
@@ -130,6 +135,7 @@
   --accent-on: oklch(98% 0.006 60);
   --accent-hover: oklch(46% 0.18 27);
   --accent-active: oklch(40% 0.16 27);
+  --recess: oklch(86% 0.015 60);
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-bg-hover: rgba(255, 255, 255, 0.92);
   --glass-blur: blur(8px);
@@ -143,14 +149,14 @@ html, body { height: 100%; }
 /* ---------- scrollbars (dezent, dunkel zum Theme passend) ---------- */
 * {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklab, var(--fg-2) 30%, transparent) color-mix(in oklab, var(--bg), #000 40%);
+  scrollbar-color: color-mix(in oklab, var(--fg-2) 30%, transparent) color-mix(in oklab, var(--bg), var(--recess) 40%);
 }
 *::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-track { background: color-mix(in oklab, var(--bg), #000 40%); }
+*::-webkit-scrollbar-track { background: color-mix(in oklab, var(--bg), var(--recess) 40%); }
 *::-webkit-scrollbar-thumb {
   background: color-mix(in oklab, var(--fg-2) 30%, transparent);
   border-radius: var(--radius-pill);
-  border: 2px solid color-mix(in oklab, var(--bg), #000 40%);
+  border: 2px solid color-mix(in oklab, var(--bg), var(--recess) 40%);
   background-clip: padding-box;
 }
 *::-webkit-scrollbar-thumb:hover { background: color-mix(in oklab, var(--fg-2) 50%, transparent); }
@@ -188,7 +194,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   height: 40px;
   display: flex; align-items: center; gap: var(--space-3);
   padding: 0 var(--space-4);
-  background: color-mix(in oklab, var(--bg), #000 12%);
+  background: color-mix(in oklab, var(--bg), var(--recess) 12%);
   border-bottom: 1px solid var(--border-soft);
   -webkit-app-region: drag; user-select: none;
 }
@@ -248,7 +254,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .llm-form { display: flex; flex-direction: column; gap: var(--space-4); }
 .input, select.input, textarea.input {
   height: 38px; padding: 0 var(--space-3);
-  background: color-mix(in oklab, var(--bg), #000 18%); color: var(--fg); border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--bg), var(--recess) 18%); color: var(--fg); border: 1px solid var(--border);
   border-radius: var(--radius-sm); font: inherit; font-size: var(--text-sm);
   transition: border-color var(--motion-fast) var(--ease-standard);
 }
@@ -264,7 +270,7 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .divider-h { height: 1px; background: var(--border-soft); }
 
 /* ---------- sidebar / session list ---------- */
-.sidebar { width: 248px; min-height: 0; background: color-mix(in oklab, var(--bg), #000 20%); border-right: 1px solid var(--border-soft); display: flex; flex-direction: column; }
+.sidebar { width: 248px; min-height: 0; background: color-mix(in oklab, var(--bg), var(--recess) 20%); border-right: 1px solid var(--border-soft); display: flex; flex-direction: column; }
 .sidebar .side-head { padding: var(--space-4); border-bottom: 1px solid var(--border-soft); }
 .sidebar .side-title { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .session-list { list-style: none; margin: 0; padding: var(--space-2); display: flex; flex-direction: column; gap: 2px; overflow: auto; flex: 1; }
@@ -328,7 +334,7 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .preview .pv-body { font-size: var(--text-sm); color: var(--fg-2); line-height: 1.7; }
 .preview .pv-body h3 { font-size: var(--text-base); margin-top: var(--space-5); margin-bottom: var(--space-2); color: var(--fg); }
 .preview .pv-body code { font-family: var(--font-mono); font-size: .9em; background: var(--glass-bg); padding: 1px 6px; border-radius: 4px; }
-.preview .pv-body pre { font-family: var(--font-mono); background: color-mix(in oklab, var(--bg), #000 24%); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-4); overflow: auto; font-size: var(--text-xs); }
+.preview .pv-body pre { font-family: var(--font-mono); background: color-mix(in oklab, var(--bg), var(--recess) 24%); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-4); overflow: auto; font-size: var(--text-xs); }
 .thumb { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--glass-bg); height: 160px; display: grid; place-items: center; color: var(--muted); font-family: var(--font-mono); font-size: var(--text-xs); }
 
 /* ---------- browser (file tree + preview) ---------- */
@@ -362,7 +368,7 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .msg .content { font-size: var(--text-base); color: var(--fg); line-height: 1.65; }
 .msg .content p + p { margin-top: var(--space-3); }
 .msg .content code { font-family: var(--font-mono); font-size: .88em; background: var(--glass-bg); padding: 1px 6px; border-radius: 4px; }
-.msg .content pre { font-family: var(--font-mono); background: color-mix(in oklab, var(--bg), #000 24%); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-4); overflow: auto; font-size: var(--text-xs); margin: var(--space-3) 0; }
+.msg .content pre { font-family: var(--font-mono); background: color-mix(in oklab, var(--bg), var(--recess) 24%); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-4); overflow: auto; font-size: var(--text-xs); margin: var(--space-3) 0; }
 .msg .content .cmd { font-family: var(--font-mono); color: var(--accent); background: color-mix(in oklab, var(--accent), transparent 82%); padding: 1px 6px; border-radius: 4px; font-size: .9em; }
 
 /* ---------- markdown body (assistant answers) ---------- */
@@ -412,7 +418,7 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .source-item .si-snippet { font-size: var(--text-xs); color: var(--fg-2); margin-top: 2px; }
 
 /* ---------- composer ---------- */
-.composer { border-top: 1px solid var(--border-soft); padding: var(--space-4) var(--space-6) var(--space-6); background: color-mix(in oklab, var(--bg), #000 14%); }
+.composer { border-top: 1px solid var(--border-soft); padding: var(--space-4) var(--space-6) var(--space-6); background: color-mix(in oklab, var(--bg), var(--recess) 14%); }
 .composer .box { max-width: 760px; margin: 0 auto; }
 .composer .field-wrap { display: flex; align-items: flex-end; gap: var(--space-3); background: var(--glass-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-3); transition: border-color var(--motion-fast) var(--ease-standard); backdrop-filter: var(--glass-blur); }
 .composer .field-wrap:focus-within { border-color: var(--accent); box-shadow: var(--focus-ring); }
@@ -427,7 +433,7 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .composer .kbd { font-family: var(--font-mono); background: var(--glass-bg); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; }
 
 /* ---------- ingest CTA + progress + summary ---------- */
-.ingest-bar { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-6); background: color-mix(in oklab, var(--bg), #000 18%); border-top: 1px solid var(--border); }
+.ingest-bar { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-6); background: color-mix(in oklab, var(--bg), var(--recess) 18%); border-top: 1px solid var(--border); }
 .ingest-bar .ib-text { flex: 1; min-width: 0; }
 .ingest-bar .ib-title { font-size: var(--text-sm); font-weight: 700; color: var(--fg); display: flex; align-items: center; gap: var(--space-2); }
 .ingest-bar .ib-sub { font-size: var(--text-xs); color: var(--muted); font-family: var(--font-mono); }
@@ -512,7 +518,7 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 @keyframes caret { 50% { opacity: 0; } }
 
 /* ---------- drawer / slide-over (glass) ---------- */
-.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 46%; max-width: 620px; background: color-mix(in oklab, var(--bg), #000 30%); border-left: 1px solid var(--border); box-shadow: var(--elev-raised); backdrop-filter: var(--glass-blur); display: flex; flex-direction: column; z-index: 40; transform: translateX(100%); transition: transform var(--motion-base) var(--ease-standard); }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 46%; max-width: 620px; background: color-mix(in oklab, var(--bg), var(--recess) 30%); border-left: 1px solid var(--border); box-shadow: var(--elev-raised); backdrop-filter: var(--glass-blur); display: flex; flex-direction: column; z-index: 40; transform: translateX(100%); transition: transform var(--motion-base) var(--ease-standard); }
 .drawer.open { transform: translateX(0); }
 .drawer .drawer-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--border-soft); }
 .drawer .drawer-body { flex: 1; overflow: auto; padding: var(--space-5); }
@@ -520,11 +526,11 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .scrim.open { opacity: 1; pointer-events: auto; }
 
 /* ---------- slide-over (left) for B ---------- */
-.slideover { position: fixed; top: 40px; left: 0; bottom: 0; width: 320px; background: color-mix(in oklab, var(--bg), #000 30%); border-right: 1px solid var(--border); box-shadow: var(--elev-raised); backdrop-filter: var(--glass-blur); display: flex; flex-direction: column; z-index: 35; transform: translateX(-100%); transition: transform var(--motion-base) var(--ease-standard); }
+.slideover { position: fixed; top: 40px; left: 0; bottom: 0; width: 320px; background: color-mix(in oklab, var(--bg), var(--recess) 30%); border-right: 1px solid var(--border); box-shadow: var(--elev-raised); backdrop-filter: var(--glass-blur); display: flex; flex-direction: column; z-index: 35; transform: translateX(-100%); transition: transform var(--motion-base) var(--ease-standard); }
 .slideover.open { transform: translateX(0); }
 
 /* ---------- toast / status ---------- */
-.toast { position: fixed; bottom: var(--space-6); left: 50%; transform: translateX(-50%) translateY(20px); background: color-mix(in oklab, var(--bg), #000 30%); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-5); display: flex; align-items: center; gap: var(--space-3); box-shadow: var(--elev-raised); backdrop-filter: var(--glass-blur); opacity: 0; transition: opacity var(--motion-base), transform var(--motion-base); z-index: 60; font-size: var(--text-sm); }
+.toast { position: fixed; bottom: var(--space-6); left: 50%; transform: translateX(-50%) translateY(20px); background: color-mix(in oklab, var(--bg), var(--recess) 30%); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-5); display: flex; align-items: center; gap: var(--space-3); box-shadow: var(--elev-raised); backdrop-filter: var(--glass-blur); opacity: 0; transition: opacity var(--motion-base), transform var(--motion-base); z-index: 60; font-size: var(--text-sm); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast .t-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
 .toast.err .t-dot { background: var(--danger); }
@@ -542,7 +548,7 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 
 /* ---------- first-run ---------- */
 .setup { flex: 1; display: grid; place-items: center; padding: var(--space-12); overflow: auto; }
-.setup-card { width: min(560px, 100%); background: color-mix(in oklab, var(--bg), #000 22%); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-8); box-shadow: var(--elev-raised); backdrop-filter: var(--glass-blur); }
+.setup-card { width: min(560px, 100%); background: color-mix(in oklab, var(--bg), var(--recess) 22%); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-8); box-shadow: var(--elev-raised); backdrop-filter: var(--glass-blur); }
 .setup-card h1 { font-size: var(--text-2xl); }
 .setup-steps { display: flex; gap: var(--space-2); margin-bottom: var(--space-8); }
 .setup-steps .step { flex: 1; height: 4px; border-radius: var(--radius-pill); background: var(--surface-warm); }
@@ -749,7 +755,7 @@ button.folder-card:focus-visible { outline: 2px solid var(--accent); outline-off
 
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 70;
-  background: color-mix(in oklab, var(--bg), #000 55%);
+  background: color-mix(in oklab, var(--bg), var(--recess) 55%);
   backdrop-filter: var(--glass-blur);
   display: grid; place-items: center;
   opacity: 0; animation: modal-fade var(--motion-fast) var(--ease-standard) forwards;
@@ -757,7 +763,7 @@ button.folder-card:focus-visible { outline: 2px solid var(--accent); outline-off
 @keyframes modal-fade { to { opacity: 1; } }
 .modal-card {
   width: min(440px, calc(100% - var(--space-8) * 2));
-  background: color-mix(in oklab, var(--bg), #000 22%);
+  background: color-mix(in oklab, var(--bg), var(--recess) 22%);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
@@ -780,6 +786,9 @@ button.folder-card:focus-visible { outline: 2px solid var(--accent); outline-off
 .addfiles-section li { font-size: var(--text-xs); color: var(--fg-2); word-break: break-all; }
 .addfiles-section li .reason { color: var(--fg-3, color-mix(in oklab, var(--fg-2) 70%, transparent)); }
 .settings-version { margin: var(--space-4) 0 0; text-align: center; font-size: var(--text-xs); }
+.settings-section { margin-top: var(--space-6); }
+.settings-section h2 { font-size: var(--text-lg); }
+.settings-section-desc { margin: var(--space-2) 0 var(--space-4); font-size: var(--text-sm); }
 
 /* ---------- reduced motion ---------- */
 /* Mirrors the splash-screen handling in index.html: no infinite animation and

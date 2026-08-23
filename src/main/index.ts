@@ -1,7 +1,7 @@
 // Electron main entry: window lifecycle, workspace selection dialog,
 // activation of the AgentRepository + IpcBridge for the chosen workspace.
 import "./polyfill.ts"; // must run before pi-coding-agent loads (undici worker_threads polyfill)
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from "electron";
 import { stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,17 +9,32 @@ import { AgentRepository } from "./agent.ts";
 import { IpcBridge } from "./ipc.ts";
 import {
   forgetWorkspace,
+  getAppearance,
   getLlmConfig,
   listRecentWorkspaces,
   rememberWorkspace,
   removeLlmApiKey,
+  setAppearance,
   toLlmConfigView,
 } from "./config.ts";
+import {
+  DEFAULT_APPEARANCE,
+  isAppearanceSettings,
+  resolveTheme,
+  THEME_BACKGROUND,
+} from "../shared/appearance.ts";
 import { mergeWorkspaces } from "./workspace-merge.ts";
 import { createUpdateRepository, type UpdateRepository } from "./update-repository.ts";
 import { ok, err, errorMessage } from "../shared/result.ts";
-import { mainT } from "./i18n.ts";
-import type { MergeReport, ProviderId, Result, UpdateEvent, WorkspaceInfo } from "../shared/ipc-types.ts";
+import { mainT, setMainLocalePreference } from "./i18n.ts";
+import type {
+  AppearanceSettings,
+  MergeReport,
+  ProviderId,
+  Result,
+  UpdateEvent,
+  WorkspaceInfo,
+} from "../shared/ipc-types.ts";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
@@ -49,9 +64,30 @@ interface AppState {
    *  (Electron discards messages sent before an `ipcRenderer.on` listener is
    *  registered). The replay closes that startup race. */
   lastUpdateEvent: UpdateEvent | null;
+  appearance: AppearanceSettings;
 }
 
-const state: AppState = { window: null, repo: null, bridge: null, workspace: null, updater: null, lastUpdateEvent: null };
+const state: AppState = {
+  window: null,
+  repo: null,
+  bridge: null,
+  workspace: null,
+  updater: null,
+  lastUpdateEvent: null,
+  appearance: DEFAULT_APPEARANCE,
+};
+
+function effectiveTheme(): "light" | "dark" {
+  return resolveTheme(state.appearance.theme, nativeTheme.shouldUseDarkColors);
+}
+
+/** Keep the native window chrome in step with the renderer's `data-theme`,
+ *  so resizes and reloads do not flash the wrong canvas colour. */
+function applyWindowBackground(): void {
+  const win = state.window;
+  if (!win || win.isDestroyed()) return;
+  win.setBackgroundColor(THEME_BACKGROUND[effectiveTheme()]);
+}
 
 // Surface any startup failure instead of dying silently.
 function fatal(message: string, error?: unknown): void {
@@ -107,6 +143,22 @@ function registerGlobalHandlers(): void {
   ipcMain.handle("okf:getLlmConfig", async () => {
     const llm = await getLlmConfig();
     return ok(llm ? toLlmConfigView(llm) : null);
+  });
+
+  // Theme + locale live in config.json and are workspace-independent, so the
+  // renderer can read them at bootstrap before a workspace is active.
+  ipcMain.handle("okf:getAppearance", async () => ok(await getAppearance()));
+
+  ipcMain.handle("okf:setAppearance", async (_event, appearance: unknown) => {
+    if (!isAppearanceSettings(appearance)) {
+      return err<void>(mainT("error.invalidPayload", { channel: "setAppearance" }));
+    }
+    const saved = await setAppearance(appearance);
+    if (!saved.success) return saved;
+    state.appearance = appearance;
+    setMainLocalePreference(appearance.locale);
+    applyWindowBackground();
+    return ok(undefined);
   });
 
   // Revoking the key only touches config.json, so this is workspace-
@@ -253,7 +305,7 @@ async function createWindow(): Promise<BrowserWindow> {
     height: 820,
     minWidth: 960,
     minHeight: 640,
-    backgroundColor: "#0e1214",
+    backgroundColor: THEME_BACKGROUND[effectiveTheme()],
     title: mainT("app.name"),
     autoHideMenuBar: true,
     icon: getAppIconPath(),
@@ -289,6 +341,9 @@ async function createWindow(): Promise<BrowserWindow> {
 
 void app.whenReady().then(async () => {
   log("ready");
+  state.appearance = await getAppearance();
+  setMainLocalePreference(state.appearance.locale);
+  nativeTheme.on("updated", applyWindowBackground);
   registerGlobalHandlers();
   try {
     state.window = await createWindow();

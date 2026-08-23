@@ -6,6 +6,8 @@ import type { AgentApi, AgentEvent, CopilotLoginEvent, Folder, IngestSummary, Up
 const api: AgentApi = {
   getAppSelf: () => ipcRenderer.invoke("okf:getAppSelf"),
   getLlmConfig: () => ipcRenderer.invoke("okf:getLlmConfig"),
+  getAppearance: () => ipcRenderer.invoke("okf:getAppearance"),
+  setAppearance: (appearance) => ipcRenderer.invoke("okf:setAppearance", appearance),
   listRecentWorkspaces: () => ipcRenderer.invoke("okf:listRecentWorkspaces"),
   openWorkspace: (path) => ipcRenderer.invoke("okf:openWorkspace", path),
   pickWorkspace: () => ipcRenderer.invoke("okf:pickWorkspace"),

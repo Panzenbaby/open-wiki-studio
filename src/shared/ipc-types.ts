@@ -1,6 +1,7 @@
 // Shared types between main, preload, and renderer. Strict, no `any`.
 // The IPC contract is defined once here as `AgentApi` and implemented by the
 // preload bridge; the renderer imports the typed `window.api`.
+import type { Locale } from "./i18n.ts";
 
 export type Result<T> =
   | { success: true; data: T }
@@ -30,6 +31,21 @@ export interface MergeReport {
   readonly concepts: number;
   readonly renamed: number;
   readonly deduplicated: number;
+}
+
+// ─── Appearance preferences ──────────────────────────────────────────
+/** `system` follows the OS (`prefers-color-scheme`). */
+export type ThemePreference = "system" | "light" | "dark";
+
+/** What the UI actually renders — what `data-theme` is set to. */
+export type EffectiveTheme = "light" | "dark";
+
+/** `system` follows `navigator.language` (renderer) / `app.getLocale()` (main). */
+export type LocalePreference = "system" | Locale;
+
+export interface AppearanceSettings {
+  readonly theme: ThemePreference;
+  readonly locale: LocalePreference;
 }
 
 export interface AppSelfInfo {
@@ -269,6 +285,11 @@ export interface AgentApi {
   // workspace & app
   getAppSelf(): Promise<Result<AppSelfInfo>>;
   getLlmConfig(): Promise<Result<LlmConfigView | null>>;
+  /** Persisted theme + locale preferences, defaulted to `system`. */
+  getAppearance(): Promise<Result<AppearanceSettings>>;
+  /** Persist theme + locale. The main process applies them immediately (window
+   *  background, `mainT` locale) — no restart. */
+  setAppearance(appearance: AppearanceSettings): Promise<Result<void>>;
   listRecentWorkspaces(): Promise<Result<readonly WorkspaceInfo[]>>;
   openWorkspace(path: string): Promise<Result<WorkspaceInfo>>;
   pickWorkspace(): Promise<Result<WorkspaceInfo | null>>;

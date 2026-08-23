@@ -14,13 +14,15 @@
         on first render, so it never overlaps the real UI. The text is
         localized inline (de/en) because the shared i18n dictionary is
         only available after the bundle loads — values mirror the
-        `app.loading` / `app.name` keys in src/shared/i18n.ts and the
-        locale detection mirrors src/renderer/i18n.ts:detectLocale.
+        `app.loading` / `app.name` keys in src/shared/i18n.ts. Theme and
+        locale come from the localStorage mirror written by
+        src/renderer/appearance-cache.ts, because config.json is only
+        readable over IPC once the bundle is up.
       -->
       <div id="oks-splash" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#0e1214;color:#868889;font-family:'Proxima Nova Soft','Avenir Next','Segoe UI',Verdana,Arial,Helvetica,sans-serif;">
         <div style="display:flex;flex-direction:column;align-items:center;gap:14px;">
           <img src="./assets/app-icon.png" alt="" width="72" height="72" style="width:72px;height:72px;border-radius:14px;display:block;box-shadow:0 16px 40px rgba(0,0,0,.55);" />
-          <span style="color:#f1f1f1;font-weight:700;font-size:20px;letter-spacing:.01em;">Open Wiki Studio</span>
+          <span id="oks-splash-name" style="color:#f1f1f1;font-weight:700;font-size:20px;letter-spacing:.01em;">Open Wiki Studio</span>
         </div>
         <div id="oks-splash-loading" style="display:inline-flex;align-items:center;gap:10px;font-size:14px;">
           <span style="display:inline-flex;gap:5px;align-items:center;">
@@ -42,11 +44,36 @@
       </style>
       <script>
         (function () {
+          var cached = {};
           try {
-            var lang = (typeof navigator !== "undefined" ? navigator.language : "en").toLowerCase();
-            var text = lang.indexOf("de") === 0 ? "Lade\u2026" : "Loading\u2026";
+            cached = JSON.parse(localStorage.getItem("okf:appearance")) || {};
+          } catch (_) { /* no usable mirror — fall back to the system */ }
+          try {
+            var theme =
+              cached.theme === "light" || cached.theme === "dark"
+                ? cached.theme
+                : window.matchMedia("(prefers-color-scheme: dark)").matches
+                  ? "dark"
+                  : "light";
+            document.documentElement.setAttribute("data-theme", theme);
+            if (theme === "light") {
+              var splash = document.getElementById("oks-splash");
+              if (splash) {
+                splash.style.background = "#faf7f3";
+                splash.style.color = "#7a7370";
+              }
+              var name = document.getElementById("oks-splash-name");
+              if (name) name.style.color = "#2b2320";
+            }
+          } catch (_) { /* splash stays dark */ }
+          try {
+            var locale = cached.locale;
+            if (locale !== "de" && locale !== "en") {
+              var lang = (typeof navigator !== "undefined" ? navigator.language : "en").toLowerCase();
+              locale = lang.indexOf("de") === 0 ? "de" : "en";
+            }
             var el = document.getElementById("oks-splash-text");
-            if (el) el.textContent = text;
+            if (el) el.textContent = locale === "de" ? "Lade\u2026" : "Loading\u2026";
           } catch (_) { /* splash stays in English */ }
         })();
       </script>

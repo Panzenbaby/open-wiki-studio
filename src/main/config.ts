@@ -3,8 +3,16 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { app, safeStorage } from "electron";
 import { ok, err, errorMessage } from "../shared/result.ts";
+import { normalizeAppearance } from "../shared/appearance.ts";
 import { mainT } from "./i18n.ts";
-import type { LlmConfig, LlmConfigView, ProviderId, Result, WorkspaceInfo } from "../shared/ipc-types.ts";
+import type {
+  AppearanceSettings,
+  LlmConfig,
+  LlmConfigView,
+  ProviderId,
+  Result,
+  WorkspaceInfo,
+} from "../shared/ipc-types.ts";
 
 const MAX_RECENT = 12;
 
@@ -32,6 +40,7 @@ interface ConfigShape {
   readonly recentWorkspaces: readonly WorkspaceInfo[];
   readonly lastWorkspace?: string;
   readonly llm?: StoredLlmConfig;
+  readonly appearance?: AppearanceSettings;
 }
 
 // Key the user chose not to persist. Lives for this process run only and is
@@ -67,6 +76,8 @@ async function readConfig(): Promise<ConfigShape> {
         : [],
       lastWorkspace: parsed.lastWorkspace,
       llm: parsed.llm,
+      appearance:
+        parsed.appearance === undefined ? undefined : normalizeAppearance(parsed.appearance),
     };
   } catch {
     return { recentWorkspaces: [] };
@@ -115,6 +126,7 @@ export async function forgetWorkspace(
     try {
       const config = await readConfig();
       const next: ConfigShape = {
+        ...config,
         recentWorkspaces: config.recentWorkspaces.filter(
           (w) => w.path !== folderPath,
         ),
@@ -122,7 +134,6 @@ export async function forgetWorkspace(
           config.lastWorkspace === folderPath
             ? undefined
             : config.lastWorkspace,
-        llm: config.llm,
       };
       await writeConfig(next);
       return ok(undefined);
@@ -141,14 +152,33 @@ export async function rememberWorkspace(
       const info = toInfo(folderPath);
       const deduped = config.recentWorkspaces.filter((w) => w.path !== folderPath);
       const next: ConfigShape = {
+        ...config,
         recentWorkspaces: [info, ...deduped].slice(0, MAX_RECENT),
         lastWorkspace: folderPath,
-        llm: config.llm,
       };
       await writeConfig(next);
       return ok(info);
     } catch (error) {
       return err<WorkspaceInfo>(mainT("error.rememberWorkspace", { detail: errorMessage(error) }));
+    }
+  });
+}
+
+export async function getAppearance(): Promise<AppearanceSettings> {
+  const config = await readConfig();
+  return normalizeAppearance(config.appearance);
+}
+
+export async function setAppearance(
+  appearance: AppearanceSettings,
+): Promise<Result<void>> {
+  return withConfigLock(async () => {
+    try {
+      const current = await readConfig();
+      await writeConfig({ ...current, appearance });
+      return ok(undefined);
+    } catch (error) {
+      return err<void>(mainT("error.saveAppearance", { detail: errorMessage(error) }));
     }
   });
 }

@@ -141,12 +141,24 @@ export const messages: Record<Locale, Dict> = {
     "copilot.copyFailed": "Could not copy code",
 
     // ── settings ──────────────────────────────────────────────────
-    "settings.title": "LLM settings",
+    "settings.title": "Settings",
+    "settings.llm": "LLM",
     "settings.desc": "Change the provider. Applies globally to all workspaces.",
     "settings.save": "Save",
     "settings.loading": "Loading configuration…",
     "settings.cancel": "Cancel",
     "settings.version": "Version {version}",
+    "settings.appearance": "Appearance",
+    "settings.appearanceDesc":
+      "Theme and language. Applies globally to all workspaces.",
+    "settings.theme": "Theme",
+    "settings.theme.system": "System",
+    "settings.theme.light": "Light",
+    "settings.theme.dark": "Dark",
+    "settings.language": "Language",
+    "settings.language.system": "System",
+    "settings.language.en": "English",
+    "settings.language.de": "German",
 
     // ── dashboard ─────────────────────────────────────────────────
     "dashboard.kicker": "Workspace · {name}",
@@ -306,6 +318,7 @@ export const messages: Record<Locale, Dict> = {
     "error.rememberWorkspace": "Failed to remember workspace: {detail}",
     "error.forgetWorkspace": "Failed to remove workspace: {detail}",
     "error.saveLlmConfig": "Failed to save LLM config: {detail}",
+    "error.saveAppearance": "Failed to save appearance settings: {detail}",
     "error.removeApiKey": "Failed to remove the API key: {detail}",
     "error.invalidPath": "Invalid path: {path}",
     "error.openFolder": "Failed to open folder: {detail}",
@@ -499,13 +512,25 @@ export const messages: Record<Locale, Dict> = {
     "copilot.copyFailed": "Code konnte nicht kopiert werden",
 
     // ── settings ──────────────────────────────────────────────────
-    "settings.title": "LLM-Einstellungen",
+    "settings.title": "Einstellungen",
+    "settings.llm": "LLM",
     "settings.desc":
       "Provider ändern. Gilt global für alle Workspaces.",
     "settings.save": "Speichern",
     "settings.loading": "Lade Konfiguration…",
     "settings.cancel": "Abbrechen",
     "settings.version": "Version {version}",
+    "settings.appearance": "Darstellung",
+    "settings.appearanceDesc":
+      "Design und Sprache. Gilt global für alle Workspaces.",
+    "settings.theme": "Design",
+    "settings.theme.system": "System",
+    "settings.theme.light": "Hell",
+    "settings.theme.dark": "Dunkel",
+    "settings.language": "Sprache",
+    "settings.language.system": "System",
+    "settings.language.en": "Englisch",
+    "settings.language.de": "Deutsch",
 
     // ── dashboard ─────────────────────────────────────────────────
     "dashboard.kicker": "Workspace · {name}",
@@ -667,6 +692,8 @@ export const messages: Record<Locale, Dict> = {
     "error.rememberWorkspace": "Workspace konnte nicht gespeichert werden: {detail}",
     "error.forgetWorkspace": "Workspace konnte nicht entfernt werden: {detail}",
     "error.saveLlmConfig": "LLM-Konfiguration konnte nicht gespeichert werden: {detail}",
+    "error.saveAppearance":
+      "Darstellungseinstellungen konnten nicht gespeichert werden: {detail}",
     "error.removeApiKey": "API-Schlüssel konnte nicht entfernt werden: {detail}",
     "error.invalidPath": "Ungültiger Pfad: {path}",
     "error.openFolder": "Ordner konnte nicht geöffnet werden: {detail}",

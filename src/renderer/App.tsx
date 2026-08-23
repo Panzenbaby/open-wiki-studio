@@ -9,6 +9,7 @@ import {
   screenAtom,
 } from "./store.ts";
 import { useT, localeAtom } from "./i18n.ts";
+import { useAppearanceSync } from "./appearance.ts";
 import { WorkspacePicker } from "./screens/WorkspacePicker.tsx";
 import { FirstRun } from "./screens/FirstRun.tsx";
 import { AppShell } from "./components/AppShell.tsx";
@@ -17,6 +18,7 @@ import { Toast } from "./components/Toast.tsx";
 export function App(): JSX.Element {
   const t = useT();
   const locale = useAtomValue(localeAtom);
+  useAppearanceSync();
 
   const [screen, setScreen] = useAtom(screenAtom);
   const setRecent = useSetAtom(recentWorkspacesAtom);
