@@ -9,7 +9,15 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # Windows and macOS are release targets (release.yml builds on both), so
+    # the test suite has to run there too — path handling is the usual source
+    # of platform drift. Type-check and lint are platform-independent and stay
+    # on Linux to keep the matrix cheap.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -21,10 +29,12 @@ jobs:
       - run: npm ci
 
       # Static type-check (tsc --noEmit)
-      - run: npm run check
+      - if: matrix.os == 'ubuntu-latest'
+        run: npm run check
 
       # ESLint (flat config, type-aware) — a lint error fails the job
-      - run: npm run lint
+      - if: matrix.os == 'ubuntu-latest'
+        run: npm run lint
 
       # Unit tests (vitest run, exits non-zero on failure)
       - run: npm test
