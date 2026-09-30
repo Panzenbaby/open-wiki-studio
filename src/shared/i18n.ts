@@ -93,6 +93,9 @@ export const messages: Record<Locale, Dict> = {
     "llf.loadModelsFailed": "Could not load models",
     "llf.noModels": "No models available. Check your key / endpoint and try again.",
     "llf.selectModel": "Model",
+    "llf.searchModels": "Search models",
+    "llf.modelSearchNoResults": "No models match your search.",
+    "llf.selectedModel": "Current selection",
 
     // Provider sub-descriptions shown in the provider selector grid.
     "llf.anthropic.sub": "Claude · anthropic-messages",
@@ -482,6 +485,9 @@ export const messages: Record<Locale, Dict> = {
     "llf.loadModelsFailed": "Modelle konnten nicht geladen werden",
     "llf.noModels": "Keine Modelle verfügbar. Schlüssel / Endpunkt prüfen und erneut versuchen.",
     "llf.selectModel": "Modell",
+    "llf.searchModels": "Modelle suchen",
+    "llf.modelSearchNoResults": "Keine Modelle entsprechen der Suche.",
+    "llf.selectedModel": "Aktuelle Auswahl",
 
     "llf.anthropic.sub": "Claude · anthropic-messages",
     "llf.openai.sub": "GPT · openai-responses",

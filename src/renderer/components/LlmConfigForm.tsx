@@ -29,6 +29,14 @@ const PROVIDERS: ReadonlyArray<ProviderDef> = [
 
 type CopilotStatus = "idle" | "logging-in" | "logged-in";
 
+function filterModels(models: readonly ModelOption[], query: string): readonly ModelOption[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return models;
+  return models.filter((model) =>
+    `${model.name} ${model.id}`.toLowerCase().includes(normalizedQuery),
+  );
+}
+
 interface LlmConfigFormProps {
   readonly initial: LlmConfigView | null;
   readonly submitLabel: string;
@@ -55,6 +63,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   // ── Copilot OAuth state ───────────────────────────────────────────
   const [copilotStatus, setCopilotStatus] = useState<CopilotStatus>("idle");
   const [copilotModels, setCopilotModels] = useState<readonly ModelOption[]>([]);
+  const [modelSearchQuery, setModelSearchQuery] = useState("");
   const [copilotDeviceCode, setCopilotDeviceCode] = useState<{ userCode: string; verificationUri: string } | null>(null);
 
   // ── Non-Copilot model-selection state (two-phase: credentials → dropdown) ─
@@ -95,6 +104,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
     // Skip the redundant re-probe right after a successful login.
     if (copilotStatus === "logged-in" && copilotModels.length > 0) return;
     let cancelled = false;
+    setModelSearchQuery("");
     void (async () => {
       const result = await api.listAvailableModels("github-copilot");
       if (cancelled) return;
@@ -131,6 +141,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
     const hasCreds = saved.hasApiKey || !!saved.baseUrl || provider === "ollama";
     if (!hasCreds) return;
     let cancelled = false;
+    setModelSearchQuery("");
     void (async () => {
       setLoadingModels(true);
       setLoadError(null);
@@ -192,6 +203,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   }
 
   async function loginCopilot(): Promise<void> {
+    setModelSearchQuery("");
     setBusy(true);
     setCopilotStatus("logging-in");
     setCopilotDeviceCode(null);
@@ -254,6 +266,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
    */
   function selectProvider(next: ProviderId): void {
     setProvider(next);
+    setModelSearchQuery("");
     setApiKey("");
     if (props.initial && props.initial.provider === next) {
       setBaseUrl(props.initial.baseUrl ?? "");
@@ -269,6 +282,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
 
   /** Manually load models with the currently-entered credentials/base URL. */
   async function loadModelsAction(): Promise<void> {
+    setModelSearchQuery("");
     setLoadingModels(true);
     setLoadError(null);
     const result = await api.loadModels(provider, apiKey || undefined, baseUrl || undefined);
@@ -318,6 +332,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
       setModels([]);
       setModelsLoaded(false);
       setLoadError(null);
+      setModelSearchQuery("");
     }
   }
   function onBaseUrlChange(value: string): void {
@@ -326,6 +341,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
       setModels([]);
       setModelsLoaded(false);
       setLoadError(null);
+      setModelSearchQuery("");
     }
   }
 
@@ -387,6 +403,8 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
           models={copilotModels}
           modelId={modelId}
           onModelChange={setModelId}
+          searchQuery={modelSearchQuery}
+          onSearchQueryChange={setModelSearchQuery}
           deviceCode={copilotDeviceCode}
           busy={busy}
           onLogin={() => void loginCopilot()}
@@ -453,13 +471,13 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
             <div className="field">
               <label>{t("llf.selectModel")}</label>
               {models.length > 0 ? (
-                <select className="input" value={modelId} onChange={(e) => setModelId(e.target.value)}>
-                  {models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name || model.id}
-                    </option>
-                  ))}
-                </select>
+                <ModelPicker
+                  models={models}
+                  modelId={modelId}
+                  onModelChange={setModelId}
+                  searchQuery={modelSearchQuery}
+                  onSearchQueryChange={setModelSearchQuery}
+                />
               ) : (
                 <div className="hint">{t("llf.noModels")}</div>
               )}
@@ -498,6 +516,8 @@ interface CopilotSectionProps {
   readonly models: readonly ModelOption[];
   readonly modelId: string;
   readonly onModelChange: (id: string) => void;
+  readonly searchQuery: string;
+  readonly onSearchQueryChange: (query: string) => void;
   readonly deviceCode: { userCode: string; verificationUri: string } | null;
   readonly busy: boolean;
   readonly onLogin: () => void;
@@ -507,9 +527,65 @@ interface CopilotSectionProps {
   readonly onCopyCode: (code: string) => void;
 }
 
+interface ModelPickerProps {
+  readonly models: readonly ModelOption[];
+  readonly modelId: string;
+  readonly onModelChange: (id: string) => void;
+  readonly searchQuery: string;
+  readonly onSearchQueryChange: (query: string) => void;
+}
+
+function ModelPicker(props: ModelPickerProps): JSX.Element {
+  const t = useT();
+  const matchingModels = filterModels(props.models, props.searchQuery);
+  const selectedModel = props.models.find((model) => model.id === props.modelId);
+  const selectedModelMatches = matchingModels.some((model) => model.id === props.modelId);
+
+  return (
+    <div className="model-picker">
+      <input
+        className="input model-picker-search"
+        type="search"
+        value={props.searchQuery}
+        onChange={(event) => props.onSearchQueryChange(event.target.value)}
+        placeholder={t("llf.searchModels")}
+        aria-label={t("llf.searchModels")}
+      />
+      {matchingModels.length > 0 ? (
+        <div className="model-picker-options" aria-label={t("llf.selectModel")}>
+          {matchingModels.map((model) => (
+            <button
+              key={model.id}
+              type="button"
+              className={`model-picker-option${model.id === props.modelId ? " selected" : ""}`}
+              aria-pressed={model.id === props.modelId}
+              onClick={() => props.onModelChange(model.id)}
+            >
+              <span className="model-picker-option-name">{model.name || model.id}</span>
+              {model.name && model.name !== model.id && (
+                <span className="model-picker-option-id">{model.id}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="hint model-picker-empty" role="status">
+          {t("llf.modelSearchNoResults")}
+        </div>
+      )}
+      {!selectedModelMatches && selectedModel && (
+        <div className="model-picker-current">
+          <span>{t("llf.selectedModel")}</span>
+          <strong>{selectedModel.name || selectedModel.id}</strong>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CopilotSection(props: CopilotSectionProps): JSX.Element {
   const t = useT();
-  const { status, models, modelId, deviceCode, busy } = props;
+  const { status, models, modelId, searchQuery, deviceCode, busy } = props;
 
   if (status === "logged-in") {
     return (
@@ -517,13 +593,13 @@ function CopilotSection(props: CopilotSectionProps): JSX.Element {
         <div className="field">
           <label>{t("copilot.selectModel")}</label>
           {models.length > 0 ? (
-            <select className="input" value={modelId} onChange={(e) => props.onModelChange(e.target.value)}>
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name || model.id}
-                </option>
-              ))}
-            </select>
+            <ModelPicker
+              models={models}
+              modelId={modelId}
+              onModelChange={props.onModelChange}
+              searchQuery={searchQuery}
+              onSearchQueryChange={props.onSearchQueryChange}
+            />
           ) : (
             <div className="hint">{t("copilot.noModels")}</div>
           )}

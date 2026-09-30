@@ -262,6 +262,72 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .input:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
 .input::placeholder { color: var(--meta); }
 
+/* A single searchable model picker keeps search and selection visually connected. */
+.model-picker {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--bg), var(--recess) 18%);
+}
+.model-picker-search.input {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.model-picker-search.input:focus { box-shadow: inset 0 -1px var(--accent); }
+.model-picker-options {
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border-soft);
+}
+.model-picker-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.model-picker-option:hover { background: var(--glass-bg); }
+.model-picker-option.selected {
+  background: color-mix(in oklab, var(--accent), transparent 84%);
+  color: var(--fg);
+}
+.model-picker-option:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.model-picker-option-name, .model-picker-option-id {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-picker-option-name { font-size: var(--text-sm); }
+.model-picker-option-id { color: var(--muted); font-family: var(--font-mono); font-size: var(--text-xs); }
+.model-picker-empty { padding: var(--space-3); border-top: 1px solid var(--border-soft); }
+.model-picker-current {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--border-soft);
+  background: var(--glass-bg);
+  font-size: var(--text-xs);
+}
+.model-picker-current > span { color: var(--muted); }
+.model-picker-current > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ---------- layout shells ---------- */
 .shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 .body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
