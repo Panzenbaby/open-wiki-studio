@@ -212,6 +212,9 @@ export const messages: Record<Locale, Dict> = {
     "chat.hintAuto": "auto: /wiki-query",
     "chat.roleUser": "You",
     "chat.roleAgent": "Open Wiki Studio",
+    "chat.copyMessage": "Copy message",
+    "chat.copySuccess": "Message copied",
+    "chat.copyFailed": "Could not copy message",
     "chat.retry": "Retry",
     "chat.stop": "Stop",
     "chat.errorNoResponse":
@@ -599,6 +602,9 @@ export const messages: Record<Locale, Dict> = {
     "chat.hintAuto": "auto: /wiki-query",
     "chat.roleUser": "Du",
     "chat.roleAgent": "Open Wiki Studio",
+    "chat.copyMessage": "Nachricht kopieren",
+    "chat.copySuccess": "Nachricht kopiert",
+    "chat.copyFailed": "Nachricht konnte nicht kopiert werden",
     "chat.retry": "Erneut versuchen",
     "chat.stop": "Stopp",
     "chat.errorNoResponse":
