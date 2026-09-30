@@ -16,6 +16,11 @@ import {
   resetWikiChatInstructions,
   saveWikiChatInstructions,
 } from "./wiki-chat-instructions.ts";
+import {
+  readCustomWikiIngestInstructions,
+  resetWikiIngestInstructions,
+  saveWikiIngestInstructions,
+} from "./wiki-ingest-instructions.ts";
 import { errorMessage, ok, err } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
 import {
@@ -49,6 +54,9 @@ const BRIDGE_CHANNELS = [
   "getWikiChatInstructions",
   "saveWikiChatInstructions",
   "resetWikiChatInstructions",
+  "getWikiIngestInstructions",
+  "saveWikiIngestInstructions",
+  "resetWikiIngestInstructions",
   "listAvailableModels",
   "loadModels",
   "loginCopilot",
@@ -85,6 +93,8 @@ const VALIDATORS: Partial<Record<BridgeChannel, ArgumentValidator>> = {
   configureLlm: (args) => (isLlmConfig(args[0]) ? null : mainT("error.invalidPayload", { channel: "configureLlm" })),
   saveWikiChatInstructions: (args) =>
     (typeof args[0] === "string" ? null : mainT("error.invalidPayload", { channel: "saveWikiChatInstructions" })),
+  saveWikiIngestInstructions: (args) =>
+    (typeof args[0] === "string" ? null : mainT("error.invalidPayload", { channel: "saveWikiIngestInstructions" })),
   listAvailableModels: expectProvider,
   loadModels: (args) =>
     expectProvider(args) ??
@@ -156,6 +166,12 @@ export class IpcBridge {
       },
       saveWikiChatInstructions: async (instructions: string) => saveWikiChatInstructions(workspace, instructions),
       resetWikiChatInstructions: async () => resetWikiChatInstructions(workspace),
+      getWikiIngestInstructions: async () => {
+        const custom = await readCustomWikiIngestInstructions(workspace);
+        return custom.success ? ok({ customInstructions: custom.data }) : custom;
+      },
+      saveWikiIngestInstructions: async (instructions: string) => saveWikiIngestInstructions(workspace, instructions),
+      resetWikiIngestInstructions: async () => resetWikiIngestInstructions(workspace),
       configureLlm: async (config: LlmConfig) => {
         // The renderer only sends a key when the user typed a new one; an
         // untouched masked field must keep the stored key.

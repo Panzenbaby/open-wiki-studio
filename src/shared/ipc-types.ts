@@ -54,6 +54,11 @@ export interface WikiChatInstructionSettings {
   readonly defaultInstructions: string;
 }
 
+/** The workspace-specific agent ingest instructions shown in Settings. */
+export interface WikiIngestInstructionSettings {
+  readonly customInstructions: string | null;
+}
+
 export interface AppSelfInfo {
   readonly version: string;
   readonly hasLlmConfig: boolean;
@@ -302,6 +307,12 @@ export interface AgentApi {
   saveWikiChatInstructions(instructions: string): Promise<Result<void>>;
   /** Remove the workspace's custom rules file so extension defaults apply. */
   resetWikiChatInstructions(): Promise<Result<void>>;
+  /** Read the active workspace's saved agent-ingest instructions. */
+  getWikiIngestInstructions(): Promise<Result<WikiIngestInstructionSettings>>;
+  /** Save custom agent-ingest instructions; empty content removes the file. */
+  saveWikiIngestInstructions(instructions: string): Promise<Result<void>>;
+  /** Remove the workspace's custom agent-ingest instructions. */
+  resetWikiIngestInstructions(): Promise<Result<void>>;
   listRecentWorkspaces(): Promise<Result<readonly WorkspaceInfo[]>>;
   openWorkspace(path: string): Promise<Result<WorkspaceInfo>>;
   pickWorkspace(): Promise<Result<WorkspaceInfo | null>>;

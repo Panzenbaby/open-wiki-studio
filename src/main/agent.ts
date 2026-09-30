@@ -36,6 +36,7 @@ type ResolvedModel = ReturnType<AgentSessionServices["modelRegistry"]["getAll"]>
 
 import { resolveOkfExtensionPath } from "./resource.ts";
 import { registerWikiChatInstructionsHook } from "./wiki-chat-instructions.ts";
+import { registerWikiIngestInstructionsHook } from "./wiki-ingest-instructions.ts";
 import { diffSnapshots, listInputFiles, snapshotWiki } from "./wiki-scan.ts";
 import { ok, err, errorMessage } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
@@ -126,7 +127,10 @@ export class AgentRepository {
           // Inline factories run after file-based extensions. The wiki hook
           // therefore sees the extension's dynamic context before replacing
           // only its fixed query instructions on each turn.
-          extensionFactories: [(extension) => registerWikiChatInstructionsHook(extension, workspace)],
+          extensionFactories: [(extension) => {
+            registerWikiChatInstructionsHook(extension, workspace);
+            registerWikiIngestInstructionsHook(extension, workspace);
+          }],
         },
       });
 

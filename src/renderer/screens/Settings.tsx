@@ -24,6 +24,10 @@ export function Settings(): JSX.Element {
   const [instructions, setInstructions] = useState<string>("");
   const [instructionsLoading, setInstructionsLoading] = useState<boolean>(true);
   const [instructionsSaving, setInstructionsSaving] = useState<boolean>(false);
+  const [savedIngestInstructions, setSavedIngestInstructions] = useState<string | null>(null);
+  const [ingestInstructions, setIngestInstructions] = useState<string>("");
+  const [ingestInstructionsLoading, setIngestInstructionsLoading] = useState<boolean>(true);
+  const [ingestInstructionsSaving, setIngestInstructionsSaving] = useState<boolean>(false);
 
   useEffect(() => {
     let active = true;
@@ -57,6 +61,28 @@ export function Settings(): JSX.Element {
   const instructionsDirty = instructions !== (savedInstructions && savedInstructions.trim() !== ""
     ? savedInstructions
     : defaultInstructions);
+  const ingestInstructionsDirty = ingestInstructions !== (savedIngestInstructions ?? "");
+
+  useEffect(() => {
+    if (!workspace) return;
+    let active = true;
+    setIngestInstructionsLoading(true);
+    setSavedIngestInstructions(null);
+    setIngestInstructions("");
+    void api.getWikiIngestInstructions().then((result) => {
+      if (!active) return;
+      if (!result.success) {
+        setToast({ message: result.error.message, kind: "error" });
+        setIngestInstructionsLoading(false);
+        return;
+      }
+      const custom = result.data.customInstructions;
+      setSavedIngestInstructions(custom);
+      setIngestInstructions(custom ?? "");
+      setIngestInstructionsLoading(false);
+    });
+    return () => { active = false; };
+  }, [workspace, setToast]);
 
   async function saveInstructions(): Promise<void> {
     setInstructionsSaving(true);
@@ -84,6 +110,34 @@ export function Settings(): JSX.Element {
     setInstructions(defaultInstructions);
     setInstructionsSaving(false);
     setToast({ message: t("settings.chatInstructions.resetDone"), kind: "info" });
+  }
+
+  async function saveIngestInstructions(): Promise<void> {
+    setIngestInstructionsSaving(true);
+    const result = await api.saveWikiIngestInstructions(ingestInstructions);
+    setIngestInstructionsSaving(false);
+    if (!result.success) {
+      setToast({ message: result.error.message, kind: "error" });
+      return;
+    }
+    const normalized = ingestInstructions.trim() === "" ? null : ingestInstructions;
+    setSavedIngestInstructions(normalized);
+    setIngestInstructions(normalized ?? "");
+    setToast({ message: t("settings.ingestInstructions.saved"), kind: "info" });
+  }
+
+  async function resetIngestInstructions(): Promise<void> {
+    setIngestInstructionsSaving(true);
+    const result = await api.resetWikiIngestInstructions();
+    if (!result.success) {
+      setIngestInstructionsSaving(false);
+      setToast({ message: result.error.message, kind: "error" });
+      return;
+    }
+    setSavedIngestInstructions(null);
+    setIngestInstructions("");
+    setIngestInstructionsSaving(false);
+    setToast({ message: t("settings.ingestInstructions.resetDone"), kind: "info" });
   }
 
   function onThemeChange(event: ChangeEvent<HTMLSelectElement>): void {
@@ -189,6 +243,62 @@ export function Settings(): JSX.Element {
                     disabled={instructionsSaving || (!instructionsDirty && savedInstructions === null)}
                   >
                     {t("settings.chatInstructions.reset")}
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {workspace && (
+          <section className="settings-section">
+            <h2>{t("settings.ingestInstructions.title")}</h2>
+            <p className="muted settings-section-desc">{t("settings.ingestInstructions.description")}</p>
+            <p className="muted settings-section-desc">
+              {t("settings.chatInstructions.workspace", { name: workspace.name })}
+            </p>
+            {ingestInstructionsLoading ? (
+              <div className="muted">{t("settings.ingestInstructions.loading")}</div>
+            ) : (
+              <div className="llm-form">
+                <div className="field">
+                  <label htmlFor="settings-ingest-instructions">
+                    {t("settings.ingestInstructions.editorLabel")}
+                  </label>
+                  <textarea
+                    id="settings-ingest-instructions"
+                    className="input"
+                    rows={10}
+                    value={ingestInstructions}
+                    onChange={(event) => setIngestInstructions(event.target.value)}
+                    disabled={ingestInstructionsSaving}
+                  />
+                  <span className="hint">{t("settings.ingestInstructions.emptyHint")}</span>
+                </div>
+                <div className="row wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => void saveIngestInstructions()}
+                    disabled={!ingestInstructionsDirty || ingestInstructionsSaving}
+                  >
+                    {t("settings.ingestInstructions.save")}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => setIngestInstructions(savedIngestInstructions ?? "")}
+                    disabled={!ingestInstructionsDirty || ingestInstructionsSaving}
+                  >
+                    {t("settings.ingestInstructions.discard")}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => void resetIngestInstructions()}
+                    disabled={ingestInstructionsSaving || (!ingestInstructionsDirty && savedIngestInstructions === null)}
+                  >
+                    {t("settings.ingestInstructions.reset")}
                   </button>
                 </div>
               </div>
