@@ -364,7 +364,9 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .msg-user .avatar { background: var(--glass-bg); color: var(--fg-2); border: 1px solid var(--border); }
 .msg-agent .avatar { background: var(--accent); color: var(--accent-on); }
 .msg .bubble { flex: 1; min-width: 0; }
-.msg .role { font-size: var(--text-xs); color: var(--muted); font-family: var(--font-mono); margin-bottom: var(--space-1); }
+.msg-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-1); }
+.msg .role { font-size: var(--text-xs); color: var(--muted); font-family: var(--font-mono); }
+.msg-copy { flex-shrink: 0; }
 .msg .content { font-size: var(--text-base); color: var(--fg); line-height: 1.65; }
 .msg .content p + p { margin-top: var(--space-3); }
 .msg .content code { font-family: var(--font-mono); font-size: .88em; background: var(--glass-bg); padding: 1px 6px; border-radius: 4px; }

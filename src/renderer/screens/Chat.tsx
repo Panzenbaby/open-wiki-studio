@@ -193,9 +193,18 @@ export function Chat(): JSX.Element {
               <span>{t("chat.noWikiBanner")}</span>
             </div>
           )}
-          {messages.map((message, index) => (
-            <Message key={index} role={message.role} text={message.text} />
-          ))}
+          {messages.map((message, index) => {
+            const isLatestAssistant = message.role === "assistant" && index === messages.length - 1;
+            const isComplete = !isLatestAssistant || (!streaming && !chatError);
+            return (
+              <Message
+                key={index}
+                role={message.role}
+                text={message.text}
+                isComplete={isComplete}
+              />
+            );
+          })}
           {streaming && !chatError && messages[messages.length - 1]?.role !== "assistant" && (
             <div className="msg msg-agent">
               <div className="avatar">{t("app.avatar")}</div>
