@@ -10,6 +10,12 @@ import { migrateWiki, planMigration } from "./wiki-migrate.ts";
 import { getLlmConfig, resolveStoredApiKey, setLlmConfig, type ApiKeyRequest } from "./config.ts";
 import { askUnencryptedKeyChoice } from "./api-key-dialog.ts";
 import { FolderWatcher } from "./folder-watcher.ts";
+import {
+  BUILT_IN_WIKI_CHAT_INSTRUCTIONS,
+  readCustomWikiChatInstructions,
+  resetWikiChatInstructions,
+  saveWikiChatInstructions,
+} from "./wiki-chat-instructions.ts";
 import { errorMessage, ok, err } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
 import {
@@ -40,6 +46,9 @@ async function storedApiKeyFor(request: ApiKeyRequest): Promise<string | undefin
 
 const BRIDGE_CHANNELS = [
   "configureLlm",
+  "getWikiChatInstructions",
+  "saveWikiChatInstructions",
+  "resetWikiChatInstructions",
   "listAvailableModels",
   "loadModels",
   "loginCopilot",
@@ -74,6 +83,8 @@ type BridgeChannel = (typeof BRIDGE_CHANNELS)[number];
  *  arguments, so there is nothing to validate. */
 const VALIDATORS: Partial<Record<BridgeChannel, ArgumentValidator>> = {
   configureLlm: (args) => (isLlmConfig(args[0]) ? null : mainT("error.invalidPayload", { channel: "configureLlm" })),
+  saveWikiChatInstructions: (args) =>
+    (typeof args[0] === "string" ? null : mainT("error.invalidPayload", { channel: "saveWikiChatInstructions" })),
   listAvailableModels: expectProvider,
   loadModels: (args) =>
     expectProvider(args) ??
@@ -137,6 +148,14 @@ export class IpcBridge {
     const webContents = this.webContents;
 
     const handlers: Record<string, (...args: never[]) => Promise<unknown>> = {
+      getWikiChatInstructions: async () => {
+        const custom = await readCustomWikiChatInstructions(workspace);
+        return custom.success
+          ? ok({ customInstructions: custom.data, defaultInstructions: BUILT_IN_WIKI_CHAT_INSTRUCTIONS })
+          : custom;
+      },
+      saveWikiChatInstructions: async (instructions: string) => saveWikiChatInstructions(workspace, instructions),
+      resetWikiChatInstructions: async () => resetWikiChatInstructions(workspace),
       configureLlm: async (config: LlmConfig) => {
         // The renderer only sends a key when the user typed a new one; an
         // untouched masked field must keep the stored key.

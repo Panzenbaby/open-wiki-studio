@@ -35,6 +35,7 @@ type PiModule = typeof import("@earendil-works/pi-coding-agent");
 type ResolvedModel = ReturnType<AgentSessionServices["modelRegistry"]["getAll"]>[number];
 
 import { resolveOkfExtensionPath } from "./resource.ts";
+import { registerWikiChatInstructionsHook } from "./wiki-chat-instructions.ts";
 import { diffSnapshots, listInputFiles, snapshotWiki } from "./wiki-scan.ts";
 import { ok, err, errorMessage } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
@@ -122,6 +123,10 @@ export class AgentRepository {
           // user's global and project-local extensions to avoid command-name
           // collisions (e.g. duplicate /wiki-query).
           noExtensions: true,
+          // Inline factories run after file-based extensions. The wiki hook
+          // therefore sees the extension's dynamic context before replacing
+          // only its fixed query instructions on each turn.
+          extensionFactories: [(extension) => registerWikiChatInstructionsHook(extension, workspace)],
         },
       });
 

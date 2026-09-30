@@ -315,6 +315,7 @@ function parseLog(content: string): readonly LogEntry[] {
 // ─── filesystem ───────────────────────────────────────────────────────
 
 const RESERVED = new Set(["index.md", "log.md"]);
+const WIKI_CHAT_INSTRUCTIONS_FILENAME = ".open-wiki-studio-chat-instructions.md";
 
 interface ScannedSource {
   readonly path: string;
@@ -418,8 +419,11 @@ async function validate(sources: readonly string[], target: string): Promise<str
     }
   }
   if (await isDirectory(target)) {
-    const entries = await readdir(target);
-    if (entries.length > 0) return mainT("merge.errorTargetNotEmpty", { path: target });
+    const entries = await readdir(target, { withFileTypes: true });
+    const unexpected = entries.filter(
+      (entry) => entry.name !== WIKI_CHAT_INSTRUCTIONS_FILENAME || !entry.isFile(),
+    );
+    if (unexpected.length > 0) return mainT("merge.errorTargetNotEmpty", { path: target });
   }
   return null;
 }
@@ -524,6 +528,11 @@ export async function mergeWorkspaces(
       }
     }
 
+    // Workspace-specific chat instructions are not merged from sources. A
+    // custom file already at the destination remains untouched; source
+    // instructions must never replace the destination's rules (or introduce
+    // custom rules where the destination had none).
+
     // `index.md` is derived, so it is regenerated from the merged concepts
     // rather than merged — by the extension, which owns the OKF index shape
     // (one index per directory, `okf_version` in the root one) and prunes the
@@ -582,6 +591,7 @@ async function cleanup(targetPath: string, targetExisted: boolean): Promise<void
       return;
     }
     for (const entry of await readdir(targetPath)) {
+      if (entry === WIKI_CHAT_INSTRUCTIONS_FILENAME) continue;
       await rm(join(targetPath, entry), { recursive: true, force: true });
     }
   } catch {

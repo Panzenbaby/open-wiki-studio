@@ -358,7 +358,11 @@ export function AppShell(): JSX.Element {
         {navBtn("dashboard", t("nav.workspace"))}
         {navBtn("chat", t("nav.chat"))}
         {navBtn("browser", t("nav.files"))}
-        <button className="iconbtn" onClick={() => setView("settings")} title={t("nav.settings")}><SettingsIcon size={16} /></button>
+        {workspace && (
+          <button className="iconbtn" onClick={() => setView("settings")} title={t("nav.settings")}>
+            <SettingsIcon size={16} />
+          </button>
+        )}
         <UpdateBadge />
       </header>
       <div className="body">

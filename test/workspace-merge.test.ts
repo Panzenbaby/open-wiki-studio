@@ -278,6 +278,27 @@ describe("mergeWorkspaces", () => {
     expect(await readFile(join(target, "wiki", "trash", target_!), "utf8")).toBe("A removed foo");
   });
 
+  it("preserves destination instructions without importing source instructions", async () => {
+    const a = await workspace("instructions-a", { "a.md": "---\ntitle: A\n---\n\nA\n" });
+    const b = await workspace("instructions-b", { "b.md": "---\ntitle: B\n---\n\nB\n" });
+    const target = await mkdtemp(join(tmpdir(), "merge-instructions-target-"));
+    roots.push(target);
+    const filename = ".open-wiki-studio-chat-instructions.md";
+    await writeFile(join(a, filename), "source A custom rules", "utf8");
+    await writeFile(join(b, filename), "source B custom rules", "utf8");
+    await writeFile(join(target, filename), "destination custom rules", "utf8");
+
+    const result = await mergeWorkspaces([a, b], target);
+    expect(result.success).toBe(true);
+    expect(await readFile(join(target, filename), "utf8")).toBe("destination custom rules");
+
+    const secondTarget = await mkdtemp(join(tmpdir(), "merge-instructions-target-"));
+    roots.push(secondTarget);
+    const sourceResult = await mergeWorkspaces([a, b], secondTarget);
+    expect(sourceResult.success).toBe(true);
+    await expect(readFile(join(secondTarget, filename), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("refuses a non-empty destination", async () => {
     const a = await workspace("v1", { "x.md": "x" });
     const b = await workspace("v2", { "y.md": "y" });

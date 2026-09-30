@@ -48,6 +48,12 @@ export interface AppearanceSettings {
   readonly locale: LocalePreference;
 }
 
+/** The workspace-specific wiki query instructions shown in Settings. */
+export interface WikiChatInstructionSettings {
+  readonly customInstructions: string | null;
+  readonly defaultInstructions: string;
+}
+
 export interface AppSelfInfo {
   readonly version: string;
   readonly hasLlmConfig: boolean;
@@ -290,6 +296,12 @@ export interface AgentApi {
   /** Persist theme + locale. The main process applies them immediately (window
    *  background, `mainT` locale) — no restart. */
   setAppearance(appearance: AppearanceSettings): Promise<Result<void>>;
+  /** Read the active workspace's saved wiki-query rules and built-in default. */
+  getWikiChatInstructions(): Promise<Result<WikiChatInstructionSettings>>;
+  /** Save custom wiki-query rules; empty content removes the custom file. */
+  saveWikiChatInstructions(instructions: string): Promise<Result<void>>;
+  /** Remove the workspace's custom rules file so extension defaults apply. */
+  resetWikiChatInstructions(): Promise<Result<void>>;
   listRecentWorkspaces(): Promise<Result<readonly WorkspaceInfo[]>>;
   openWorkspace(path: string): Promise<Result<WorkspaceInfo>>;
   pickWorkspace(): Promise<Result<WorkspaceInfo | null>>;

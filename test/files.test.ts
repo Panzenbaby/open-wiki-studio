@@ -202,6 +202,17 @@ describe("archive layout (pi-okf-wiki 0.2.0)", () => {
     else await writeFile(absolute, content);
   }
 
+  it("keeps workspace-root dotfiles hidden from the browser listing", async () => {
+    const workspace = await newWorkspace();
+    await writeFileRel(workspace, ".open-wiki-studio-chat-instructions.md", "custom chat instructions");
+    await writeFileRel(workspace, "input/visible.md", "visible");
+
+    const result = await listFolder(workspace, "input");
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.map((file) => file.relativePath)).toEqual(["visible.md"]);
+  });
+
   it("listFolder('wiki') includes the wiki/archive/ subtree", async () => {
     const workspace = await newWorkspace();
     await writeArchive(workspace, "sample/01-taxonomy.md.orig", "body");
