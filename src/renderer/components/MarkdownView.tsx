@@ -59,10 +59,20 @@ function isFileLink(href: string): boolean {
   return /\.[A-Za-z0-9]{1,8}$/.test(href);
 }
 
+/** HTTP(S) links are opened through Electron in the system browser. */
+function isHttpLink(href: string): boolean {
+  try {
+    const protocol = new URL(href).protocol;
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 /** External (http/mailto) or in-page anchor links — never internal wiki
  *  navigation. */
 function isExternal(href: string): boolean {
-  return /^(https?:|mailto:|#)/.test(href);
+  return isHttpLink(href) || /^(mailto:|#)/.test(href);
 }
 
 /** A folder link: href ends in a slash (OKF index.md emits `* [name/](name/)`). */
@@ -195,10 +205,37 @@ export function MarkdownView(props: MarkdownViewProps): JSX.Element {
     setView("browser");
   }
 
+  async function openExternalLink(url: string): Promise<void> {
+    try {
+      const result = await api.openExternal(url);
+      if (!result.success) setToast({ message: result.error.message, kind: "error" });
+    } catch {
+      setToast({ message: t("markdown.openExternalFailed"), kind: "error" });
+    }
+  }
+
   const components: Components = {
     a({ href, children }) {
       const h = href ?? "";
       if (isExternal(h)) {
+        if (isHttpLink(h)) {
+          const openSystemBrowser = (event: React.MouseEvent<HTMLAnchorElement>): void => {
+            event.preventDefault();
+            void openExternalLink(h);
+          };
+          return (
+            <a
+              href={h}
+              onClick={openSystemBrowser}
+              onAuxClick={(event) => {
+                if (event.button !== 1) return;
+                openSystemBrowser(event);
+              }}
+            >
+              {children}
+            </a>
+          );
+        }
         return (
           <a href={h} target="_blank" rel="noreferrer noopener">
             {children}
