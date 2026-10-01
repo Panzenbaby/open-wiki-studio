@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { ExternalLink, FileText, Folder as FolderIcon, Plus, Share2, Trash2 } from "lucide-react";
+import { ExternalLink, FileText, Folder as FolderIcon, Plus, Share2, Trash2, Upload } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import { reportAddFilesResult } from "../add-files.ts";
@@ -367,8 +367,9 @@ export function Browser(): JSX.Element {
               </div>
             )}
             {folder === "input" && (
-              <div className="side-head">
+              <div className="side-head browser-add-actions">
                 <button className="btn btn-sm btn-primary btn-block" onClick={() => void addFiles()}><Plus size={14} /> {t("browser.addFiles")}</button>
+                <span className="drop-hint"><Upload size={14} aria-hidden="true" />{t("files.dragDropHint")}</span>
               </div>
             )}
           </>

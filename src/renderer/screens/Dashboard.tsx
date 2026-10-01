@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { ArrowLeftRight, ArrowUpCircle, Download, FileText, Merge, Play, Trash2 } from "lucide-react";
+import { ArrowLeftRight, ArrowUpCircle, Download, FileText, Merge, Play, Trash2, Upload } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import { ConfirmModal } from "../components/ConfirmModal.tsx";
@@ -117,6 +117,7 @@ export function Dashboard(props: DashboardProps): JSX.Element {
                 <span className="pulse" /> {running ? t("dashboard.ingestRunning") : t("dashboard.inputWaiting", { n: counts.input })}
               </div>
               <div className="hero-sub fg2">{running ? t("dashboard.ingestRunningSub") : t("dashboard.ingestHint")}</div>
+              <div className="drop-hint"><Upload size={14} aria-hidden="true" />{t("files.dragDropHint")}</div>
             </div>
             <div className="row">
               {running ? (
@@ -211,6 +212,9 @@ function FolderCard(props: { dot: "input" | "wiki"; onClick: () => void }): JSX.
         </div>
       </div>
       <div className="fc-desc">{t(descKey)}</div>
+      {props.dot === "input" && (
+        <div className="drop-hint folder-card-drop-hint"><Upload size={14} aria-hidden="true" />{t("files.dragDropHint")}</div>
+      )}
     </button>
   );
 }
