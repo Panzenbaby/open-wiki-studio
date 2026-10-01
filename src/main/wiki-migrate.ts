@@ -18,6 +18,7 @@ import { migrateConcept, migrateWiki as migrateBundle } from "pi-okf-wiki/src/mi
 import { loadAllConcepts, wikiPaths, OKF_VERSION } from "pi-okf-wiki/src/wiki.ts";
 
 import { err, ok } from "../shared/result.ts";
+import { ConceptStore } from "./concept-store.ts";
 import type { MigrationPlan, MigrationReport, Result } from "../shared/ipc-types.ts";
 
 /** `okf_version` declared in the bundle-root `index.md` (OKF §12), or
@@ -50,6 +51,11 @@ export async function planMigration(workspace: string): Promise<Result<Migration
 export async function migrateWiki(workspace: string): Promise<Result<MigrationReport>> {
   const result = await migrateBundle(workspace);
   if (!result.success) return err<MigrationReport>(result.error.message, { path: result.error.path });
+  const store = new ConceptStore(workspace);
+  for (const conceptId of result.data.migrated) {
+    const status = await store.setVerified(conceptId, false);
+    if (!status.success) return err<MigrationReport>(status.error.message, { path: conceptId });
+  }
   return ok({
     migrated: result.data.migrated,
     alreadyCurrent: result.data.alreadyCurrent,

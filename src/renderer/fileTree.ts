@@ -15,6 +15,7 @@ export interface TreeNode {
    *  For a file node this is always 1; for a directory it counts every
    *  file in all nested subdirectories, not just immediate children. */
   readonly fileCount: number;
+  readonly verified?: boolean;
 }
 
 const sep = "/";
@@ -32,6 +33,7 @@ export function buildFileTree(files: readonly FileNode[]): TreeNode {
     isDirectory: boolean;
     children: Mutable[];
     fileCount: number;
+    verified?: boolean;
   };
   const root: Mutable = {
     relativePath: "",
@@ -72,6 +74,7 @@ export function buildFileTree(files: readonly FileNode[]): TreeNode {
       isDirectory: false,
       children: [],
       fileCount: 1,
+      ...(file.verified !== undefined ? { verified: file.verified } : {}),
     };
     cursor.children.push(leaf);
   }
@@ -98,6 +101,7 @@ export function buildFileTree(files: readonly FileNode[]): TreeNode {
       isDirectory: node.isDirectory,
       children,
       fileCount,
+      ...(node.verified !== undefined ? { verified: node.verified } : {}),
     };
   }
   return freeze(root);

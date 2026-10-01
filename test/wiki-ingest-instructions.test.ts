@@ -109,6 +109,7 @@ describe("wiki-update prompt recognition and hook", () => {
     expect(ingest?.systemPrompt).toContain("Built-in system prompt with OKF rules");
     expect(ingest?.systemPrompt).toContain("Use short descriptions.");
     expect(ingest?.systemPrompt).toContain("always take precedence");
+    expect(ingest?.systemPrompt).toContain("verified: false");
     await expect(runHook("A regular chat prompt")).resolves.toBeUndefined();
   });
 

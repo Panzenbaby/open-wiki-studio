@@ -20,6 +20,7 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { loadAllConcepts, writeAllIndexMd } from "pi-okf-wiki/src/wiki.ts";
+import { ConceptStore } from "./concept-store.ts";
 import { ok, err, errorMessage } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
 import type { MergeReport, Result } from "../shared/ipc-types.ts";
@@ -544,6 +545,11 @@ export async function mergeWorkspaces(
     const indexed = await writeAllIndexMd(targetWiki, mergedConcepts.data);
     if (!indexed.success) throw new Error(indexed.error.message);
     const conceptCount = mergedConcepts.data.length;
+    const mergedStore = new ConceptStore(targetPath);
+    for (const concept of mergedConcepts.data) {
+      const status = await mergedStore.setVerified(concept.conceptId, false);
+      if (!status.success) throw new Error(status.error.message);
+    }
 
     const today = new Date().toISOString().slice(0, 10);
     const mergeEntry = [

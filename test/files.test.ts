@@ -10,6 +10,7 @@ import {
   MAX_TEXT_PREVIEW_BYTES,
   MAX_WALK_DEPTH,
   addInputFiles,
+  setConceptVerified,
   getPreview,
   listFolder,
 } from "../src/main/files.ts";
@@ -26,6 +27,33 @@ async function writeFileRel(root: string, rel: string, content: string): Promise
   await mkdir(join(absolute, ".."), { recursive: true });
   await writeFile(absolute, content, "utf8");
 }
+
+describe("concept verification status", () => {
+  const workspaces: string[] = [];
+
+  afterAll(async () => {
+    await Promise.all(workspaces.map((workspace) => rm(workspace, { recursive: true, force: true })));
+  });
+
+  it("includes concept status in tree and preview and supports changing it", async () => {
+    const workspace = await freshWorkspace();
+    workspaces.push(workspace);
+    await writeFileRel(join(workspace, "wiki"), "note.md", "---\ntype: Note\n---\nBody.");
+
+    const listed = await listFolder(workspace, "wiki");
+    expect(listed.success).toBe(true);
+    if (!listed.success) return;
+    expect(listed.data[0]?.verified).toBe(true);
+
+    const changed = await setConceptVerified(workspace, "wiki/note.md", false);
+    expect(changed.success).toBe(true);
+    const preview = await getPreview(workspace, "wiki/note.md");
+    expect(preview.success).toBe(true);
+    if (!preview.success) return;
+    expect(preview.data.frontmatter?.verified).toBe(false);
+    expect(preview.data.content).toBe("Body.");
+  });
+});
 
 describe("addInputFiles", () => {
   const workspaces: string[] = [];

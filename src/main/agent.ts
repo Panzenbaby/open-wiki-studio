@@ -37,7 +37,7 @@ type ResolvedModel = ReturnType<AgentSessionServices["modelRegistry"]["getAll"]>
 import { resolveOkfExtensionPath } from "./resource.ts";
 import { registerWikiChatInstructionsHook } from "./wiki-chat-instructions.ts";
 import { registerWikiIngestInstructionsHook } from "./wiki-ingest-instructions.ts";
-import { diffSnapshots, listInputFiles, snapshotWiki } from "./wiki-scan.ts";
+import { diffSnapshots, listInputFiles, markChangedConceptsUnverified, snapshotWiki } from "./wiki-scan.ts";
 import { ok, err, errorMessage } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
 import { ModelCatalog } from "./model-catalog.ts";
@@ -465,7 +465,9 @@ export class AgentRepository {
       const sawStart = await awaitIngestTurn(this.ingestSession);
 
       const after = await snapshotWiki(this.workspace);
-      const diff = diffSnapshots(before, after);
+      await markChangedConceptsUnverified(this.workspace, before, after);
+      const finalized = await snapshotWiki(this.workspace);
+      const diff = diffSnapshots(before, finalized);
       const leftover = await listInputFiles(this.workspace);
 
       // No-progress detection: a turn ran (sawStart) but the wiki did not change
@@ -486,7 +488,7 @@ export class AgentRepository {
         createdConcepts: diff.created,
         updatedConcepts: diff.updated,
         wikiConceptCountBefore: before.entries.size,
-        wikiConceptCountAfter: after.entries.size,
+        wikiConceptCountAfter: finalized.entries.size,
       };
       this.summaryListener?.(summary);
       return ok(undefined);

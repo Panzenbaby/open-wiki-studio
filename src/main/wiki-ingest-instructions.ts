@@ -83,9 +83,9 @@ export function registerWikiIngestInstructionsHook(
       context.ui.notify(custom.error.message, "warning");
       return;
     }
-    if (custom.data === null || custom.data.trim() === "") return;
+    const systemPrompt = appendWikiIngestInstructions(event.systemPrompt, custom.data ?? "");
     return {
-      systemPrompt: appendWikiIngestInstructions(event.systemPrompt, custom.data),
+      systemPrompt: `${systemPrompt}\n\nNewly created concepts MUST include \`verified: false\` in their YAML frontmatter. This boolean is informational for human readers only and must never affect retrieval, processing, or conclusions.`,
     };
   });
 }

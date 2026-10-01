@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { ExternalLink, FileText, Folder as FolderIcon, Plus, Share2, Trash2, Upload } from "lucide-react";
+import { BadgeCheck, ExternalLink, FileText, Folder as FolderIcon, Plus, Share2, Trash2, Upload } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import { reportAddFilesResult } from "../add-files.ts";
@@ -227,6 +227,24 @@ export function Browser(): JSX.Element {
     setRemoval({ relativePath: node.relativePath, plan: result.data });
   }
 
+  async function changeVerificationStatus(): Promise<void> {
+    if (!selected || !preview?.frontmatter) return;
+    const verified = !preview.frontmatter.verified;
+    const result = await api.setConceptVerified(selected, verified);
+    if (!result.success) {
+      setToast({
+        message: t("concept.verificationFailed", { detail: result.error.message }),
+        kind: "warning",
+      });
+      return;
+    }
+    setPreview((current) => current?.frontmatter
+      ? { ...current, frontmatter: { ...current.frontmatter, verified } }
+      : current);
+    setToast({ message: t("concept.verificationSaved"), kind: "info" });
+    void refreshList();
+  }
+
   async function confirmRemoval(): Promise<void> {
     if (!removal) return;
     setRemoving(true);
@@ -421,6 +439,17 @@ export function Browser(): JSX.Element {
                   {preview.frontmatter && (
                     <div className="pv-tags">
                       <span className="badge accent mono">{preview.frontmatter.type}</span>
+                      <span className={`badge verification-badge${preview.frontmatter.verified ? " is-verified" : ""}`}>
+                        <BadgeCheck size={13} aria-hidden="true" />
+                        {t(preview.frontmatter.verified ? "concept.verified" : "concept.unverified")}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => void changeVerificationStatus()}
+                      >
+                        {t(preview.frontmatter.verified ? "concept.unverifyAction" : "concept.verifyAction")}
+                      </button>
                     </div>
                   )}
                   {preview.truncated && (

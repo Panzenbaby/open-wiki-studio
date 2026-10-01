@@ -93,6 +93,18 @@ describe("ConceptStore.listConcepts / listAll", () => {
     expect(concept.body).toBe("the body\n");
   });
 
+  it("treats a missing verified field as verified and reads explicit false", async () => {
+    const dir = await workspace();
+    await writeWiki(
+      dir,
+      { path: "legacy.md", content: "---\ntype: Note\n---\nlegacy body" },
+      { path: "unchecked.md", content: "---\ntype: Note\nverified: false\n---\nunchecked body" },
+    );
+    const concepts = await new ConceptStore(dir).listConcepts();
+    expect(concepts.find((concept) => concept.conceptId === "legacy")?.verified).toBe(true);
+    expect(concepts.find((concept) => concept.conceptId === "unchecked")?.verified).toBe(false);
+  });
+
   it("falls back title -> type -> conceptId and type -> untyped label", async () => {
     const dir = await workspace();
     await writeWiki(dir, { path: "no_meta.md", content: "just body" });
@@ -113,6 +125,22 @@ describe("ConceptStore.readConcept", () => {
     expect(concept?.conceptId).toBe("foo/bar");
     expect(concept?.type).toBe("Table");
     expect(concept?.body).toBe("body");
+  });
+
+  it("updates only the boolean status and preserves the rest of the document", async () => {
+    const dir = await workspace();
+    const content = "---\ntype: Note\ntitle: Keep title\nverified: true\n---\n\nBody stays exact.\n";
+    await writeWiki(dir, { path: "note.md", content });
+    const result = await new ConceptStore(dir).setVerified("note", false);
+    expect(result.success).toBe(true);
+    const updated = await new ConceptStore(dir).readConcept("wiki/note.md");
+    expect(updated?.verified).toBe(false);
+    expect(updated?.title).toBe("Keep title");
+    expect(updated?.body).toBe("\nBody stays exact.\n");
+
+    const resultAgain = await new ConceptStore(dir).setVerified("note", true);
+    expect(resultAgain.success).toBe(true);
+    expect((await new ConceptStore(dir).readConcept("wiki/note.md"))?.verified).toBe(true);
   });
 
   it("returns null for a non-wiki path", async () => {

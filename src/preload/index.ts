@@ -37,6 +37,7 @@ const api: AgentApi = {
 
   listFolder: (folder) => ipcRenderer.invoke("okf:listFolder", folder),
   getPreview: (relativePath) => ipcRenderer.invoke("okf:getPreview", relativePath),
+  setConceptVerified: (relativePath, verified) => ipcRenderer.invoke("okf:setConceptVerified", relativePath, verified),
   fileExists: (relativePath) => ipcRenderer.invoke("okf:fileExists", relativePath),
   addInputFiles: (filePaths) => ipcRenderer.invoke("okf:addInputFiles", filePaths),
   getPathForFile: (file) => webUtils.getPathForFile(file),

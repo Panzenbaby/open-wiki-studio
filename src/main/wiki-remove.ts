@@ -16,6 +16,7 @@ import {
 } from "pi-okf-wiki/src/remove.ts";
 
 import { err, ok } from "../shared/result.ts";
+import { ConceptStore } from "./concept-store.ts";
 import type { RemovalPlan, RemovalReport, Result } from "../shared/ipc-types.ts";
 
 function toRemovalPlan(plan: BundleRemovalPlan): RemovalPlan {
@@ -57,5 +58,10 @@ export async function removeFromWiki(
   // (`remove.failed`), so prefixing it here would double the wording.
   const result = await removeFromBundle(workspace, relativePath);
   if (!result.success) return err<RemovalReport>(result.error.message, { path: result.error.path });
+  const store = new ConceptStore(workspace);
+  for (const conceptId of result.data.rewrittenConcepts) {
+    const status = await store.setVerified(conceptId, false);
+    if (!status.success) return err<RemovalReport>(status.error.message, { path: conceptId });
+  }
   return ok(toRemovalReport(result.data));
 }

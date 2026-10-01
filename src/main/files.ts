@@ -101,6 +101,15 @@ export async function listFolder(
 ): Promise<Result<readonly FileNode[]>> {
   try {
     const nodes = await walk(workspaceDir(workspace, folder), workspaceDir(workspace, folder), 0);
+    if (folder === "wiki") {
+      const concepts = await new ConceptStore(workspace).listConcepts();
+      const verifiedByPath = new Map(concepts.map((concept) => [`${concept.conceptId}.md`, concept.verified]));
+      for (let index = 0; index < nodes.length; index += 1) {
+        const node = nodes[index]!;
+        const verified = verifiedByPath.get(node.relativePath);
+        if (verified !== undefined) nodes[index] = { ...node, verified };
+      }
+    }
     return ok(nodes.sort((a, b) => a.relativePath.localeCompare(b.relativePath)));
   } catch (error) {
     return err<readonly FileNode[]>(mainT("error.listFolder", { folder, detail: errorMessage(error) }));
@@ -148,6 +157,20 @@ export async function fileExists(
   return ok(stats?.isFile() === true);
 }
 
+export async function setConceptVerified(
+  workspace: string,
+  relativePath: string,
+  verified: boolean,
+): Promise<Result<void>> {
+  if (!relativePath.startsWith("wiki/") || !relativePath.endsWith(".md")) {
+    return err<void>(mainT("error.invalidPath", { path: relativePath }));
+  }
+  const store = new ConceptStore(workspace);
+  const concept = await store.readConcept(relativePath);
+  if (!concept || concept.kind !== "concept") return err<void>(mainT("error.setConceptVerified"));
+  return store.setVerified(concept.conceptId, verified);
+}
+
 export async function getPreview(
   workspace: string,
   relativePath: string,
@@ -179,6 +202,7 @@ export async function getPreview(
               title: concept.title,
               description: concept.description,
               type: concept.type,
+              verified: concept.verified,
             }
           : undefined;
       return ok({

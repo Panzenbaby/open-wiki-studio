@@ -133,6 +133,8 @@ export interface FileNode {
   readonly relativePath: string; // posix, with extension
   readonly name: string;
   readonly isDirectory: boolean;
+  /** Wiki concept review status; absent for non-concept files. */
+  readonly verified?: boolean;
 }
 
 export interface ConceptInfo {
@@ -140,6 +142,7 @@ export interface ConceptInfo {
   readonly title: string;
   readonly description: string;
   readonly type: string;
+  readonly verified: boolean;
 }
 
 // ─── Removal (concept / directory → wiki/trash/) ──────────────────
@@ -376,6 +379,8 @@ export interface AgentApi {
   // files
   listFolder(folder: Folder): Promise<Result<readonly FileNode[]>>;
   getPreview(relativePath: string): Promise<Result<FilePreview>>;
+  /** Change the informational review status of a wiki concept. */
+  setConceptVerified(relativePath: string, verified: boolean): Promise<Result<void>>;
   /** Whether the selection key (`${folder}/${rel}`) names an existing file. */
   fileExists(relativePath: string): Promise<Result<boolean>>;
   addInputFiles(filePaths: readonly string[]): Promise<Result<AddFilesSummary>>;

@@ -3,7 +3,7 @@
 // globally in index.ts; this bridge registers the handlers that need an
 // active AgentRepository.
 import { BrowserWindow, dialog, ipcMain, type WebContents } from "electron";
-import { addInputFiles, fileExists, getPreview, listFolder, revealInFileManager } from "./files.ts";
+import { addInputFiles, fileExists, getPreview, listFolder, revealInFileManager, setConceptVerified } from "./files.ts";
 import { buildWikiGraph } from "./wiki-graph.ts";
 import { planRemoval, removeFromWiki } from "./wiki-remove.ts";
 import { migrateWiki, planMigration } from "./wiki-migrate.ts";
@@ -64,6 +64,7 @@ const BRIDGE_CHANNELS = [
   "logoutCopilot",
   "listFolder",
   "getPreview",
+  "setConceptVerified",
   "fileExists",
   "addInputFiles",
   "addInputFilesDialog",
@@ -103,6 +104,9 @@ const VALIDATORS: Partial<Record<BridgeChannel, ArgumentValidator>> = {
       : mainT("error.invalidPayload", { channel: "loadModels" })),
   listFolder: (args) => (isFolder(args[0]) ? null : mainT("error.invalidPayload", { channel: "listFolder" })),
   getPreview: expectPath,
+  setConceptVerified: (args) =>
+    expectPath(args) ??
+    (isBoolean(args[1]) ? null : mainT("error.invalidPayload", { channel: "setConceptVerified" })),
   fileExists: expectPath,
   addInputFiles: (args) =>
     isNonEmptyStringArray(args[0]) ? null : mainT("error.invalidPayload", { channel: "addInputFiles" }),
@@ -190,6 +194,8 @@ export class IpcBridge {
       logoutCopilot: async () => repo.logoutCopilot(),
       listFolder: async (folder: Folder) => listFolder(workspace, folder),
       getPreview: async (relativePath: string) => getPreview(workspace, relativePath),
+      setConceptVerified: async (relativePath: string, verified: boolean) =>
+        setConceptVerified(workspace, relativePath, verified),
       fileExists: async (relativePath: string) => fileExists(workspace, relativePath),
       addInputFiles: async (filePaths: readonly string[]) => addInputFiles(workspace, filePaths),
       addInputFilesDialog: async () => {

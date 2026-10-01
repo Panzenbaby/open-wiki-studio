@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen } from "lucide-react";
+import { BadgeCheck, ChevronDown, ChevronRight, FileText, Folder, FolderOpen } from "lucide-react";
 import type { Folder as FolderId } from "../../shared/ipc-types.ts";
+import { useT } from "../i18n.ts";
 import type { TreeNode } from "../fileTree.ts";
 
 interface CtxPosition {
@@ -33,6 +34,8 @@ interface BranchProps {
   /** Relative path of the tree's single tabbable row (roving tabindex). */
   readonly rovingPath: string | null;
   readonly registerItem: (relativePath: string, element: HTMLLIElement | null) => void;
+  readonly verifiedLabel: string;
+  readonly unverifiedLabel: string;
 }
 
 /** The rows a user can actually see, in visual order: depth-first, descending
@@ -53,6 +56,7 @@ function flattenVisible(
 }
 
 export function FileTree(props: FileTreeProps): JSX.Element {
+  const t = useT();
   const { nodes, folder, selected, expanded, onToggleDir } = props;
   const visible = useMemo(() => flattenVisible(nodes, expanded), [nodes, expanded]);
   const [activePath, setActivePath] = useState<string | null>(null);
@@ -149,6 +153,8 @@ export function FileTree(props: FileTreeProps): JSX.Element {
           onContextMenu={props.onContextMenu}
           rovingPath={rovingPath}
           registerItem={registerItem}
+          verifiedLabel={t("concept.verified")}
+          unverifiedLabel={t("concept.unverified")}
         />
       ))}
     </ul>
@@ -159,6 +165,7 @@ function TreeBranch(props: BranchProps): JSX.Element {
   const {
     node, folder, selected, expanded,
     onToggleDir, onSelectFile, onContextMenu, rovingPath, registerItem,
+    verifiedLabel, unverifiedLabel,
   } = props;
   const selectionKey = `${folder}/${node.relativePath}`;
   const tabIndex = rovingPath === node.relativePath ? 0 : -1;
@@ -224,6 +231,8 @@ function TreeBranch(props: BranchProps): JSX.Element {
                 onContextMenu={onContextMenu}
                 rovingPath={rovingPath}
                 registerItem={registerItem}
+                verifiedLabel={verifiedLabel}
+                unverifiedLabel={unverifiedLabel}
               />
             ))}
           </ul>
@@ -252,6 +261,15 @@ function TreeBranch(props: BranchProps): JSX.Element {
         <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {node.name}
         </span>
+        {node.verified !== undefined && (
+          <span
+            className={`verification-indicator${node.verified ? " is-verified" : ""}`}
+            title={node.verified ? verifiedLabel : unverifiedLabel}
+            aria-label={node.verified ? verifiedLabel : unverifiedLabel}
+          >
+            <BadgeCheck size={13} aria-hidden="true" />
+          </span>
+        )}
       </div>
     </li>
   );
