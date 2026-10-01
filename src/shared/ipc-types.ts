@@ -374,9 +374,9 @@ export interface AgentApi {
   /**
    * Load selectable models for a provider, given credentials/base URL.
    *
-   * Side effect for API-key providers (anthropic/openai/google): stores the
-   * key in authStorage so the built-in catalog becomes available via
-   * `getAvailable()` before the final Save. For Ollama it fetches local
+   * API-key providers (anthropic/openai/google) return their static model
+   * catalog; the key is persisted and applied to Pi's ModelRuntime on Save.
+   * For Ollama it fetches local
    * (`{baseUrl}/v1/models`) + cloud (`https://ollama.com/v1/models`) models;
    * for openai-compatible it fetches `{baseUrl}/v1/models`. GitHub Copilot
    * is NOT handled here — use `loginCopilot()`.

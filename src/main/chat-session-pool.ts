@@ -35,6 +35,7 @@
 import type {
   AgentSession,
   AgentSessionServices,
+  ModelRuntime,
   SessionStartEvent,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentEvent } from "../shared/ipc-types.ts";
@@ -45,10 +46,9 @@ import { errorMessage } from "../shared/result.ts";
  *  through it; narrowing `services` would break production assignability. */
 type PiModule = typeof import("@earendil-works/pi-coding-agent");
 
-/** Model resolved from the registry, applied to newly created sessions.
- *  Re-derived locally (the element type of `modelRegistry.getAll()`) so the
- *  pool does not import the internal `ResolvedModel` alias from agent.ts. */
-type ResolvedModel = ReturnType<AgentSessionServices["modelRegistry"]["getAll"]>[number];
+/** Model resolved from Pi's ModelRuntime, applied to newly created sessions.
+ *  Re-derived locally so the pool does not import agent.ts internals. */
+type ResolvedModel = NonNullable<ReturnType<ModelRuntime["getModel"]>>;
 
 /** Minimal structural slice of `AgentSession` the pool + agent actually use
  *  AFTER creation (creation uses the full `AgentSession` returned by pi, then

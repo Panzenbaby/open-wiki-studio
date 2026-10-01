@@ -161,9 +161,18 @@ function registerGlobalHandlers(): void {
     return ok(undefined);
   });
 
-  // Revoking the key only touches config.json, so this is workspace-
-  // independent and stays available before a workspace is active.
-  ipcMain.handle("okf:removeLlmApiKey", async () => removeLlmApiKey());
+  // API-key revocation is workspace-independent; if no workspace is open, use
+  // the app's shared auth store directly through the agent repository.
+  ipcMain.handle("okf:removeLlmApiKey", async () => {
+    const stored = await getLlmConfig();
+    if (stored) {
+      const cleared = state.repo
+        ? await state.repo.removeApiKey(stored.provider)
+        : await AgentRepository.removeStoredApiKey(stored.provider);
+      if (!cleared.success) return cleared;
+    }
+    return removeLlmApiKey();
+  });
 
 // App self-info is workspace-independent. Registered globally so the renderer
   // can call it at bootstrap, before any workspace is active.

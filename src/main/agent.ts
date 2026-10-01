@@ -24,17 +24,13 @@ import { join } from "node:path";
 import type {
   AgentSession,
   AgentSessionServices,
+  ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
 
 type PiModule = typeof import("@earendil-works/pi-coding-agent");
 
-/**
- * Model resolved from the registry, kept on the repo so a recreated ingest
- * session (and every newly created chat session) re-applies the configured
- * model without re-resolving (which would drop dynamically registered
- * providers like ollama/openai-compatible).
- */
-type ResolvedModel = ReturnType<AgentSessionServices["modelRegistry"]["getAll"]>[number];
+/** A model resolved from Pi's model runtime. */
+type ResolvedModel = NonNullable<ReturnType<ModelRuntime["getModel"]>>;
 
 import { resolveOkfExtensionPath } from "./resource.ts";
 import { registerWikiChatInstructionsHook } from "./wiki-chat-instructions.ts";
@@ -100,10 +96,7 @@ export class AgentRepository {
     private readonly pi: PiModule,
     private ingestSession: AgentSession,
   ) {
-    this.catalog = new ModelCatalog({
-      modelRegistry: services.modelRegistry,
-      authStorage: services.authStorage,
-    });
+    this.catalog = new ModelCatalog({ modelRuntime: services.modelRuntime });
     // The pool is constructed here (after services + pi exist) using arrow deps
     // that read repo state lazily — `chatListener`/`chatModel` are null now
     // but read at call time, after the listeners are wired from ipc.ts.
@@ -219,19 +212,16 @@ export class AgentRepository {
 
   // ─── LLM ────────────────────────────────────────────────────────
   hasLlmConfig(): boolean {
-    return this.services.modelRegistry.getAvailable().length > 0;
+    return this.services.modelRuntime.getAvailableSnapshot().length > 0;
   }
 
   async configureLlm(config: LlmConfig): Promise<Result<void>> {
     try {
-      // Register the provider / store the API key via the catalog. No
-      // refresh() here — it reloads models from disk and would drop the
-      // dynamically registered providers above.
-      this.catalog.registerProvider(config);
-
-      // Resolve both roles before applying either: when a model is missing
-      // from the registry the config form warns immediately, and the
-      // previously configured models (if any) stay active.
+      // Register endpoint-backed providers, then resolve both roles before
+      // changing the active models. A missing model preserves current sessions.
+      // Provider keys stay encrypted in app config; ModelRuntime only holds a
+      // runtime copy for the active workspace.
+      await this.catalog.registerProvider(config);
       const models = this.catalog.resolveModels(config);
       if (!models.success) return err<void>(models.error.message);
 
@@ -255,7 +245,7 @@ export class AgentRepository {
   /** For Copilot a non-empty result doubles as the "already logged in" probe:
    *  the form shows the model dropdown instead of the login button. Delegates
    *  to the catalog (model discovery is the catalog's concern). */
-  listAvailableModels(provider: ProviderId): Result<readonly ModelOption[]> {
+  listAvailableModels(provider: ProviderId): Promise<Result<readonly ModelOption[]>> {
     return this.catalog.listAvailableModels(provider);
   }
 
@@ -281,22 +271,21 @@ export class AgentRepository {
     this.copilotAbort = new AbortController();
     const signal = this.copilotAbort.signal;
     try {
-      await this.services.authStorage.login("github-copilot", {
-        onAuth: () => {},
-        onDeviceCode: (info) => {
-          this.copilotLoginListener?.({
-            type: "device_code",
-            userCode: info.userCode,
-            verificationUri: info.verificationUri,
-          });
-        },
-        // Auto-answer the GHES domain prompt → github.com (no GHES).
-        onPrompt: async () => "",
-        onProgress: (message) => {
-          this.copilotLoginListener?.({ type: "progress", message });
-        },
-        onSelect: async () => undefined,
+      await this.services.modelRuntime.login("github-copilot", "oauth", {
         signal,
+        // The app uses github.com Copilot; auto-answer the optional GHES domain.
+        prompt: async () => "",
+        notify: (event) => {
+          if (event.type === "device_code") {
+            this.copilotLoginListener?.({
+              type: "device_code",
+              userCode: event.userCode,
+              verificationUri: event.verificationUri,
+            });
+          } else if (event.type === "progress") {
+            this.copilotLoginListener?.({ type: "progress", message: event.message });
+          }
+        },
       });
       this.copilotAbort = null;
       return this.catalog.listAvailableModels("github-copilot");
@@ -314,6 +303,32 @@ export class AgentRepository {
     }
   }
 
+  async removeApiKey(provider: ProviderId): Promise<Result<void>> {
+    try {
+      await this.catalog.removeApiKey(provider);
+      return ok(undefined);
+    } catch (error) {
+      return err<void>(errorMessage(error));
+    }
+  }
+
+  /** Remove an API key when no active workspace repository exists. */
+  static async removeStoredApiKey(provider: ProviderId): Promise<Result<void>> {
+    try {
+      const pi = await import("@earendil-works/pi-coding-agent");
+      const agentDir = appAgentDir();
+      const runtime = await pi.ModelRuntime.create({
+        authPath: join(agentDir, "auth.json"),
+        modelsPath: join(agentDir, "models.json"),
+        refreshOnCreate: false,
+      });
+      await runtime.logout(provider);
+      return ok(undefined);
+    } catch (error) {
+      return err<void>(errorMessage(error));
+    }
+  }
+
   async cancelCopilotLogin(): Promise<Result<void>> {
     try {
       this.copilotAbort?.abort();
@@ -326,7 +341,7 @@ export class AgentRepository {
 
   async logoutCopilot(): Promise<Result<void>> {
     try {
-      this.services.authStorage.logout("github-copilot");
+      await this.services.modelRuntime.logout("github-copilot");
       return ok(undefined);
     } catch (error) {
       return err<void>(mainT("error.logout", { detail: errorMessage(error) }));

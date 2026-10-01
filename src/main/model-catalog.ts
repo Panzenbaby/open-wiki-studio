@@ -1,16 +1,14 @@
 // ModelCatalog: the deep module that owns model discovery + provider
 // registration for the LLM config flow. Its interface is the test surface for
-// "which models can I pick for this provider?" and "register this provider /
-// store this API key".
+// model selection and provider setup through Pi's ModelRuntime.
 //
 // What lives here (the deep implementation):
 //   - the pure HTTP model-list fetching for Ollama (local + cloud) and
 //     OpenAI-compatible endpoints (the OpenAI /v1/models shape)
 //   - the cloud-id suffix rule (ollamaCloudId) and the v1-suffix normalization
-//   - the auth-gated static catalog projection for anthropic/openai/google
-//   - provider registration into modelRegistry (ollama/openai-compatible) and
-//     API-key storage into authStorage (anthropic/openai/google)
-//   - model resolution from the registry for both roles — the chat model and
+//   - the built-in static model catalogs for anthropic/openai/google
+//   - provider registration and API-key handling through Pi ModelRuntime
+//   - model resolution from the runtime for both roles — the chat model and
 //     the ingest model, which follows the chat model unless chosen separately
 //     (ADR 0007) — by provider+modelId, falling back to modelId alone
 //
@@ -31,36 +29,37 @@
 //     fetch failures are swallowed INDEPENDENTLY; the dropdown gets whichever
 //     succeeded; throw only if both return nothing.
 //   - openai-compatible: throw only if the fetch itself fails.
-//   - anthropic/openai/google: store the key so the built-in catalog surfaces,
-//     then return the auth-gated static list.
+//   - anthropic/openai/google: return the built-in model catalog; credentials
+//     are applied only when the user saves the configuration.
 //   - github-copilot: err (must use loginCopilot()).
-import type { AgentSessionServices } from "@earendil-works/pi-coding-agent";
+import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { ok, err, errorMessage } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
 import type { LlmConfig, ModelOption, ProviderId, Result } from "../shared/ipc-types.ts";
 
-/** A model resolved from the registry. Re-derive the type locally rather than
- *  importing the internal `ResolvedModel` alias from agent.ts, so the catalog
- *  stays decoupled from the agent module. It is the element type of
- *  `modelRegistry.getAll()` — i.e. `Model<Api>`. */
-type ResolvedModel = ReturnType<ModelCatalogModelRegistry["getAll"]>[number];
+/** A chat model resolved from Pi's canonical model runtime. */
+type ResolvedModel = NonNullable<ReturnType<ModelRuntime["getModel"]>>;
 
-/** The structural slice of `AgentSessionServices["modelRegistry"]` the catalog
- *  actually uses. Narrowing to `Pick` (instead of the full `ModelRegistry`
- *  class) is what makes minimal, typed fakes possible in tests: a plain object
- *  is assignable to an interface but not to a class with private members. The
- *  real `services.modelRegistry` still satisfies this structurally. */
-interface ModelCatalogModelRegistry
-  extends Pick<AgentSessionServices["modelRegistry"], "getAvailable" | "getAll" | "registerProvider"> {}
-
-/** The structural slice of `AgentSessionServices["authStorage"]` the catalog
- *  actually uses (storing an API key for anthropic/openai/google). */
-interface ModelCatalogAuthStorage
-  extends Pick<AgentSessionServices["authStorage"], "set" | "get"> {}
+/** Narrow Pi runtime surface: minimal fakes keep catalog tests independent of
+ *  ModelRuntime's private implementation. */
+export interface ModelCatalogRuntime {
+  getModels(providerId?: string): readonly ResolvedModel[];
+  getModel(providerId: string, modelId: string): ResolvedModel | undefined;
+  getAvailable(providerId?: string): Promise<readonly ResolvedModel[]>;
+  registerProvider(
+    providerId: string,
+    config: Parameters<ModelRuntime["registerProvider"]>[1],
+  ): void;
+  getRegisteredProviderConfig(
+    providerId: string,
+  ): ReturnType<ModelRuntime["getRegisteredProviderConfig"]>;
+  setRuntimeApiKey(providerId: string, apiKey: string): Promise<void>;
+  removeRuntimeApiKey(providerId: string): Promise<void>;
+  logout(providerId: string): Promise<void>;
+}
 
 export interface ModelCatalogDeps {
-  readonly modelRegistry: ModelCatalogModelRegistry;
-  readonly authStorage: ModelCatalogAuthStorage;
+  readonly modelRuntime: ModelCatalogRuntime;
   /** Injectable so tests can fake HTTP without a network. Default: global fetch. */
   readonly fetch?: typeof fetch;
 }
@@ -115,13 +114,10 @@ export class ModelCatalog {
   /** Models already available for a provider (auth configured). For Copilot a
    *  non-empty result doubles as the "already logged in" probe: the form shows
    *  the model dropdown instead of the login button. */
-  listAvailableModels(provider: ProviderId): Result<readonly ModelOption[]> {
+  async listAvailableModels(provider: ProviderId): Promise<Result<readonly ModelOption[]>> {
     try {
-      const models = this.deps.modelRegistry
-        .getAvailable()
-        .filter((model) => model.provider === provider)
-        .map((model) => ({ id: model.id, name: model.name }));
-      return ok(models);
+      const models = await this.deps.modelRuntime.getAvailable(provider);
+      return ok(models.map((model) => ({ id: model.id, name: model.name })));
     } catch (error) {
       return err<readonly ModelOption[]>(
         mainT("error.listModels", { detail: errorMessage(error) }),
@@ -136,8 +132,8 @@ export class ModelCatalog {
    *                       swallow each failure independently, throw only if
    *                       both return nothing
    *    - openai-compat -> fetch {base}/v1/models, err only if the fetch fails
-   *    - anthropic/openai/google -> store apiKey so the built-in catalog
-   *                       surfaces, return the static auth-gated list */
+   *    - anthropic/openai/google -> return the built-in static model catalog;
+   *                       credentials are applied when configuration is saved */
   async loadModels(
     provider: ProviderId,
     apiKey?: string,
@@ -155,37 +151,44 @@ export class ModelCatalog {
         if (!baseUrl) return err<readonly ModelOption[]>(mainT("error.baseUrlRequired"));
         return ok(await this.fetchOpenAiCompatibleModels(baseUrl, apiKey));
       }
-      // anthropic / openai / google — static built-in catalog, auth-gated.
-      if (apiKey) {
-        this.deps.authStorage.set(provider, { type: "api_key", key: apiKey });
-      }
-      const models = this.deps.modelRegistry
-        .getAvailable()
-        .filter((model) => model.provider === provider)
-        .map((model) => ({ id: model.id, name: model.name }));
-      return ok(models);
+      // anthropic / openai / google use static built-in catalogs. The renderer
+      // gates this request on a supplied/stored key; avoid injecting an
+      // unsaved credential into the workspace runtime just to list model IDs.
+      const models = this.deps.modelRuntime.getModels(provider);
+      return ok(models.map((model) => ({ id: model.id, name: model.name })));
     } catch (error) {
       return err<readonly ModelOption[]>(errorMessage(error));
     }
   }
 
-  /** Register a provider into the registry (ollama/openai-compatible) and/or
-   *  store an API key (anthropic/openai/google). No-op for copilot. This is the
-   *  side-effecting half of the old `configureLlm`; the agent still applies the
-   *  resolved models to its sessions afterwards. */
-  registerProvider(config: LlmConfig): void {
+  /** Register a provider (ollama/openai-compatible) or apply an API key
+   *  (anthropic/openai/google) through ModelRuntime. Copilot uses OAuth. */
+  async registerProvider(config: LlmConfig): Promise<void> {
     const providerName =
       config.provider === "openai-compatible" ? "openai-compatible" : config.provider;
+    const baseUrl =
+      config.baseUrl ?? (config.provider === "ollama" ? "http://localhost:11434/v1" : "");
+    let endpointChanged = false;
+
+    if (config.provider === "openai-compatible") {
+      const previous = this.deps.modelRuntime.getRegisteredProviderConfig(providerName);
+      endpointChanged = previous?.baseUrl !== baseUrl;
+      if (endpointChanged || !config.apiKey) {
+        await this.deps.modelRuntime.removeRuntimeApiKey(providerName);
+      } else {
+        await this.deps.modelRuntime.setRuntimeApiKey(providerName, config.apiKey);
+      }
+    } else if (config.apiKey && config.provider !== "github-copilot") {
+      await this.deps.modelRuntime.setRuntimeApiKey(config.provider, config.apiKey);
+    }
 
     if (config.provider === "ollama" || config.provider === "openai-compatible") {
-      const baseUrl =
-        config.baseUrl ?? (config.provider === "ollama" ? "http://localhost:11434/v1" : "");
-      this.deps.modelRegistry.registerProvider(providerName, {
+      this.deps.modelRuntime.registerProvider(providerName, {
         name: config.provider === "ollama" ? "Ollama" : "OpenAI-compatible",
         baseUrl,
-        // registerProvider requires an apiKey; for providers that don't need
-        // one, pass a placeholder.
-        apiKey: config.apiKey || (config.provider === "ollama" ? "ollama" : "not-needed"),
+        // Keep secret material out of ModelRuntime's provider config. The
+        // actual key is supplied through its runtime credential overlay below.
+        apiKey: config.provider === "ollama" ? "ollama" : "not-needed",
         // "openai-completions" is the OpenAI chat completions wire protocol,
         // spoken by Ollama and OpenAI-compatible endpoints.
         api: "openai-completions",
@@ -202,8 +205,10 @@ export class ModelCatalog {
           maxTokens: 8192,
         })),
       });
-    } else if (config.apiKey) {
-      this.deps.authStorage.set(config.provider, { type: "api_key", key: config.apiKey });
+    }
+    if (config.provider === "openai-compatible" && config.apiKey && endpointChanged) {
+      // After the provider switches hosts, install only the newly supplied key.
+      await this.deps.modelRuntime.setRuntimeApiKey(providerName, config.apiKey);
     }
     // github-copilot: no-op — auth flows through loginCopilot().
   }
@@ -221,12 +226,18 @@ export class ModelCatalog {
     return ok({ chat, ingest });
   }
 
+  removeApiKey(provider: ProviderId): Promise<void> {
+    // logout clears both the runtime override and any credentials saved by an
+    // older app version in Pi's auth.json.
+    return this.deps.modelRuntime.logout(provider);
+  }
+
   private findModel(provider: ProviderId, modelId: string): ResolvedModel | null {
-    const all = this.deps.modelRegistry.getAll();
-    const model =
-      all.find((m) => m.provider === provider && m.id === modelId) ??
-      all.find((m) => m.id === modelId);
-    return model ?? null;
+    return (
+      this.deps.modelRuntime.getModel(provider, modelId) ??
+      this.deps.modelRuntime.getModels().find((model) => model.id === modelId) ??
+      null
+    );
   }
 
   private modelNotFound(provider: ProviderId, modelId: string): Result<ResolvedLlmModels> {

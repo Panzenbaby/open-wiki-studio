@@ -2,25 +2,22 @@
 // surface for model discovery + provider registration. The testability win is
 // the **injectable `fetch`** (the seam): an in-memory fetch adapter lets these
 // exercise the Ollama local+cloud graceful-degradation path and the
-// openai-compatible path without touching the network. The `modelRegistry` and
-// `authStorage` deps are narrowed to a structural `Pick`, so minimal typed fakes
-// (plain objects) stand in for them — no `any`, no real services, no disk.
+// openai-compatible path without touching the network. A narrow ModelRuntime
+// interface lets minimal typed fakes stand in without real services or disk.
 import { describe, expect, it } from "vitest";
-import { effectiveIngestModelId, ModelCatalog, type ModelCatalogDeps, type ResolvedLlmModels } from "../src/main/model-catalog.ts";
+import { effectiveIngestModelId, ModelCatalog, type ModelCatalogRuntime, type ResolvedLlmModels } from "../src/main/model-catalog.ts";
 import type { LlmConfig, ModelOption, Result } from "../src/shared/ipc-types.ts";
 
 // ─── Minimal typed fakes ────────────────────────────────────────────────
-// Shapes follow the `Pick` slices in ModelCatalogDeps. Deriving the model and
-// credential types FROM the catalog's deps keeps the fakes structurally
-// compatible with the real `Model<Api>` / `AuthCredential` (no `any`, no
-// hand-maintained parallel types).
+// Shapes follow the narrow ModelRuntime interface used by ModelCatalog. The
+// model type comes from the Pi runtime API; there is no real runtime or disk.
 
-/** The real `Model<Api>` element type returned by `getAll()`. */
-type CatalogModel = ReturnType<ModelCatalogDeps["modelRegistry"]["getAll"]>[number];
-/** The real `AuthCredential` union accepted by `authStorage.set`. */
-type CatalogCredential = Parameters<ModelCatalogDeps["authStorage"]["set"]>[1];
+/** The real `Model<Api>` element type returned by `getModels()`. */
+type CatalogModel = ReturnType<ModelCatalogRuntime["getModels"]>[number];
+/** The credential shape used by ModelRuntime's runtime API-key setter. */
+type CatalogCredential = { readonly type: "api_key"; readonly key: string };
 /** The real `ProviderConfigInput` accepted by `registerProvider`. */
-type CatalogProviderConfig = Parameters<ModelCatalogDeps["modelRegistry"]["registerProvider"]>[1];
+type CatalogProviderConfig = Parameters<ModelCatalogRuntime["registerProvider"]>[1];
 
 /** Recorded `registerProvider` call. `config` is the real `ProviderConfigInput`. */
 interface RegisteredProvider {
@@ -64,8 +61,29 @@ function makeModelRegistry(
   return { registry, registered };
 }
 
-/** A recorded `authStorage.set` call. `credential` is the real union; tests
- *  narrow it (`type === "api_key"`) before reading `key`. */
+function makeModelRuntime(registry: FakeModelRegistry, auth: FakeAuthStorage): ModelCatalogRuntime {
+  const registeredProviders = new Map<string, CatalogProviderConfig>();
+  return {
+    getModels: (provider) => registry.getAll().filter((model) => provider === undefined || model.provider === provider),
+    getModel: (provider, id) => registry.getAll().find((model) => model.provider === provider && model.id === id),
+    getAvailable: async (provider) => registry.getAvailable().filter((model) => provider === undefined || model.provider === provider),
+    registerProvider: (provider, config) => {
+      auth.keysAtProviderRegistration.push(apiKey(auth.store.get(provider)));
+      registry.registerProvider(provider, config);
+      registeredProviders.set(provider, config);
+    },
+    getRegisteredProviderConfig: (provider) => registeredProviders.get(provider),
+    setRuntimeApiKey: async (provider, key) => auth.set(provider, { type: "api_key", key }),
+    removeRuntimeApiKey: async (provider) => {
+      auth.store.delete(provider);
+    },
+    logout: async (provider) => {
+      auth.store.delete(provider);
+    },
+  };
+}
+
+/** A recorded ModelRuntime API-key setter call. */
 interface SetCall {
   readonly provider: string;
   readonly credential: CatalogCredential;
@@ -75,15 +93,18 @@ interface FakeAuthStorage {
   set: (provider: string, credential: CatalogCredential) => void;
   get: (provider: string) => CatalogCredential | undefined;
   readonly setCalls: SetCall[];
+  readonly keysAtProviderRegistration: Array<string | undefined>;
   readonly store: Map<string, CatalogCredential>;
 }
 
 function makeAuthStorage(): FakeAuthStorage {
   const store = new Map<string, CatalogCredential>();
   const setCalls: SetCall[] = [];
+  const keysAtProviderRegistration: Array<string | undefined> = [];
   return {
     store,
     setCalls,
+    keysAtProviderRegistration,
     set: (provider, credential) => {
       setCalls.push({ provider, credential });
       store.set(provider, credential);
@@ -154,7 +175,7 @@ describe("ModelCatalog.loadModels — ollama", () => {
       { url: "http://localhost:11434/v1/models", ids: ["llama3", "mistral"] },
       { url: "https://ollama.com/v1/models", ids: ["qwen2:7b", "gpt-oss"] },
     ]);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage(), fetch });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()), fetch });
 
     const out = models(await catalog.loadModels("ollama"));
     const ids = out.map((m) => m.id);
@@ -175,7 +196,7 @@ describe("ModelCatalog.loadModels — ollama", () => {
       { url: "http://localhost:11434/v1/models", ids: ["llama3"] },
       { url: "https://ollama.com/v1/models", ids: [] },
     ]);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage(), fetch });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()), fetch });
 
     const out = models(await catalog.loadModels("ollama", undefined, "http://localhost:11434"));
     expect(out.map((m) => m.id)).toEqual(["llama3"]);
@@ -187,7 +208,7 @@ describe("ModelCatalog.loadModels — ollama", () => {
       { url: "http://localhost:11434/v1/models", ids: ["llama3"] },
       { url: "https://ollama.com/v1/models", ids: [], fail: true },
     ]);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage(), fetch });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()), fetch });
 
     const out = models(await catalog.loadModels("ollama"));
     expect(out.map((m) => m.id)).toEqual(["llama3"]);
@@ -199,7 +220,7 @@ describe("ModelCatalog.loadModels — ollama", () => {
       { url: "http://localhost:11434/v1/models", ids: [], fail: true },
       { url: "https://ollama.com/v1/models", ids: ["qwen2"] },
     ]);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage(), fetch });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()), fetch });
 
     const out = models(await catalog.loadModels("ollama"));
     expect(out.map((m) => m.id)).toEqual(["qwen2:cloud"]);
@@ -211,7 +232,7 @@ describe("ModelCatalog.loadModels — ollama", () => {
       { url: "http://localhost:11434/v1/models", ids: [] },
       { url: "https://ollama.com/v1/models", ids: [] },
     ]);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage(), fetch });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()), fetch });
 
     const r = await catalog.loadModels("ollama");
     expect(r.success).toBe(false);
@@ -224,7 +245,7 @@ describe("ModelCatalog.loadModels — ollama", () => {
       { url: "http://localhost:11434/v1/models", ids: [], fail: true },
       { url: "https://ollama.com/v1/models", ids: [], fail: true },
     ]);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage(), fetch });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()), fetch });
 
     const r = await catalog.loadModels("ollama");
     expect(r.success).toBe(false);
@@ -238,7 +259,7 @@ describe("ModelCatalog.loadModels — openai-compatible", () => {
       // base passed without /v1 -> catalog normalizes to /v1/models
       { url: "http://my-endpoint/v1/models", ids: ["foo", "bar"] },
     ]);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage(), fetch });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()), fetch });
 
     const out = models(await catalog.loadModels("openai-compatible", "key", "http://my-endpoint"));
     expect(out.map((m) => m.id)).toEqual(["foo", "bar"]);
@@ -246,7 +267,7 @@ describe("ModelCatalog.loadModels — openai-compatible", () => {
 
   it("errors when baseUrl is missing", async () => {
     const { registry } = makeModelRegistry([], []);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()) });
 
     const r = await catalog.loadModels("openai-compatible");
     expect(r.success).toBe(false);
@@ -258,7 +279,7 @@ describe("ModelCatalog.loadModels — openai-compatible", () => {
     const fetch = makeFetch([
       { url: "http://my-endpoint/v1/models", ids: [], fail: true },
     ]);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage(), fetch });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()), fetch });
 
     const r = await catalog.loadModels("openai-compatible", undefined, "http://my-endpoint/v1");
     expect(r.success).toBe(false);
@@ -281,7 +302,7 @@ describe("ModelCatalog.loadModels — openai-compatible", () => {
         json: async () => ({ data: [{ id: "foo" }] }) as { data: readonly { id: string }[] },
       } as Response;
     }) as typeof fetch;
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage(), fetch: fakeFetch });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()), fetch: fakeFetch });
 
     const out = models(await catalog.loadModels("openai-compatible", "secret", "http://my-endpoint/v1"));
     expect(out.map((m) => m.id)).toEqual(["foo"]);
@@ -292,7 +313,7 @@ describe("ModelCatalog.loadModels — openai-compatible", () => {
 describe("ModelCatalog.loadModels — github-copilot", () => {
   it("returns an error (must use loginCopilot)", async () => {
     const { registry } = makeModelRegistry([], []);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()) });
 
     const r = await catalog.loadModels("github-copilot");
     expect(r.success).toBe(false);
@@ -300,53 +321,65 @@ describe("ModelCatalog.loadModels — github-copilot", () => {
   });
 });
 
-describe("ModelCatalog.loadModels — anthropic / openai / google (auth-gated)", () => {
-  it("stores the API key and returns the provider's available models", async () => {
+describe("ModelCatalog.loadModels — anthropic / openai / google", () => {
+  it("returns built-in provider models without mutating runtime credentials", async () => {
     const anthropicModels = [makeModel("anthropic", "claude-3"), makeModel("anthropic", "claude-4")];
     const openaiModels = [makeModel("openai", "gpt-4")];
     const { registry } = makeModelRegistry([...anthropicModels, ...openaiModels], [...anthropicModels, ...openaiModels]);
     const auth = makeAuthStorage();
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: auth });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, auth) });
 
     const out = models(await catalog.loadModels("anthropic", "sk-ant-key"));
     expect(out.map((m) => m.id)).toEqual(["claude-3", "claude-4"]);
-    // key stored on authStorage
-    expect(auth.setCalls).toEqual([{ provider: "anthropic", credential: { type: "api_key", key: "sk-ant-key" } }]);
-    expect(apiKey(auth.store.get("anthropic"))).toBe("sk-ant-key");
+    // Model preview must not install an unsaved key into the runtime.
+    expect(auth.setCalls).toHaveLength(0);
+    expect(apiKey(auth.store.get("anthropic"))).toBeUndefined();
 
     // openai is filtered separately
     const out2 = models(await catalog.loadModels("openai", "sk-key"));
     expect(out2.map((m) => m.id)).toEqual(["gpt-4"]);
+    expect(auth.setCalls).toHaveLength(0);
   });
 
-  it("does not store a key when no apiKey is given", async () => {
+  it("returns built-in models when no key is passed", async () => {
     const { registry } = makeModelRegistry([makeModel("google", "gemini")], [makeModel("google", "gemini")]);
     const auth = makeAuthStorage();
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: auth });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, auth) });
 
     const out = models(await catalog.loadModels("google"));
     expect(out.map((m) => m.id)).toEqual(["gemini"]);
     expect(auth.setCalls).toHaveLength(0);
   });
+
+  it("removes stored credentials through ModelRuntime logout", async () => {
+    const { registry } = makeModelRegistry([], []);
+    const credentials = makeAuthStorage();
+    credentials.set("anthropic", { type: "api_key", key: "secret" });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, credentials) });
+
+    await catalog.removeApiKey("anthropic");
+
+    expect(credentials.store.has("anthropic")).toBe(false);
+  });
 });
 
 describe("ModelCatalog.listAvailableModels", () => {
-  it("filters the registry's available models by provider", () => {
+  it("filters the registry's available models by provider", async () => {
     const { registry } = makeModelRegistry(
       [makeModel("anthropic", "claude"), makeModel("openai", "gpt-4")],
       [],
     );
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()) });
 
-    const out = models(catalog.listAvailableModels("openai"));
+    const out = models(await catalog.listAvailableModels("openai"));
     expect(out.map((m) => m.id)).toEqual(["gpt-4"]);
   });
 
-  it("returns an empty list when no models match", () => {
+  it("returns an empty list when no models match", async () => {
     const { registry } = makeModelRegistry([makeModel("anthropic", "claude")], []);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()) });
 
-    const out = models(catalog.listAvailableModels("ollama"));
+    const out = models(await catalog.listAvailableModels("ollama"));
     expect(out).toEqual([]);
   });
 });
@@ -365,7 +398,7 @@ describe("ModelCatalog.resolveModels", () => {
   it("finds a model by provider + modelId and uses it for both roles by default", () => {
     const all = [makeModel("ollama", "llama3"), makeModel("openai-compatible", "llama3")];
     const { registry } = makeModelRegistry([], all);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()) });
 
     const config: LlmConfig = { provider: "ollama", modelId: "llama3" };
     const { chat, ingest } = resolved(catalog.resolveModels(config));
@@ -377,7 +410,7 @@ describe("ModelCatalog.resolveModels", () => {
   it("resolves a separately chosen ingest model", () => {
     const all = [makeModel("anthropic", "claude-haiku"), makeModel("anthropic", "claude-opus")];
     const { registry } = makeModelRegistry([], all);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()) });
 
     const config: LlmConfig = { provider: "anthropic", modelId: "claude-haiku", ingestModelId: "claude-opus" };
     const { chat, ingest } = resolved(catalog.resolveModels(config));
@@ -389,7 +422,7 @@ describe("ModelCatalog.resolveModels", () => {
   it("falls back to modelId alone when the provider has no exact match", () => {
     const all = [makeModel("openai-compatible", "llama3")];
     const { registry } = makeModelRegistry([], all);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()) });
 
     // provider mismatch, but id matches -> fallback by id alone
     const config: LlmConfig = { provider: "ollama", modelId: "llama3" };
@@ -398,7 +431,7 @@ describe("ModelCatalog.resolveModels", () => {
 
   it("fails with the missing chat model when it is absent", () => {
     const { registry } = makeModelRegistry([], [makeModel("anthropic", "claude")]);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()) });
 
     const config: LlmConfig = { provider: "ollama", modelId: "missing" };
     expect(errorOf(catalog.resolveModels(config))).toBe("Model not found in registry: ollama/missing");
@@ -406,7 +439,7 @@ describe("ModelCatalog.resolveModels", () => {
 
   it("fails as a whole with the missing ingest model when only the chat model exists", () => {
     const { registry } = makeModelRegistry([], [makeModel("anthropic", "claude")]);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()) });
 
     const config: LlmConfig = { provider: "anthropic", modelId: "claude", ingestModelId: "gone" };
     expect(errorOf(catalog.resolveModels(config))).toBe("Model not found in registry: anthropic/gone");
@@ -415,7 +448,7 @@ describe("ModelCatalog.resolveModels", () => {
   it("treats openai-compatible provider name as 'openai-compatible'", () => {
     const all = [makeModel("openai-compatible", "my-model")];
     const { registry } = makeModelRegistry([], all);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()) });
 
     const config: LlmConfig = { provider: "openai-compatible", modelId: "my-model" };
     const { chat } = resolved(catalog.resolveModels(config));
@@ -425,13 +458,13 @@ describe("ModelCatalog.resolveModels", () => {
 });
 
 describe("ModelCatalog.registerProvider", () => {
-  it("registers an ollama provider with the OpenAI-completions wire protocol", () => {
+  it("registers an ollama provider with the OpenAI-completions wire protocol", async () => {
     const { registry, registered } = makeModelRegistry([], []);
     const auth = makeAuthStorage();
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: auth });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, auth) });
 
     const config: LlmConfig = { provider: "ollama", modelId: "llama3", baseUrl: "http://localhost:11434/v1" };
-    catalog.registerProvider(config);
+    await catalog.registerProvider(config);
 
     expect(registered).toHaveLength(1);
     const [call] = registered;
@@ -442,13 +475,13 @@ describe("ModelCatalog.registerProvider", () => {
     expect(call.config.apiKey).toBe("ollama"); // placeholder for ollama without apiKey
     expect(call.config.models?.[0]?.id).toBe("llama3");
     expect(call.config.models).toHaveLength(1);
-    // ollama does NOT touch authStorage
+    // Ollama does not need a runtime API key.
     expect(auth.setCalls).toHaveLength(0);
   });
 
-  it("registers the chat and a separate ingest model in ONE call (a second call would replace the first)", () => {
+  it("registers the chat and a separate ingest model in ONE call (a second call would replace the first)", async () => {
     const { registry, registered } = makeModelRegistry([], []);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()) });
 
     const config: LlmConfig = {
       provider: "ollama",
@@ -456,15 +489,15 @@ describe("ModelCatalog.registerProvider", () => {
       ingestModelId: "qwen3:32b",
       baseUrl: "http://localhost:11434/v1",
     };
-    catalog.registerProvider(config);
+    await catalog.registerProvider(config);
 
     expect(registered).toHaveLength(1);
     expect(registered[0]!.config.models?.map((model) => model.id)).toEqual(["llama3", "qwen3:32b"]);
   });
 
-  it("registers a model only once when the ingest model equals the chat model", () => {
+  it("registers a model only once when the ingest model equals the chat model", async () => {
     const { registry, registered } = makeModelRegistry([], []);
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()) });
 
     const config: LlmConfig = {
       provider: "openai-compatible",
@@ -472,15 +505,15 @@ describe("ModelCatalog.registerProvider", () => {
       ingestModelId: "my-model",
       baseUrl: "http://my-endpoint/v1",
     };
-    catalog.registerProvider(config);
+    await catalog.registerProvider(config);
 
     expect(registered[0]!.config.models?.map((model) => model.id)).toEqual(["my-model"]);
   });
 
-  it("registers an openai-compatible provider with the provided baseUrl + apiKey", () => {
+  it("registers an openai-compatible provider without persisting its key in provider config", async () => {
     const { registry, registered } = makeModelRegistry([], []);
     const auth = makeAuthStorage();
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: auth });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, auth) });
 
     const config: LlmConfig = {
       provider: "openai-compatible",
@@ -488,38 +521,61 @@ describe("ModelCatalog.registerProvider", () => {
       baseUrl: "http://my-endpoint/v1",
       apiKey: "key-1",
     };
-    catalog.registerProvider(config);
+    await catalog.registerProvider(config);
 
     expect(registered).toHaveLength(1);
     const [call] = registered;
     expect(call.providerName).toBe("openai-compatible");
     expect(call.config.name).toBe("OpenAI-compatible");
     expect(call.config.baseUrl).toBe("http://my-endpoint/v1");
-    expect(call.config.apiKey).toBe("key-1");
+    expect(call.config.apiKey).toBe("not-needed");
     expect(call.config.models?.[0]?.id).toBe("my-model");
-    expect(auth.setCalls).toHaveLength(0);
+    expect(auth.setCalls).toEqual([{ provider: "openai-compatible", credential: { type: "api_key", key: "key-1" } }]);
   });
 
-  it("stores the API key on authStorage for anthropic (and openai/google)", () => {
+  it("clears a stale OpenAI-compatible key when configuring a new endpoint without one", async () => {
+    const { registry } = makeModelRegistry([], []);
+    const runtimeCredentials = makeAuthStorage();
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, runtimeCredentials) });
+
+    await catalog.registerProvider({
+      provider: "openai-compatible",
+      modelId: "old-model",
+      baseUrl: "https://old.example/v1",
+      apiKey: "old-secret",
+    });
+    expect(apiKey(runtimeCredentials.store.get("openai-compatible"))).toBe("old-secret");
+
+    await catalog.registerProvider({
+      provider: "openai-compatible",
+      modelId: "new-model",
+      baseUrl: "https://new.example/v1",
+    });
+
+    expect(runtimeCredentials.store.has("openai-compatible")).toBe(false);
+    expect(runtimeCredentials.keysAtProviderRegistration).toEqual([undefined, undefined]);
+  });
+
+  it("sets the runtime API key for anthropic (and openai/google)", async () => {
     const { registry, registered } = makeModelRegistry([], []);
     const auth = makeAuthStorage();
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: auth });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, auth) });
 
     const config: LlmConfig = { provider: "anthropic", modelId: "claude-3", apiKey: "sk-ant" };
-    catalog.registerProvider(config);
+    await catalog.registerProvider(config);
 
-    // anthropic does NOT register a provider into the registry
+    // Built-in providers are not re-registered; keys are runtime credentials.
     expect(registered).toHaveLength(0);
     expect(auth.setCalls).toEqual([{ provider: "anthropic", credential: { type: "api_key", key: "sk-ant" } }]);
   });
 
-  it("is a no-op for github-copilot", () => {
+  it("is a no-op for github-copilot", async () => {
     const { registry, registered } = makeModelRegistry([], []);
     const auth = makeAuthStorage();
-    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: auth });
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, auth) });
 
     const config: LlmConfig = { provider: "github-copilot", modelId: "gpt-4" };
-    catalog.registerProvider(config);
+    await catalog.registerProvider(config);
 
     expect(registered).toHaveLength(0);
     expect(auth.setCalls).toHaveLength(0);

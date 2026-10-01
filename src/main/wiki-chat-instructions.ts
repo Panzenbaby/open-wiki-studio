@@ -1,5 +1,5 @@
 // Workspace-specific overrides for the fixed pi-okf-wiki /wiki-query rules.
-// pi-okf-wiki 0.4.0 currently puts its fixed instructions before the dynamic
+// pi-okf-wiki 0.5.0 currently puts its fixed instructions before the dynamic
 // "## Wiki tree" context in the system prompt. This isolated replacement
 // boundary must be revalidated if that extension prompt layout changes.
 import { readFile, unlink, writeFile } from "node:fs/promises";
