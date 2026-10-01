@@ -114,28 +114,35 @@ These three providers share the same flow:
 
 The dashboard is the home of a workspace. It shows:
 
-- The workspace name and a summary of its contents (concepts, pending input,
-  archived originals).
-- Three folder cards — **Input**, **Wiki**, **Archive** — each showing how
-  many files it holds. Click a card to browse that folder.
-- An **ingest hero** that appears when files are waiting in `input/` or an
-  ingest is running, with a shortcut to run or watch `/wiki-update`.
-- Your recent **sessions** — click one to resume it, or start a new question.
-
-Use **Switch workspace** to return to the workspace picker.
+- The **active workspace** — its name and folder (open it in Finder,
+  Explorer, or your file manager), with **Switch** (back to the workspace
+  picker) and **Merge** (combine workspaces).
+- **Add new files** — a drop zone and a **Choose files** button. Files always
+  land in `input/`; the drop zone lights up while you drag files over the
+  window.
+- An **ingest card** while there is something to report: the files pending in
+  `input/` (with **Ingest now**), a running `/wiki-update`, the per-file result
+  of the last run (concepts created per file, files that were not ingested,
+  with **Try again**), or the error a run ended with.
+- The **Wiki** card — concept and source-file counts plus how many concepts
+  are verified. Click it to browse the wiki.
+- Your **recent chats** with a preview of the answer — click one to resume
+  it, or start a new chat from the header.
 
 ### Adding documents & ingesting
 
 To build your wiki you add documents and run an ingest:
 
 1. **Add documents to `input/`.** Drag files onto the app window (they always
-   go to `input/`), use the **Add files** button in the Browser's Input view,
-   or copy files into the `input/` folder on disk.
-2. **Run `/wiki-update`.** From the dashboard (the ingest hero) or the ingest
-   view, click **Run /wiki-update**. The agent reads each input file, writes a
-   concept into `wiki/`, and moves the original to `archive/` once its concept
-   exists.
-3. **Read the summary.** When the run finishes, the ingest view shows counts:
+   go to `input/`), use **Choose files** on the dashboard or the **Add files**
+   button in the Browser's Input view, or copy files into the `input/` folder
+   on disk.
+2. **Run `/wiki-update`.** Click **Ingest now** on the dashboard (progress
+   shows in place) or **Run /wiki-update** in the ingest view. The agent reads
+   each input file, writes a concept into `wiki/`, and moves the original to
+   `archive/` once its concept exists.
+3. **Read the summary.** When the run finishes, the dashboard lists each input
+   file with the concepts it produced, and the ingest view shows counts:
    - **created** — new concepts written this run,
    - **updated** — existing concepts whose content changed,
    - **leftover** — files still in `input/` that the agent did not consume,
@@ -284,6 +291,13 @@ npm run test:watch # vitest in watch mode
 Tests run in a plain Node environment with `electron` mocked in
 `test/setup.ts`. There is one test file per deep module: `concept-store`,
 `model-catalog`, `chat-session-pool`, and `agent-events`.
+
+### Fonts
+
+The UI uses [Geist and Geist Mono](https://github.com/vercel/geist-font),
+bundled through `@fontsource-variable/geist` and
+`@fontsource-variable/geist-mono` under the SIL Open Font License 1.1 (the
+license text ships with those packages). Nothing is loaded from a font CDN.
 
 ### Building locally
 

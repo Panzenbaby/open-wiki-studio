@@ -3,6 +3,7 @@ import { atom } from "jotai";
 import type {
   AddFilesSummary,
   ChatMessage,
+  FileNode,
   IngestSummary,
   SessionInfo,
   UpdateInfo,
@@ -27,6 +28,8 @@ export const llmConfiguredAtom = atom<boolean>(false);
 export const platformAtom = atom<string>("");
 /** App version reported by the main process (`app.getVersion()`). */
 export const currentVersionAtom = atom<string>("");
+/** The user's home directory (`app.getPath("home")`), for `~/…` paths. */
+export const homeDirectoryAtom = atom<string>("");
 export type ToastKind = "info" | "warning" | "error";
 
 export const toastAtom = atom<{ message: string; kind: ToastKind } | null>(null);
@@ -54,6 +57,26 @@ export const countsAtom = atom<{ input: number; wiki: number }>({
   input: 0,
   wiki: 0,
 });
+
+/** Files currently waiting in `input/` (with sizes), refreshed together with
+ *  `countsAtom`. The dashboard lists them as pending ingest. */
+export const inputFilesAtom = atom<readonly FileNode[]>([]);
+
+/** Wiki numbers shown on the dashboard's wiki card. */
+export interface WikiOverview {
+  /** Concepts in the wiki (reserved, archived, and trashed files excluded). */
+  readonly concepts: number;
+  /** Concepts a person marked as verified. */
+  readonly verified: number;
+  /** Archived originals the concepts were ingested from. */
+  readonly sourceFiles: number;
+}
+
+export const wikiOverviewAtom = atom<WikiOverview>({ concepts: 0, verified: 0, sourceFiles: 0 });
+
+/** True while the user drags external files over the window. AppShell owns
+ *  the drop; the dashboard's drop zone highlights while this is set. */
+export const fileDragActiveAtom = atom<boolean>(false);
 
 // sessions
 export const sessionsAtom = atom<readonly SessionInfo[]>([]);

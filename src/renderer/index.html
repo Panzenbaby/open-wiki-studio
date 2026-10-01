@@ -19,16 +19,16 @@
         src/renderer/appearance-cache.ts, because config.json is only
         readable over IPC once the bundle is up.
       -->
-      <div id="oks-splash" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#0e1214;color:#868889;font-family:'Proxima Nova Soft','Avenir Next','Segoe UI',Verdana,Arial,Helvetica,sans-serif;">
+      <div id="oks-splash" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#0B0E12;color:#8E959E;font-family:'Geist Variable',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;">
         <div style="display:flex;flex-direction:column;align-items:center;gap:14px;">
           <img src="./assets/app-icon.png" alt="" width="72" height="72" style="width:72px;height:72px;border-radius:14px;display:block;box-shadow:0 16px 40px rgba(0,0,0,.55);" />
-          <span id="oks-splash-name" style="color:#f1f1f1;font-weight:700;font-size:20px;letter-spacing:.01em;">Open Wiki Studio</span>
+          <span id="oks-splash-name" style="color:#ECEEF0;font-weight:700;font-size:20px;letter-spacing:.01em;">Open Wiki Studio</span>
         </div>
         <div id="oks-splash-loading" style="display:inline-flex;align-items:center;gap:10px;font-size:14px;">
           <span style="display:inline-flex;gap:5px;align-items:center;">
-            <span style="width:6px;height:6px;border-radius:50%;background:#c51a1b;animation:oks-splash-wave 1.4s ease-in-out infinite;"></span>
-            <span style="width:6px;height:6px;border-radius:50%;background:#c51a1b;animation:oks-splash-wave 1.4s ease-in-out infinite;animation-delay:.2s;"></span>
-            <span style="width:6px;height:6px;border-radius:50%;background:#c51a1b;animation:oks-splash-wave 1.4s ease-in-out infinite;animation-delay:.4s;"></span>
+            <span style="width:6px;height:6px;border-radius:50%;background:#D9382C;animation:oks-splash-wave 1.4s ease-in-out infinite;"></span>
+            <span style="width:6px;height:6px;border-radius:50%;background:#D9382C;animation:oks-splash-wave 1.4s ease-in-out infinite;animation-delay:.2s;"></span>
+            <span style="width:6px;height:6px;border-radius:50%;background:#D9382C;animation:oks-splash-wave 1.4s ease-in-out infinite;animation-delay:.4s;"></span>
           </span>
           <span id="oks-splash-text">Loading…</span>
         </div>
@@ -59,11 +59,11 @@
             if (theme === "light") {
               var splash = document.getElementById("oks-splash");
               if (splash) {
-                splash.style.background = "#faf7f3";
-                splash.style.color = "#7a7370";
+                splash.style.background = "#F5F6F8";
+                splash.style.color = "#5F6770";
               }
               var name = document.getElementById("oks-splash-name");
-              if (name) name.style.color = "#2b2320";
+              if (name) name.style.color = "#14181D";
             }
           } catch (_) { /* splash stays dark */ }
           try {

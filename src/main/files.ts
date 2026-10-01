@@ -7,7 +7,8 @@
 //     and shows up in the wiki listing.
 //   - getPreview: single-file preview — wiki .md delegates to the store; text
 //     and binary stay here
-//   - addInputFiles / revealInFileManager: input-folder writes + OS integration
+//   - addInputFiles / revealInFileManager / openWorkspaceFolder: input-folder
+//     writes + OS integration
 import { copyFile, lstat, mkdir, open, readdir, stat } from "node:fs/promises";
 import type { Dirent, Stats } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -70,7 +71,13 @@ function isWikiMarkdown(relativePath: string): boolean {
  *  which would otherwise recurse without limit on every watcher event. */
 export const MAX_WALK_DEPTH = 32;
 
-async function walk(dir: string, root: string, depth: number): Promise<FileNode[]> {
+/** Per-walk options. `withSize` adds a `stat` per file — wanted for the small
+ *  `input/` listing the dashboard shows, skipped for the larger wiki tree. */
+interface WalkOptions {
+  readonly withSize: boolean;
+}
+
+async function walk(dir: string, root: string, depth: number, options: WalkOptions): Promise<FileNode[]> {
   const out: FileNode[] = [];
   let entries: Dirent[];
   try {
@@ -83,13 +90,21 @@ async function walk(dir: string, root: string, depth: number): Promise<FileNode[
     const absolute = join(dir, entry.name);
     if (entry.isDirectory()) {
       if (depth >= MAX_WALK_DEPTH) continue;
-      out.push(...(await walk(absolute, root, depth + 1)));
+      out.push(...(await walk(absolute, root, depth + 1, options)));
     } else if (entry.isFile()) {
-      out.push({
+      const node: FileNode = {
         relativePath: relative(root, absolute).split(sep).join("/"),
         name: entry.name,
         isDirectory: false,
-      });
+      };
+      if (!options.withSize) {
+        out.push(node);
+        continue;
+      }
+      // A file that vanishes between readdir and stat is listed without a
+      // size rather than failing the whole listing.
+      const size = await stat(absolute).then((stats) => stats.size).catch(() => undefined);
+      out.push(size === undefined ? node : { ...node, size });
     }
   }
   return out;
@@ -100,7 +115,8 @@ export async function listFolder(
   folder: Folder,
 ): Promise<Result<readonly FileNode[]>> {
   try {
-    const nodes = await walk(workspaceDir(workspace, folder), workspaceDir(workspace, folder), 0);
+    const base = workspaceDir(workspace, folder);
+    const nodes = await walk(base, base, 0, { withSize: folder === "input" });
     if (folder === "wiki") {
       const concepts = await new ConceptStore(workspace).listConcepts();
       const verifiedByPath = new Map(concepts.map((concept) => [`${concept.conceptId}.md`, concept.verified]));
@@ -413,6 +429,19 @@ async function copyTree(
     } catch (error) {
       out.failed.push({ path: rel, error: errorMessage(error) });
     }
+  }
+}
+
+/** Open the workspace folder itself in the OS file manager. */
+export async function openWorkspaceFolder(workspace: string): Promise<Result<void>> {
+  try {
+    const error = await shell.openPath(workspace);
+    if (error) {
+      return err<void>(mainT("error.openFolder", { detail: error }), { path: workspace });
+    }
+    return ok(undefined);
+  } catch (error) {
+    return err<void>(mainT("error.openFolder", { detail: errorMessage(error) }), { path: workspace });
   }
 }
 

@@ -83,5 +83,11 @@ opportunities within it.)
 concepts + archive inputs, snapshot again, diff. The ingest summary
 (created/updated/leftover) is computed from the before/after snapshots.
 
+**Ingest file result** — the per-input-file outcome of an ingest: `processed`
+(the file left `input/` and its archived original is cited by N created / M
+updated concepts) or `leftover` (still in `input/`). Reconstructed from the
+filesystem in `ingest-file-results.ts`, because pi-okf-wiki reports only
+aggregate numbers.
+
 **Session** — a Pi chat session file; one or more live in the
 AgentRepository's pool so background turns keep streaming.

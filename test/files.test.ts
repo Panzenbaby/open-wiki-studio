@@ -385,17 +385,27 @@ describe("walk depth cap and preview truncation", () => {
     expect(result.data.map((node) => node.relativePath)).toContain(relative);
   });
 
-  it("listFolder no longer reports a file size", async () => {
+  it("listFolder reports file sizes for input/ only", async () => {
     const workspace = await newWorkspace();
     await writeFileRel(join(workspace, "input"), "note.md", "hello");
+    await writeFileRel(join(workspace, "wiki"), "archive/original.txt", "hello");
 
-    const result = await listFolder(workspace, "input");
+    const input = await listFolder(workspace, "input");
+    const wiki = await listFolder(workspace, "wiki");
 
-    expect(result.success).toBe(true);
-    if (!result.success) return;
-    expect(result.data[0]).toEqual({
+    expect(input.success).toBe(true);
+    expect(wiki.success).toBe(true);
+    if (!input.success || !wiki.success) return;
+    expect(input.data[0]).toEqual({
       relativePath: "note.md",
       name: "note.md",
+      isDirectory: false,
+      size: 5,
+    });
+    // The wiki tree (with its growing archive) skips the per-file stat.
+    expect(wiki.data.find((node) => node.relativePath === "archive/original.txt")).toEqual({
+      relativePath: "archive/original.txt",
+      name: "original.txt",
       isDirectory: false,
     });
   });

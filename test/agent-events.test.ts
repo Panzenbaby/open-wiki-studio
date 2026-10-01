@@ -61,10 +61,11 @@ function makeApi() {
 }
 
 function session(path: string, streaming = false): SessionInfo {
-  return { path, name: path, lastModified: "", streaming };
+  return { path, name: path, lastModified: "", streaming, preview: "" };
 }
 
 const EMPTY_SUMMARY: IngestSummary = {
+  files: [],
   leftover: [],
   createdConcepts: [],
   updatedConcepts: [],

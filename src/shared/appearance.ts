@@ -17,8 +17,8 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
 /** Window background per effective theme, mirroring `--bg` in brand.css. The
  *  main process cannot read the stylesheet, so both must change together. */
 export const THEME_BACKGROUND: Record<EffectiveTheme, string> = {
-  dark: "#0e1214",
-  light: "#faf7f3",
+  dark: "#0B0E12",
+  light: "#F5F6F8",
 };
 
 export function isThemePreference(value: unknown): value is ThemePreference {

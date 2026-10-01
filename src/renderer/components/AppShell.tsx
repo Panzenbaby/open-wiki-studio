@@ -1,23 +1,23 @@
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Menu as MenuIcon, Settings as SettingsIcon, X as CloseIcon } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import { reportAddFilesResult } from "../add-files.ts";
+import { summarizeWikiListing } from "../dashboard-data.ts";
+import { useIngestActions } from "../ingest-actions.ts";
+import { useActiveNavigationTarget, useNavigation, type NavigationTarget } from "../navigation.ts";
 import {
   addFilesSummaryAtom,
-  browserFolderAtom,
-  browserModeAtom,
+  fileDragActiveAtom,
   folderVersionAtom,
   chatErrorAtom,
   chatStreamingAtom,
   chatTurnEndedAtom,
   countsAtom,
   currentSessionAtom,
-  ingestErrorAtom,
   ingestStateAtom,
-  ingestStreamAtom,
-  ingestSummaryAtom,
+  inputFilesAtom,
   messagesAtom,
   screenAtom,
   sessionsAtom,
@@ -25,6 +25,7 @@ import {
   streamingSessionsAtom,
   toastAtom,
   viewAtom,
+  wikiOverviewAtom,
   workspaceAtom,
 } from "../store.ts";
 import type { AddFilesSummary, FileNode, Folder, SessionInfo } from "../../shared/ipc-types.ts";
@@ -59,13 +60,7 @@ export function AppShell(): JSX.Element {
   const setMessages = useSetAtom(messagesAtom);
   const messages = useAtomValue(messagesAtom);
   const ingestState = useAtomValue(ingestStateAtom);
-  const setIngestError = useSetAtom(ingestErrorAtom);
-  const setIngestState = useSetAtom(ingestStateAtom);
-  const setIngestStream = useSetAtom(ingestStreamAtom);
-  const setIngestSummary = useSetAtom(ingestSummaryAtom);
   const setScreen = useSetAtom(screenAtom);
-  const setBrowserFolder = useSetAtom(browserFolderAtom);
-  const setBrowserMode = useSetAtom(browserModeAtom);
   const setChatStreaming = useSetAtom(chatStreamingAtom);
   const setChatError = useSetAtom(chatErrorAtom);
   const setStreamingSessions = useSetAtom(streamingSessionsAtom);
@@ -75,7 +70,12 @@ export function AppShell(): JSX.Element {
   const setAddFilesSummary = useSetAtom(addFilesSummaryAtom);
   const addFilesSummary = useAtomValue(addFilesSummaryAtom);
   const setFolderVersion = useSetAtom(folderVersionAtom);
-  const [dragOver, setDragOver] = useState<boolean>(false);
+  const setInputFiles = useSetAtom(inputFilesAtom);
+  const setWikiOverview = useSetAtom(wikiOverviewAtom);
+  const [dragOver, setDragOver] = useAtom(fileDragActiveAtom);
+  const { runIngest } = useIngestActions();
+  const { showBrowser } = useNavigation();
+  const activeTarget = useActiveNavigationTarget();
 
   /**
    * Drop external files/folders anywhere in the app → copy them into `input/`.
@@ -103,28 +103,26 @@ export function AppShell(): JSX.Element {
     // changes" in exactly one place.
   }
 
-  /** Refresh folder counts. With no argument, re-lists all three folders
-   *  (used on mount). With a `folder`, lists only that one and patches its
-   *  count — used by the `onFolderChanged` handler so a single debounced
-   *  burst costs one round-trip, not three. */
+  /** Store one folder listing: its count, plus the dashboard's view of it
+   *  (pending input files, wiki overview numbers). */
+  const applyListing = useCallback((folder: Folder, files: readonly FileNode[]): void => {
+    setCounts((current) => ({ ...current, [folder]: countConcepts(folder, files) }));
+    if (folder === "input") setInputFiles(files);
+    else setWikiOverview(summarizeWikiListing(files));
+  }, [setCounts, setInputFiles, setWikiOverview]);
+
+  /** Refresh folder counts. With no argument, re-lists both folders (used on
+   *  mount). With a `folder`, lists only that one — used by the
+   *  `onFolderChanged` handler so a single debounced burst costs one
+   *  round-trip, not two. */
   const refreshCounts = useCallback(async (folder?: Folder): Promise<void> => {
-    if (folder) {
-      const result = await api.listFolder(folder);
-      setCounts((current) => ({
-        ...current,
-        [folder]: result.success ? countConcepts(folder, result.data) : 0,
-      }));
-      return;
-    }
-    const [input, wiki] = await Promise.all([
-      api.listFolder("input"),
-      api.listFolder("wiki"),
-    ]);
-    setCounts({
-      input: input.success ? input.data.length : 0,
-      wiki: wiki.success ? countConcepts("wiki", wiki.data) : 0,
+    const folders: readonly Folder[] = folder ? [folder] : ["input", "wiki"];
+    const results = await Promise.all(folders.map((name) => api.listFolder(name)));
+    folders.forEach((name, index) => {
+      const result = results[index]!;
+      applyListing(name, result.success ? result.data : []);
     });
-  }, [setCounts]);
+  }, [applyListing]);
 
   const refreshSessions = useCallback(async (): Promise<readonly SessionInfo[]> => {
     const list = await api.listSessions();
@@ -173,23 +171,6 @@ export function AppShell(): JSX.Element {
     setView("chat");
     resetChatTurnUi();
     await refreshSessions();
-  }
-
-  // Kick off /wiki-update from any entry point. Resets the ingest state machine
-  // so the previous run's state does not linger, navigates to the ingest view,
-  // and surfaces IPC-level errors (turn-level errors arrive via the ingest
-  // event stream and are handled in App.tsx).
-  async function runIngest(): Promise<void> {
-    setView("ingest");
-    setIngestSummary(null);
-    setIngestStream("");
-    setIngestError(null);
-    setIngestState("running");
-    const result = await api.ingest();
-    if (!result.success) {
-      setIngestState("idle");
-      setIngestError(result.error.message);
-    }
   }
 
   useEffect(() => {
@@ -259,10 +240,18 @@ export function AppShell(): JSX.Element {
     return unsubscribe;
   }, [setFolderVersion, refreshCounts]);
 
-  const navBtn = (target: "chat" | "dashboard" | "browser", label: string): JSX.Element => (
+  const navigate = (target: NavigationTarget): void => {
+    if (target === "files") showBrowser("input");
+    else if (target === "wiki") showBrowser("wiki");
+    else setView(target);
+  };
+
+  const navLink = (target: NavigationTarget, label: string): JSX.Element => (
     <button
-      className={`btn btn-sm btn-ghost mono${view === target ? " active" : ""}`}
-      onClick={() => setView(target)}
+      type="button"
+      className="appnav-link"
+      aria-current={activeTarget === target ? "page" : undefined}
+      onClick={() => navigate(target)}
     >
       {label}
     </button>
@@ -321,7 +310,8 @@ export function AppShell(): JSX.Element {
         void handleDropFiles(event.dataTransfer.files);
       }}
     >
-      {dragOver && (
+      {/* The dashboard has its own drop zone, which lights up instead. */}
+      {dragOver && view !== "dashboard" && (
         <div
           style={{
             position: "fixed",
@@ -355,14 +345,24 @@ export function AppShell(): JSX.Element {
         <div className="brand"><span className="mark">{t("app.avatar")}</span> {t("app.name")}</div>
         <span className="crumb">{workspace?.name ?? ""}</span>
         <div className="spacer" />
-        {navBtn("dashboard", t("nav.workspace"))}
-        {navBtn("chat", t("nav.chat"))}
-        {navBtn("browser", t("nav.files"))}
-        {workspace && (
-          <button className="iconbtn" onClick={() => setView("settings")} title={t("nav.settings")}>
-            <SettingsIcon size={16} />
-          </button>
-        )}
+        <nav className="appnav" aria-label={t("nav.main")}>
+          {navLink("dashboard", t("nav.workspace"))}
+          {navLink("chat", t("nav.chat"))}
+          {navLink("files", t("nav.files"))}
+          {navLink("wiki", t("nav.wiki"))}
+          {workspace && (
+            <button
+              type="button"
+              className="appnav-link appnav-icon"
+              aria-current={view === "settings" ? "page" : undefined}
+              onClick={() => setView("settings")}
+              title={t("nav.settings")}
+              aria-label={t("nav.settings")}
+            >
+              <SettingsIcon size={18} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+          )}
+        </nav>
         <UpdateBadge />
       </header>
       <div className="body">
@@ -384,15 +384,22 @@ export function AppShell(): JSX.Element {
           </Fragment>
         )}
         <main className="pane grow">
-          {view === "dashboard" && <Dashboard onAsk={() => void startNewSession()} onOpenSession={(path) => void openSession(path)} onDeleteSession={handleDeleteSession} onSwitchWorkspace={() => setScreen("picker")} onBrowser={(folder) => { setBrowserFolder(folder); setBrowserMode("files"); setView("browser"); }} onIngest={runIngest} onViewIngest={() => setView("ingest")} />}
+          {view === "dashboard" && (
+            <Dashboard
+              onNewChat={() => void startNewSession()}
+              onOpenSession={(path) => void openSession(path)}
+              onSwitchWorkspace={() => setScreen("picker")}
+            />
+          )}
           {view === "chat" && <Chat />}
           {view === "browser" && <Browser />}
-          {view === "ingest" && <IngestView onRun={runIngest} />}
+          {view === "ingest" && <IngestView onRun={() => void runIngest()} />}
           {view === "settings" && <Settings />}
         </main>
       </div>
-      {(ingestState !== "idle" || view === "dashboard") && (
-        <IngestBar onRun={runIngest} onView={view !== "ingest" ? () => setView("ingest") : undefined} />
+      {/* The dashboard shows ingest status in its own card. */}
+      {ingestState !== "idle" && view !== "dashboard" && (
+        <IngestBar onRun={() => void runIngest()} onView={view !== "ingest" ? () => setView("ingest") : undefined} />
       )}
       {addFilesSummary && (
         <AddFilesSummaryModal

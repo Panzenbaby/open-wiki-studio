@@ -48,7 +48,7 @@ const SOURCE_PREFIX = "archive/";
  *  real, possibly collision-renamed path); the leading slash and the `wiki/`
  *  prefix are both tolerated. Percent-encoding is decoded so a citation with
  *  spaces matches the file on disk. */
-function normalizeSourceRef(ref: string): string | null {
+export function normalizeSourceRef(ref: string): string | null {
   let p = stripAngleBrackets(ref).split("#")[0]!.split("?")[0]!;
   if (/^(https?:|mailto:)/.test(p)) return null;
   try {
@@ -103,7 +103,7 @@ function extractLinks(store: ConceptStore, concept: Concept): readonly string[] 
 /** Every file under `wiki/archive/`, as POSIX paths relative to that folder.
  *  Cited-but-missing originals are filtered against this set, mirroring the
  *  existing "edges only to concepts that exist" rule. */
-async function listArchiveFiles(wikiDir: string): Promise<ReadonlySet<string>> {
+export async function listArchiveFiles(wikiDir: string): Promise<ReadonlySet<string>> {
   const root = join(wikiDir, "archive");
   const out = new Set<string>();
   const walk = async (dir: string): Promise<void> => {

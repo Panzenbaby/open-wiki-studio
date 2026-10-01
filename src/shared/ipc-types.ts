@@ -64,6 +64,9 @@ export interface AppSelfInfo {
   readonly hasLlmConfig: boolean;
   /** Electron process.platform (e.g. "darwin", "win32", "linux"), for OS-adaptive UI. */
   readonly platform: string;
+  /** The user's home directory, so the renderer can show workspace paths as
+   *  `~/…` on macOS and Linux. */
+  readonly homeDirectory: string;
 }
 
 // ─── LLM config (first-run) ──────────────────────────────────────────
@@ -135,6 +138,9 @@ export interface FileNode {
   readonly isDirectory: boolean;
   /** Wiki concept review status; absent for non-concept files. */
   readonly verified?: boolean;
+  /** File size in bytes. Set for `input/` listings only — the dashboard shows
+   *  it for pending files; the wiki walk skips the extra `stat` per file. */
+  readonly size?: number;
 }
 
 export interface ConceptInfo {
@@ -210,6 +216,9 @@ export interface SessionInfo {
   readonly lastModified: string;
   /** True while an agent turn is actively streaming for this session. */
   readonly streaming: boolean;
+  /** Plain-text start of the first answer (markdown stripped, shortened), or
+   *  `""` while the session has no answer yet. */
+  readonly preview: string;
 }
 
 export interface ChatMessage {
@@ -235,7 +244,22 @@ export type AgentEvent =
       notifyType?: "info" | "warning" | "error";
     };
 
+/** Outcome of one input file in an ingest run. `processed` files left
+ *  `input/` (archived into `wiki/archive/`); `leftover` files are still in
+ *  `input/` — the run did not ingest them. The concept counts are the created
+ *  and updated concepts that cite the file's archived original. */
+export interface IngestFileResult {
+  /** POSIX path relative to `input/`, as it was before the run. */
+  readonly relativePath: string;
+  readonly status: "processed" | "leftover";
+  readonly createdConcepts: number;
+  readonly updatedConcepts: number;
+}
+
 export interface IngestSummary {
+  /** Per-file outcome for every file that was in `input/` when the run
+   *  started, sorted by path. */
+  readonly files: readonly IngestFileResult[];
   readonly leftover: readonly string[];
   readonly createdConcepts: readonly string[];
   readonly updatedConcepts: readonly string[];
@@ -391,6 +415,8 @@ export interface AgentApi {
   addInputFilesDialog(): Promise<Result<AddFilesSummary>>;
   /** Reveal a file/folder in the OS file manager (Finder / Explorer / file manager). */
   revealInFileManager(folder: Folder, relativePath: string, isDirectory: boolean): Promise<Result<void>>;
+  /** Open the active workspace folder itself in the OS file manager. */
+  openWorkspaceFolder(): Promise<Result<void>>;
 
   // removal
   /** What removing this concept/directory would affect. Does not mutate. */

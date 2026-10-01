@@ -1,42 +1,38 @@
 import { useEffect, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { ArrowLeftRight, ArrowUpCircle, Download, FileText, Merge, Play, Trash2, Upload } from "lucide-react";
+import { MessageSquare, Settings as SettingsIcon } from "lucide-react";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
-import { ConfirmModal } from "../components/ConfirmModal.tsx";
+import { useNavigation } from "../navigation.ts";
 import { MergeWorkspacesModal } from "../components/MergeWorkspacesModal.tsx";
 import { MigrateWikiModal } from "../components/MigrateWikiModal.tsx";
-import { countsAtom, currentSessionAtom, folderVersionAtom, ingestStateAtom, toastAtom, visibleSessionsAtom, workspaceAtom } from "../store.ts";
+import { AddFilesCard } from "../components/dashboard/AddFilesCard.tsx";
+import { IngestCard } from "../components/dashboard/IngestCard.tsx";
+import { MigrationCard } from "../components/dashboard/MigrationCard.tsx";
+import { RecentChatsCard } from "../components/dashboard/RecentChatsCard.tsx";
+import { WikiCard } from "../components/dashboard/WikiCard.tsx";
+import { WorkspaceCard } from "../components/dashboard/WorkspaceCard.tsx";
+import { folderVersionAtom, ingestStateAtom, toastAtom, workspaceAtom } from "../store.ts";
 import type { MigrationPlan } from "../../shared/ipc-types.ts";
 
 interface DashboardProps {
-  onAsk: () => void;
+  onNewChat: () => void;
   onOpenSession: (path: string) => void;
-  onDeleteSession: (path: string) => void;
   onSwitchWorkspace: () => void;
-  onBrowser: (folder: "input" | "wiki") => void;
-  onIngest: () => void;
-  onViewIngest: () => void;
 }
 
 export function Dashboard(props: DashboardProps): JSX.Element {
   const t = useT();
-  const counts = useAtomValue(countsAtom);
   const workspace = useAtomValue(workspaceAtom);
   const ingestState = useAtomValue(ingestStateAtom);
-  const sessions = useAtomValue(visibleSessionsAtom);
-  const currentSession = useAtomValue(currentSessionAtom);
   const folderVersion = useAtomValue(folderVersionAtom);
   const setToast = useSetAtom(toastAtom);
+  const { showBrowser, showView } = useNavigation();
   const [merging, setMerging] = useState<boolean>(false);
   const [migrationPlan, setMigrationPlan] = useState<MigrationPlan | null>(null);
   const [migrateOpen, setMigrateOpen] = useState<boolean>(false);
   const [migrating, setMigrating] = useState<boolean>(false);
-  const [pendingDeletePath, setPendingDeletePath] = useState<string | null>(null);
   const running = ingestState === "running";
-  const inputPending = counts.input > 0;
-  const showIngest = inputPending || running;
-  const summaryKey = showIngest ? "dashboard.summaryShort" : "dashboard.summary";
 
   // Re-checked whenever the wiki changes on disk: an ingest can add concepts,
   // and a merge can pull legacy ones in from another workspace.
@@ -46,8 +42,6 @@ export function Dashboard(props: DashboardProps): JSX.Element {
       setMigrationPlan(result.success ? result.data : null);
     })();
   }, [folderVersion.wiki]);
-
-  const legacyConcepts = migrationPlan?.conceptIds.length ?? 0;
 
   const confirmMigration = async (): Promise<void> => {
     setMigrating(true);
@@ -62,115 +56,49 @@ export function Dashboard(props: DashboardProps): JSX.Element {
     setToast({ message: t("migrate.done", { n: result.data.migrated.length }), kind: "info" });
   };
 
-  const askDelete = (path: string): void => {
-    setPendingDeletePath(path);
-  };
-
-  const confirmDelete = (): void => {
-    if (pendingDeletePath === null) return;
-    props.onDeleteSession(pendingDeletePath);
-    setPendingDeletePath(null);
-  };
-
   return (
-    <div className="ws pane grow">
-      <div className="ws-inner">
-        <div className="ws-hero">
-          <div>
-            <span className="kicker">
-              {t("dashboard.kicker", { name: workspace?.name ?? "" })}
-            </span>
-            <h1>{t("dashboard.title", { name: workspace?.name ?? "" })}</h1>
-            <p>{t(summaryKey, showIngest ? { wiki: counts.wiki } : { wiki: counts.wiki, input: counts.input })}</p>
-          </div>
-          <div className="row wrap">
-            <button className="btn btn-primary" onClick={props.onAsk}>{t("dashboard.newQuestion")}</button>
-            <button className="btn btn-ghost" onClick={props.onSwitchWorkspace}><ArrowLeftRight size={14} /> {t("nav.switchWorkspace")}</button>
-            {/* A merge copies the wiki as it is on disk — refuse while an ingest
-                is rewriting it. */}
-            <button className="btn btn-ghost" disabled={running} onClick={() => setMerging(true)}><Merge size={14} /> {t("merge.action")}</button>
-          </div>
-        </div>
-
-        {legacyConcepts > 0 && (
-          <div className="migrate-hero">
-            <div className="grow">
-              <div className="hero-title">
-                {t("migrate.bannerTitle", { version: migrationPlan?.targetVersion ?? "" })}
-              </div>
-              <div className="hero-sub fg2">
-                {t("migrate.bannerSub", { n: legacyConcepts })}
-              </div>
+    <div className="dashboard">
+      <div className="dashboard-inner">
+        <header className="dashboard-header">
+          <div className="dashboard-heading">
+            <span className="dashboard-kicker">{t("dashboard.kicker", { name: workspace?.name ?? "" })}</span>
+            <div className="dashboard-title-row">
+              <h1>{t("dashboard.heading")}</h1>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={t("dashboard.openSettings")}
+                title={t("dashboard.openSettings")}
+                onClick={() => showView("settings")}
+              >
+                <SettingsIcon size={20} strokeWidth={1.75} aria-hidden="true" />
+              </button>
             </div>
-            {/* A migration rewrites the wiki as it is on disk — refuse while an
-                ingest is writing to it. */}
-            <button className="btn btn-primary" disabled={running} onClick={() => setMigrateOpen(true)}>
-              <ArrowUpCircle size={14} /> {t("migrate.action")}
-            </button>
           </div>
+          <button type="button" className="btn btn-xl btn-primary" onClick={props.onNewChat}>
+            <MessageSquare size={18} aria-hidden="true" /> {t("dashboard.newChat")}
+          </button>
+        </header>
+
+        {migrationPlan && migrationPlan.conceptIds.length > 0 && (
+          <MigrationCard plan={migrationPlan} disabled={running} onUpgrade={() => setMigrateOpen(true)} />
         )}
 
-        {showIngest && (
-          <div className="ingest-hero">
-            <div className="grow">
-              <div className="hero-title row">
-                <span className="pulse" /> {running ? t("dashboard.ingestRunning") : t("dashboard.inputWaiting", { n: counts.input })}
-              </div>
-              <div className="hero-sub fg2">{running ? t("dashboard.ingestRunningSub") : t("dashboard.ingestHint")}</div>
-              <div className="drop-hint"><Upload size={14} aria-hidden="true" />{t("files.dragDropHint")}</div>
-            </div>
-            <div className="row">
-              {running ? (
-                <button className="btn btn-primary" onClick={props.onViewIngest}>{t("dashboard.viewProgress")}</button>
-              ) : (
-                <>
-                  <button className="btn" onClick={() => props.onBrowser("input")}>{t("dashboard.viewInput")}</button>
-                  <button className="btn btn-primary" onClick={props.onIngest}><Play size={14} /> {t("dashboard.runUpdate")}</button>
-                </>
-              )}
-            </div>
+        <div className="dashboard-grid">
+          <div className="dashboard-column">
+            <WorkspaceCard
+              onSwitch={props.onSwitchWorkspace}
+              onMerge={() => setMerging(true)}
+              mergeDisabled={running}
+            />
+            <AddFilesCard onShowFiles={() => showBrowser("input")} />
+            <IngestCard />
           </div>
-        )}
-
-        <div className={`folder-cards${showIngest ? " single" : ""}`}>
-          {!showIngest && <FolderCard dot="input" onClick={() => props.onBrowser("input")} />}
-          <FolderCard dot="wiki" onClick={() => props.onBrowser("wiki")} />
+          <div className="dashboard-column">
+            <WikiCard />
+            <RecentChatsCard onOpenSession={props.onOpenSession} />
+          </div>
         </div>
-
-        <section>
-          <div className="side-title">{t("sidebar.sessions")}</div>
-          {sessions.length === 0 ? (
-            <div className="no-sessions">{t("sidebar.noSessions")}</div>
-          ) : (
-            <div className="recent-sessions">
-              {sessions.map((session) => (
-                <div key={session.path} className="session-row">
-                  <button
-                    type="button"
-                    className={`rs-item${currentSession?.path === session.path ? " active" : ""}`}
-                    onClick={() => props.onOpenSession(session.path)}
-                  >
-                    <span className="rs-content">
-                      <span className="rs-title" title={session.name}>{session.name}</span>
-                      <span className="rs-prev mono">{new Date(session.lastModified).toLocaleString()}</span>
-                    </span>
-                  </button>
-                  <span className="session-row-actions">
-                    <button
-                      type="button"
-                      className="session-delete-dash"
-                      title={t("session.delete")}
-                      aria-label={t("session.delete")}
-                      onClick={() => askDelete(session.path)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
       </div>
       {merging && <MergeWorkspacesModal onClose={() => setMerging(false)} />}
       {migrateOpen && migrationPlan && (
@@ -181,40 +109,6 @@ export function Dashboard(props: DashboardProps): JSX.Element {
           onCancel={() => setMigrateOpen(false)}
         />
       )}
-      {pendingDeletePath !== null && (
-        <ConfirmModal
-          title={t("session.confirmDeleteTitle")}
-          message={t("session.confirmDelete")}
-          confirmLabel={t("session.delete")}
-          cancelLabel={t("action.cancel")}
-          onConfirm={confirmDelete}
-          onCancel={() => setPendingDeletePath(null)}
-        />
-      )}
     </div>
-  );
-}
-
-function FolderCard(props: { dot: "input" | "wiki"; onClick: () => void }): JSX.Element {
-  const t = useT();
-  const counts = useAtomValue(countsAtom);
-  const n = props.dot === "input" ? counts.input : counts.wiki;
-  const nameKey = props.dot === "input" ? "folder.input.name" : "folder.wiki.name";
-  const countKey = props.dot === "input" ? "folder.input.count" : "folder.wiki.count";
-  const descKey = props.dot === "input" ? "folder.input.desc" : "folder.wiki.desc";
-  return (
-    <button type="button" className="folder-card" onClick={props.onClick}>
-      <div className="fc-head">
-        <div className={`fc-icon ${props.dot}`}>{props.dot === "input" ? <Download size={18} /> : <FileText size={18} />}</div>
-        <div>
-          <div className="fc-name">{t(nameKey)}</div>
-          <div className="fc-count mono">{t(countKey, { n })}</div>
-        </div>
-      </div>
-      <div className="fc-desc">{t(descKey)}</div>
-      {props.dot === "input" && (
-        <div className="drop-hint folder-card-drop-hint"><Upload size={14} aria-hidden="true" />{t("files.dragDropHint")}</div>
-      )}
-    </button>
   );
 }

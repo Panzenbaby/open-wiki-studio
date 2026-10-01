@@ -43,6 +43,7 @@ const api: AgentApi = {
   getPathForFile: (file) => webUtils.getPathForFile(file),
   addInputFilesDialog: () => ipcRenderer.invoke("okf:addInputFilesDialog"),
   revealInFileManager: (folder, relativePath, isDirectory) => ipcRenderer.invoke("okf:revealInFileManager", folder, relativePath, isDirectory),
+  openWorkspaceFolder: () => ipcRenderer.invoke("okf:openWorkspaceFolder"),
   planRemoval: (relativePath) => ipcRenderer.invoke("okf:planRemoval", relativePath),
   removeFromWiki: (relativePath) => ipcRenderer.invoke("okf:removeFromWiki", relativePath),
   planMigration: () => ipcRenderer.invoke("okf:planMigration"),

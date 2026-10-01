@@ -6,6 +6,7 @@ import {
   platformAtom,
   recentWorkspacesAtom,
   currentVersionAtom,
+  homeDirectoryAtom,
   screenAtom,
 } from "./store.ts";
 import { useT, localeAtom } from "./i18n.ts";
@@ -24,6 +25,7 @@ export function App(): JSX.Element {
   const setRecent = useSetAtom(recentWorkspacesAtom);
   const setPlatform = useSetAtom(platformAtom);
   const setCurrentVersion = useSetAtom(currentVersionAtom);
+  const setHomeDirectory = useSetAtom(homeDirectoryAtom);
   const store = useStore();
 
   useEffect(() => {
@@ -38,10 +40,11 @@ export function App(): JSX.Element {
       if (self.success) {
         setPlatform(self.data.platform);
         setCurrentVersion(self.data.version);
+        setHomeDirectory(self.data.homeDirectory);
       }
       setScreen("picker");
     })();
-  }, [setRecent, setScreen, setPlatform, setCurrentVersion]);
+  }, [setRecent, setScreen, setPlatform, setCurrentVersion, setHomeDirectory]);
 
   useEffect(() => bindAgentEvents(api, store, locale), [store, locale]);
 

@@ -3,7 +3,7 @@
 // globally in index.ts; this bridge registers the handlers that need an
 // active AgentRepository.
 import { BrowserWindow, dialog, ipcMain, type WebContents } from "electron";
-import { addInputFiles, fileExists, getPreview, listFolder, revealInFileManager, setConceptVerified } from "./files.ts";
+import { addInputFiles, fileExists, getPreview, listFolder, openWorkspaceFolder, revealInFileManager, setConceptVerified } from "./files.ts";
 import { buildWikiGraph } from "./wiki-graph.ts";
 import { planRemoval, removeFromWiki } from "./wiki-remove.ts";
 import { migrateWiki, planMigration } from "./wiki-migrate.ts";
@@ -69,6 +69,7 @@ const BRIDGE_CHANNELS = [
   "addInputFiles",
   "addInputFilesDialog",
   "revealInFileManager",
+  "openWorkspaceFolder",
   "planRemoval",
   "removeFromWiki",
   "planMigration",
@@ -212,6 +213,7 @@ export class IpcBridge {
       },
       revealInFileManager: async (folder: Folder, relativePath: string, isDirectory: boolean) =>
         revealInFileManager(workspace, folder, relativePath, isDirectory),
+      openWorkspaceFolder: async () => openWorkspaceFolder(workspace),
       planRemoval: async (relativePath: string) => planRemoval(workspace, relativePath),
       removeFromWiki: async (relativePath: string) => removeFromWiki(workspace, relativePath),
       planMigration: async () => planMigration(workspace),

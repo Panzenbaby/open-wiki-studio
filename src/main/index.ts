@@ -181,7 +181,12 @@ function registerGlobalHandlers(): void {
       !!llm &&
       !!llm.modelId &&
       (!!llm.apiKey || noKeyProviders.includes(llm.provider));
-    return ok({ version: app.getVersion(), hasLlmConfig, platform: process.platform });
+    return ok({
+      version: app.getVersion(),
+      hasLlmConfig,
+      platform: process.platform,
+      homeDirectory: app.getPath("home"),
+    });
   });
 
   // Opens the Copilot OAuth verification URL in the default browser (global).

@@ -15,7 +15,8 @@
 //   pi->AgentEvent translator (`forwardAgentEvents`) is a module-level free
 //   function here, shared with the ingest path and injected into the pool as a
 //   dep so the pool does not import this module.
-// - ingest summary computed from a before/after wiki snapshot (wiki-scan.ts).
+// - ingest summary computed from a before/after wiki snapshot (wiki-scan.ts),
+//   plus a per-input-file outcome (ingest-file-results.ts).
 import { app } from "electron";
 import { mkdirSync } from "node:fs";
 import { unlink } from "node:fs/promises";
@@ -38,6 +39,7 @@ import { resolveOkfExtensionPath } from "./resource.ts";
 import { registerWikiChatInstructionsHook } from "./wiki-chat-instructions.ts";
 import { registerWikiIngestInstructionsHook } from "./wiki-ingest-instructions.ts";
 import { diffSnapshots, listInputFiles, markChangedConceptsUnverified, snapshotWiki } from "./wiki-scan.ts";
+import { captureIngestStartState, loadIngestFileResults } from "./ingest-file-results.ts";
 import { ok, err, errorMessage } from "../shared/result.ts";
 import { mainT } from "./i18n.ts";
 import { ModelCatalog } from "./model-catalog.ts";
@@ -57,7 +59,7 @@ import type {
   Result,
   SessionInfo,
 } from "../shared/ipc-types.ts";
-import { stripQueryCommand } from "../shared/text.ts";
+import { buildSessionPreview, stripQueryCommand } from "../shared/text.ts";
 
 /**
  * Dedicated agent directory for the app (NOT the user's ~/.pi/agent), so the
@@ -337,6 +339,7 @@ export class AgentRepository {
           name: stripQueryCommand(s.name ?? s.firstMessage ?? mainT("session.newDefault")),
           lastModified: s.modified.toISOString(),
           streaming: this.pool.isStreaming(s.path),
+          preview: buildSessionPreview(s.allMessagesText, s.firstMessage),
         })),
       );
     } catch (error) {
@@ -356,6 +359,7 @@ export class AgentRepository {
         name: mainT("session.newDefault"),
         lastModified: new Date().toISOString(),
         streaming: live.session.isStreaming,
+        preview: "",
       });
     } catch (error) {
       return err<SessionInfo>(
@@ -394,6 +398,7 @@ export class AgentRepository {
         name: stripQueryCommand(info?.name ?? info?.firstMessage ?? mainT("session.newDefault")),
         lastModified: (info?.modified ?? new Date()).toISOString(),
         streaming: live.session.isStreaming,
+        preview: info ? buildSessionPreview(info.allMessagesText, info.firstMessage) : "",
       });
     } catch (error) {
       return err<SessionInfo>(
@@ -461,6 +466,7 @@ export class AgentRepository {
       await this.resetIngestSession();
 
       const before = await snapshotWiki(this.workspace);
+      const start = await captureIngestStartState(this.workspace, await listInputFiles(this.workspace));
 
       const sawStart = await awaitIngestTurn(this.ingestSession);
 
@@ -484,6 +490,7 @@ export class AgentRepository {
       }
 
       const summary: IngestSummary = {
+        files: await loadIngestFileResults(this.workspace, start, leftover, diff),
         leftover,
         createdConcepts: diff.created,
         updatedConcepts: diff.updated,
