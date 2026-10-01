@@ -383,7 +383,7 @@ export function AppShell(): JSX.Element {
             />
           </Fragment>
         )}
-        <main className="pane grow">
+        <main className="screen-host">
           {view === "dashboard" && (
             <Dashboard
               onNewChat={() => void startNewSession()}

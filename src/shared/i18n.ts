@@ -293,6 +293,7 @@ export const messages: Record<Locale, Dict> = {
     // ── browser ───────────────────────────────────────────────────
     "browser.viewTabs": "Browser views",
     "markdown.openExternalFailed": "Could not open external link",
+    "markdown.footnotes": "Footnotes",
     "browser.emptyFiles": "No files.",
     "browser.selectFile": "Select a file",
     "browser.addFiles": "Add",
@@ -764,6 +765,7 @@ export const messages: Record<Locale, Dict> = {
     // ── browser ───────────────────────────────────────────────────
     "browser.viewTabs": "Browser-Ansichten",
     "markdown.openExternalFailed": "Externer Link konnte nicht geöffnet werden",
+    "markdown.footnotes": "Fußnoten",
     "browser.emptyFiles": "Keine Dateien.",
     "browser.selectFile": "Datei auswählen",
     "browser.addFiles": "Hinzufügen",

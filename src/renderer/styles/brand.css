@@ -400,6 +400,12 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 .body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 .pane { min-height: 0; overflow: auto; }
+/* Hosts the active screen. It is deliberately not a scroll container: every
+   screen owns its scrolling (dashboard, settings, chat stream, browser
+   preview pane). A second, outer scroll container would also be moved by
+   `scrollIntoView` (e.g. footnote jumps), shifting the whole screen.
+   `overflow: clip` — unlike `hidden` — cannot be scrolled programmatically. */
+.screen-host { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: clip; }
 .divider { width: 1px; background: var(--border-soft); }
 .divider-h { height: 1px; background: var(--border-soft); }
 
@@ -475,7 +481,7 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .thumb { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--glass-bg); height: 160px; display: grid; place-items: center; color: var(--muted); font-family: var(--font-mono); font-size: var(--text-xs); }
 
 /* ---------- browser (file tree + preview) ---------- */
-.browser { height: 100%; }
+.browser { flex: 1; }
 .browser-sidebar { width: 280px; }
 /* Tabpanel wrapper inside the pane: fills it so the graph still gets a full
    height, and grows past it so the preview keeps scrolling on the pane. */
@@ -522,6 +528,12 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 .msg .content .cmd { font-family: var(--font-mono); color: var(--accent); background: color-mix(in oklab, var(--accent), transparent 82%); padding: 1px 6px; border-radius: 4px; font-size: .9em; }
 
 /* ---------- markdown body (assistant answers) ---------- */
+/* Containing block for absolutely positioned content such as the visually
+   hidden GFM footnote heading (`.sr-only`). Without it that heading is
+   positioned against the viewport, escapes every clipping/scroll container,
+   and makes the whole document scrollable — a footnote jump then scrolls the
+   window and shows an empty area. */
+.markdown { position: relative; }
 .markdown > :first-child { margin-top: 0; }
 .markdown h1, .markdown h2, .markdown h3, .markdown h4 { margin: var(--space-5) 0 var(--space-2); line-height: 1.3; }
 .markdown h1 { font-size: var(--text-xl); }
@@ -743,7 +755,7 @@ textarea.input { height: auto; padding: var(--space-3); line-height: var(--leadi
 
 
 /* ---------- dashboard ---------- */
-.dashboard { flex: 1; min-height: 100%; font-size: 15px; line-height: 1.5; }
+.dashboard { flex: 1; min-height: 0; overflow-y: auto; font-size: 15px; line-height: 1.5; }
 .dashboard-inner { max-width: 1200px; margin: 0 auto; padding: 40px var(--space-8) 64px; display: flex; flex-direction: column; gap: var(--space-6); }
 .dashboard h1, .dashboard h2 { font-family: var(--font-display); }
 .dashboard-header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-6); flex-wrap: wrap; }

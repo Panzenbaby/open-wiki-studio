@@ -1,5 +1,6 @@
 import { useSetAtom } from "jotai";
 import { FileText, Folder as FolderIcon } from "lucide-react";
+import { useRef } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api } from "../ipc.ts";
@@ -69,10 +70,14 @@ function isHttpLink(href: string): boolean {
   }
 }
 
-/** External (http/mailto) or in-page anchor links — never internal wiki
- *  navigation. */
+/** External (http/mailto) links — never internal wiki navigation. */
 function isExternal(href: string): boolean {
-  return isHttpLink(href) || /^(mailto:|#)/.test(href);
+  return isHttpLink(href) || href.startsWith("mailto:");
+}
+
+/** In-page anchor (e.g. a GFM footnote reference `#user-content-fn-x`). */
+function isInPageAnchor(href: string): boolean {
+  return href.startsWith("#");
 }
 
 /** A folder link: href ends in a slash (OKF index.md emits `* [name/](name/)`). */
@@ -178,6 +183,24 @@ export function MarkdownView(props: MarkdownViewProps): JSX.Element {
   const setBrowserFolder = useSetAtom(browserFolderAtom);
   const setBrowserMode = useSetAtom(browserModeAtom);
   const setToast = useSetAtom(toastAtom);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  /** Scroll to an in-page anchor target. The lookup is scoped to this
+   *  view's container: the chat renders several messages side by side and
+   *  each can define the same footnote ids. The default `target="_blank"`
+   *  behavior would open an empty Electron window instead. */
+  function scrollToAnchor(fragment: string): void {
+    const container = containerRef.current;
+    if (!container || fragment === "") return;
+    const candidates: readonly string[] = [fragment, decodeHref(fragment)];
+    for (const id of candidates) {
+      const target = container.querySelector<HTMLElement>(`#${CSS.escape(id)}`);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+    }
+  }
 
   /** Open an internal file link in the Browser: select it (which highlights
    *  it in the tree and expands its ancestors) and show whatever preview is
@@ -215,8 +238,23 @@ export function MarkdownView(props: MarkdownViewProps): JSX.Element {
   }
 
   const components: Components = {
-    a({ href, children }) {
+    a({ href, children, node }) {
       const h = href ?? "";
+      // GFM footnote back-references (the "↩" arrows) are not shown.
+      if (node?.properties.dataFootnoteBackref !== undefined) return null;
+      if (isInPageAnchor(h)) {
+        return (
+          <a
+            href={h}
+            onClick={(event) => {
+              event.preventDefault();
+              scrollToAnchor(h.slice(1));
+            }}
+          >
+            {children}
+          </a>
+        );
+      }
       if (isExternal(h)) {
         if (isHttpLink(h)) {
           const openSystemBrowser = (event: React.MouseEvent<HTMLAnchorElement>): void => {
@@ -287,9 +325,10 @@ export function MarkdownView(props: MarkdownViewProps): JSX.Element {
   };
 
   return (
-    <div className={`markdown${props.className ? ` ${props.className}` : ""}`}>
+    <div ref={containerRef} className={`markdown${props.className ? ` ${props.className}` : ""}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkConceptLinks]}
+        remarkRehypeOptions={{ footnoteLabel: t("markdown.footnotes") }}
         components={components}
       >
         {props.source}
