@@ -497,7 +497,10 @@ describe("ModelCatalog.registerProvider", () => {
 
   it("registers a model only once when the ingest model equals the chat model", async () => {
     const { registry, registered } = makeModelRegistry([], []);
-    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, makeAuthStorage()) });
+    const catalog = new ModelCatalog({
+      modelRuntime: makeModelRuntime(registry, makeAuthStorage()),
+      fetch: makeFetch([{ url: "http://my-endpoint/v1/models", ids: ["my-model"] }]),
+    });
 
     const config: LlmConfig = {
       provider: "openai-compatible",
@@ -510,10 +513,68 @@ describe("ModelCatalog.registerProvider", () => {
     expect(registered[0]!.config.models?.map((model) => model.id)).toEqual(["my-model"]);
   });
 
+  it("registers Requesty vision metadata as image input per model", async () => {
+    const { registry, registered } = makeModelRegistry([], []);
+    const auth = makeAuthStorage();
+    const fetch: typeof globalThis.fetch = async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      expect(url).toBe("https://router.requesty.ai/v1/models");
+      expect((init?.headers as Record<string, string> | undefined)?.Authorization).toBe("Bearer key-1");
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        json: async () => ({
+          data: [
+            { id: "anthropic/claude-opus-4-5", supports_vision: true },
+            { id: "text-only-model", supports_vision: false },
+          ],
+        }),
+      } as Response;
+    };
+    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, auth), fetch });
+
+    await catalog.registerProvider({
+      provider: "openai-compatible",
+      modelId: "anthropic/claude-opus-4-5",
+      ingestModelId: "text-only-model",
+      baseUrl: "https://router.requesty.ai/v1",
+      apiKey: "key-1",
+    });
+
+    const registeredModels = registered[0]?.config.models ?? [];
+    expect(registeredModels.map((model) => [model.id, model.input])).toEqual([
+      ["anthropic/claude-opus-4-5", ["text", "image"]],
+      ["text-only-model", ["text"]],
+    ]);
+  });
+
+  it("continues with text-only metadata when an endpoint does not expose vision fields", async () => {
+    const { registry, registered } = makeModelRegistry([], []);
+    const catalog = new ModelCatalog({
+      modelRuntime: makeModelRuntime(registry, makeAuthStorage()),
+      fetch: makeFetch([{ url: "https://example.test/v1/models", ids: ["my-model"] }]),
+    });
+
+    await catalog.registerProvider({
+      provider: "openai-compatible",
+      modelId: "my-model",
+      baseUrl: "https://example.test/v1",
+    });
+
+    expect(registered[0]?.config.models?.[0]?.input).toEqual(["text"]);
+  });
+
   it("registers an openai-compatible provider without persisting its key in provider config", async () => {
     const { registry, registered } = makeModelRegistry([], []);
     const auth = makeAuthStorage();
-    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, auth) });
+    const catalog = new ModelCatalog({
+      modelRuntime: makeModelRuntime(registry, auth),
+      fetch: makeFetch([{ url: "http://my-endpoint/v1/models", ids: ["my-model"] }]),
+    });
 
     const config: LlmConfig = {
       provider: "openai-compatible",
@@ -536,7 +597,13 @@ describe("ModelCatalog.registerProvider", () => {
   it("clears a stale OpenAI-compatible key when configuring a new endpoint without one", async () => {
     const { registry } = makeModelRegistry([], []);
     const runtimeCredentials = makeAuthStorage();
-    const catalog = new ModelCatalog({ modelRuntime: makeModelRuntime(registry, runtimeCredentials) });
+    const catalog = new ModelCatalog({
+      modelRuntime: makeModelRuntime(registry, runtimeCredentials),
+      fetch: makeFetch([
+        { url: "https://old.example/v1/models", ids: ["old-model"] },
+        { url: "https://new.example/v1/models", ids: ["new-model"] },
+      ]),
+    });
 
     await catalog.registerProvider({
       provider: "openai-compatible",

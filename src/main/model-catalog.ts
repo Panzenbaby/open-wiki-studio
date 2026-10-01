@@ -183,6 +183,14 @@ export class ModelCatalog {
     }
 
     if (config.provider === "ollama" || config.provider === "openai-compatible") {
+      // OpenAI-compatible catalogs may expose per-model vision metadata (for
+      // example Requesty's `supports_vision`). Fetch it at configuration time
+      // so the ingest extension receives accurate Pi model input metadata.
+      // This is optional: endpoints without the field or an available catalog
+      // remain text-only rather than blocking LLM configuration.
+      const visionModelIds = config.provider === "openai-compatible"
+        ? await this.fetchVisionModelIds(baseUrl, config.apiKey).catch(() => new Set<string>())
+        : new Set<string>();
       this.deps.modelRuntime.registerProvider(providerName, {
         name: config.provider === "ollama" ? "Ollama" : "OpenAI-compatible",
         baseUrl,
@@ -199,7 +207,7 @@ export class ModelCatalog {
           id: modelId,
           name: modelId,
           reasoning: false,
-          input: ["text"],
+          input: visionModelIds.has(modelId) ? ["text", "image"] : ["text"],
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
           contextWindow: 128000,
           maxTokens: 8192,
@@ -248,6 +256,30 @@ export class ModelCatalog {
   // See ADR 0001. All endpoints speak the OpenAI-compat /v1/models shape:
   // { data: [{ id: string, ... }] }. Cloud models get a runnable suffix so the
   // local Ollama server routes them to Ollama Cloud (requires `ollama signin`).
+
+  private async fetchVisionModelIds(baseUrl: string, apiKey?: string): Promise<ReadonlySet<string>> {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+    const response = await this.fetchImpl(`${ensureV1Suffix(baseUrl)}/models`, {
+      headers,
+      signal: AbortSignal.timeout(MODEL_FETCH_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+
+    const json: unknown = await response.json();
+    if (typeof json !== "object" || json === null || !("data" in json) || !Array.isArray(json.data)) {
+      return new Set<string>();
+    }
+    const visionModelIds = new Set<string>();
+    for (const entry of json.data) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const model = entry as { id?: unknown; supports_vision?: unknown };
+      if (typeof model.id === "string" && model.supports_vision === true) {
+        visionModelIds.add(model.id);
+      }
+    }
+    return visionModelIds;
+  }
 
   private async fetchModelList(url: string, apiKey?: string): Promise<readonly string[]> {
     const headers: Record<string, string> = { Accept: "application/json" };
