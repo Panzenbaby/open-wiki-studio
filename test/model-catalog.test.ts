@@ -6,7 +6,7 @@
 // `authStorage` deps are narrowed to a structural `Pick`, so minimal typed fakes
 // (plain objects) stand in for them — no `any`, no real services, no disk.
 import { describe, expect, it } from "vitest";
-import { ModelCatalog, type ModelCatalogDeps } from "../src/main/model-catalog.ts";
+import { effectiveIngestModelId, ModelCatalog, type ModelCatalogDeps, type ResolvedLlmModels } from "../src/main/model-catalog.ts";
 import type { LlmConfig, ModelOption, Result } from "../src/shared/ipc-types.ts";
 
 // ─── Minimal typed fakes ────────────────────────────────────────────────
@@ -131,6 +131,11 @@ function makeFetch(routes: readonly FetchRoute[]): typeof fetch {
 // ─── helpers for reading results ────────────────────────────────────────
 
 function models(r: Result<readonly ModelOption[]>): readonly ModelOption[] {
+  if (!r.success) throw new Error(`expected success, got error: ${r.error.message}`);
+  return r.data;
+}
+
+function resolved(r: Result<ResolvedLlmModels>): ResolvedLlmModels {
   if (!r.success) throw new Error(`expected success, got error: ${r.error.message}`);
   return r.data;
 }
@@ -346,16 +351,39 @@ describe("ModelCatalog.listAvailableModels", () => {
   });
 });
 
-describe("ModelCatalog.resolveModel", () => {
-  it("finds a model by provider + modelId", () => {
+describe("effectiveIngestModelId", () => {
+  it("follows the chat model while no separate ingest model is set", () => {
+    expect(effectiveIngestModelId({ modelId: "chat" })).toBe("chat");
+  });
+
+  it("uses the separately chosen ingest model", () => {
+    expect(effectiveIngestModelId({ modelId: "chat", ingestModelId: "strong" })).toBe("strong");
+  });
+});
+
+describe("ModelCatalog.resolveModels", () => {
+  it("finds a model by provider + modelId and uses it for both roles by default", () => {
     const all = [makeModel("ollama", "llama3"), makeModel("openai-compatible", "llama3")];
     const { registry } = makeModelRegistry([], all);
     const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
 
     const config: LlmConfig = { provider: "ollama", modelId: "llama3" };
-    const model = catalog.resolveModel(config);
-    expect(model?.provider).toBe("ollama");
-    expect(model?.id).toBe("llama3");
+    const { chat, ingest } = resolved(catalog.resolveModels(config));
+    expect(chat.provider).toBe("ollama");
+    expect(chat.id).toBe("llama3");
+    expect(ingest).toBe(chat);
+  });
+
+  it("resolves a separately chosen ingest model", () => {
+    const all = [makeModel("anthropic", "claude-haiku"), makeModel("anthropic", "claude-opus")];
+    const { registry } = makeModelRegistry([], all);
+    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+
+    const config: LlmConfig = { provider: "anthropic", modelId: "claude-haiku", ingestModelId: "claude-opus" };
+    const { chat, ingest } = resolved(catalog.resolveModels(config));
+    expect(chat.id).toBe("claude-haiku");
+    expect(ingest.id).toBe("claude-opus");
+    expect(ingest.provider).toBe("anthropic");
   });
 
   it("falls back to modelId alone when the provider has no exact match", () => {
@@ -365,16 +393,23 @@ describe("ModelCatalog.resolveModel", () => {
 
     // provider mismatch, but id matches -> fallback by id alone
     const config: LlmConfig = { provider: "ollama", modelId: "llama3" };
-    const model = catalog.resolveModel(config);
-    expect(model?.id).toBe("llama3");
+    expect(resolved(catalog.resolveModels(config)).chat.id).toBe("llama3");
   });
 
-  it("returns null when the model is absent", () => {
+  it("fails with the missing chat model when it is absent", () => {
     const { registry } = makeModelRegistry([], [makeModel("anthropic", "claude")]);
     const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
 
     const config: LlmConfig = { provider: "ollama", modelId: "missing" };
-    expect(catalog.resolveModel(config)).toBeNull();
+    expect(errorOf(catalog.resolveModels(config))).toBe("Model not found in registry: ollama/missing");
+  });
+
+  it("fails as a whole with the missing ingest model when only the chat model exists", () => {
+    const { registry } = makeModelRegistry([], [makeModel("anthropic", "claude")]);
+    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+
+    const config: LlmConfig = { provider: "anthropic", modelId: "claude", ingestModelId: "gone" };
+    expect(errorOf(catalog.resolveModels(config))).toBe("Model not found in registry: anthropic/gone");
   });
 
   it("treats openai-compatible provider name as 'openai-compatible'", () => {
@@ -383,9 +418,9 @@ describe("ModelCatalog.resolveModel", () => {
     const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
 
     const config: LlmConfig = { provider: "openai-compatible", modelId: "my-model" };
-    const model = catalog.resolveModel(config);
-    expect(model?.provider).toBe("openai-compatible");
-    expect(model?.id).toBe("my-model");
+    const { chat } = resolved(catalog.resolveModels(config));
+    expect(chat.provider).toBe("openai-compatible");
+    expect(chat.id).toBe("my-model");
   });
 });
 
@@ -406,8 +441,40 @@ describe("ModelCatalog.registerProvider", () => {
     expect(call.config.api).toBe("openai-completions");
     expect(call.config.apiKey).toBe("ollama"); // placeholder for ollama without apiKey
     expect(call.config.models?.[0]?.id).toBe("llama3");
+    expect(call.config.models).toHaveLength(1);
     // ollama does NOT touch authStorage
     expect(auth.setCalls).toHaveLength(0);
+  });
+
+  it("registers the chat and a separate ingest model in ONE call (a second call would replace the first)", () => {
+    const { registry, registered } = makeModelRegistry([], []);
+    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+
+    const config: LlmConfig = {
+      provider: "ollama",
+      modelId: "llama3",
+      ingestModelId: "qwen3:32b",
+      baseUrl: "http://localhost:11434/v1",
+    };
+    catalog.registerProvider(config);
+
+    expect(registered).toHaveLength(1);
+    expect(registered[0]!.config.models?.map((model) => model.id)).toEqual(["llama3", "qwen3:32b"]);
+  });
+
+  it("registers a model only once when the ingest model equals the chat model", () => {
+    const { registry, registered } = makeModelRegistry([], []);
+    const catalog = new ModelCatalog({ modelRegistry: registry, authStorage: makeAuthStorage() });
+
+    const config: LlmConfig = {
+      provider: "openai-compatible",
+      modelId: "my-model",
+      ingestModelId: "my-model",
+      baseUrl: "http://my-endpoint/v1",
+    };
+    catalog.registerProvider(config);
+
+    expect(registered[0]!.config.models?.map((model) => model.id)).toEqual(["my-model"]);
   });
 
   it("registers an openai-compatible provider with the provided baseUrl + apiKey", () => {

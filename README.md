@@ -110,6 +110,22 @@ These three providers share the same flow:
   GitHub**, open the verification URL, enter the displayed device code on
   GitHub, and authorize. Once signed in, pick a model and save.
 
+#### A separate model for ingest
+
+By default, one model answers chat questions and runs the ingest. The ingest
+reads your documents and writes the wiki, so you may want a stronger model for
+it than for chatting. In **Settings**, below the **Chat model**, clear
+**Use the same model as chat** and pick an **Ingest model** from the same
+provider, then save.
+
+- While **Use the same model as chat** is checked, the ingest follows the chat
+  model — also when you change the chat model later.
+- A separately chosen ingest model stays until you change it or check the box
+  again.
+- A new chat model applies to open chats right away, without interrupting an
+  answer in progress; a new ingest model is used from the next ingest on at
+  the latest.
+
 ### Dashboard
 
 The dashboard is the home of a workspace. It shows:
@@ -170,7 +186,7 @@ how they are read:
 | Documents | `.pdf`, `.docx`, `.pptx`, `.odt`, `.epub`, `.rtf` | Text is extracted into Markdown before the agent reads it. |
 | Spreadsheets | `.xlsx`, `.csv` | Sheets are read as structured text (`.xlsx` is extracted, `.csv` is read directly). |
 | Web & markup | `.html`, `.htm`, `.md`, `.txt`, `.json` | Read as text — Markdown directly, HTML/HTM stripped to text. |
-| Images | `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp` | Read through the LLM's vision capability (requires a vision-capable model). |
+| Images | `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp` | Read through the LLM's vision capability (requires a vision-capable ingest model). |
 
 > **Not supported:** legacy Office formats (`.doc`, `.xls`, `.ppt`), older
 > OpenDocument variants (`.ods`, `.odp`), and any other extension not listed

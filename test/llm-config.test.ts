@@ -57,6 +57,7 @@ interface RawConfigFile {
   readonly llm?: {
     readonly provider?: string;
     readonly modelId?: string;
+    readonly ingestModelId?: string;
     readonly baseUrl?: string;
     readonly apiKey?: string;
     readonly apiKeyEncrypted?: string;
@@ -347,6 +348,105 @@ describe("resolveStoredApiKey", () => {
     const config = await loadConfigModule();
     expect(config.resolveStoredApiKey(baseConfig, { provider: "openai" })).toBeUndefined();
     expect(config.resolveStoredApiKey(undefined, { provider: "anthropic" })).toBeUndefined();
+  });
+});
+
+describe("separate ingest model", () => {
+  beforeEach(async () => {
+    electronState.userDataDir = await mkdtemp(join(tmpdir(), "okf-config-"));
+    electronState.encryptionAvailable = true;
+  });
+
+  afterEach(async () => {
+    await rm(electronState.userDataDir, { recursive: true, force: true });
+  });
+
+  const withIngestModel: LlmConfig = { ...baseConfig, ingestModelId: "claude-opus-4-7-strong" };
+
+  it("persists the ingest model next to the chat model", async () => {
+    const config = await loadConfigModule();
+    await config.setLlmConfig(withIngestModel, neverAsked);
+
+    const parsed = parseRawConfig(await readRawConfig());
+    expect(parsed.llm?.modelId).toBe("claude-opus-4-7");
+    expect(parsed.llm?.ingestModelId).toBe("claude-opus-4-7-strong");
+
+    const loaded = await config.getLlmConfig();
+    expect(loaded?.modelId).toBe("claude-opus-4-7");
+    expect(loaded?.ingestModelId).toBe("claude-opus-4-7-strong");
+  });
+
+  it("writes no ingest model while the ingest follows the chat model", async () => {
+    const config = await loadConfigModule();
+    await config.setLlmConfig(withIngestModel, neverAsked);
+    await config.setLlmConfig(baseConfig, neverAsked);
+
+    expect(parseRawConfig(await readRawConfig()).llm).not.toHaveProperty("ingestModelId");
+    expect((await config.getLlmConfig())?.ingestModelId).toBeUndefined();
+  });
+
+  it("reads a config saved before separate ingest models as one model for both", async () => {
+    await writeFile(
+      configPath(),
+      JSON.stringify({
+        recentWorkspaces: [],
+        llm: { provider: "ollama", modelId: "llama3", baseUrl: "http://localhost:11434/v1" },
+      }),
+      "utf8",
+    );
+    const config = await loadConfigModule();
+
+    const loaded = await config.getLlmConfig();
+    expect(loaded?.modelId).toBe("llama3");
+    expect(loaded?.ingestModelId).toBeUndefined();
+  });
+
+  it("ignores a malformed stored ingest model", async () => {
+    await writeFile(
+      configPath(),
+      JSON.stringify({
+        recentWorkspaces: [],
+        llm: { provider: "ollama", modelId: "llama3", ingestModelId: 42 },
+      }),
+      "utf8",
+    );
+    const config = await loadConfigModule();
+
+    expect((await config.getLlmConfig())?.ingestModelId).toBeUndefined();
+  });
+
+  it("keeps the ingest model when a legacy plaintext key is migrated", async () => {
+    await writeFile(
+      configPath(),
+      JSON.stringify({
+        recentWorkspaces: [],
+        llm: { provider: "openai", modelId: "gpt-5-mini", ingestModelId: "gpt-5", apiKey: SECRET },
+      }),
+      "utf8",
+    );
+    const config = await loadConfigModule();
+
+    expect((await config.getLlmConfig())?.ingestModelId).toBe("gpt-5");
+    const parsed = parseRawConfig(await readRawConfig());
+    expect(parsed.llm?.apiKeyEncrypted).toBeTruthy();
+    expect(parsed.llm?.ingestModelId).toBe("gpt-5");
+  });
+
+  it("keeps the ingest model when the stored key is removed", async () => {
+    const config = await loadConfigModule();
+    await config.setLlmConfig(withIngestModel, neverAsked);
+
+    await config.removeLlmApiKey();
+
+    const parsed = parseRawConfig(await readRawConfig());
+    expect(parsed.llm?.apiKeyEncrypted).toBeUndefined();
+    expect(parsed.llm?.ingestModelId).toBe("claude-opus-4-7-strong");
+  });
+
+  it("exposes the ingest model in the renderer view", async () => {
+    const config = await loadConfigModule();
+    expect(config.toLlmConfigView(withIngestModel).ingestModelId).toBe("claude-opus-4-7-strong");
+    expect(config.toLlmConfigView(baseConfig).ingestModelId).toBeUndefined();
   });
 });
 

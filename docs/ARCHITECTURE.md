@@ -77,7 +77,9 @@ The flow from a user action to an agent answer:
    `SessionManager`, and opens or creates a chat session.
 2. **LLM config** — `configureLlm` is applied through the `ModelCatalog`
    (provider registration / API-key storage / model resolution) and onto the
-   chat session pool and the ingest session.
+   chat session pool (the chat model) and the ingest session (the ingest
+   model, which is the chat model unless a separate one is chosen — see
+   [ADR 0007](adr/0007-chat-and-ingest-models.md)).
 3. **Chat** — the composer calls `api.ask(question)`; the main process runs the
    current session's turn as `/wiki-query <question>`. Streaming events
    (`agent_start` / `text_delta` / `agent_end`) are forwarded over IPC, routed
@@ -121,7 +123,8 @@ the OS. Key modules:
   `"input" | "wiki" | "archive"` `Folder` type stays unchanged AND archive
   previews are confined to `wiki/archive/` (no `../` traversal out of the
   archive, even to other workspace files).
-- **`config.ts`** — persists recent workspaces and the LLM config in Electron's
+- **`config.ts`** — persists recent workspaces and the LLM config (provider,
+  credentials, chat model, optional separate ingest model) in Electron's
   `userData/config.json`, with serialized reads/writes.
 - **`resource.ts`** — resolves the bundled `pi-okf-wiki` extension entry path
   (dev: `node_modules`; packaged: `extraResources`).
@@ -227,3 +230,4 @@ choices live in `docs/adr/`:
 - [ADR 0004 — ModelCatalog](adr/0004-model-catalog.md)
 - [ADR 0005 — ChatSessionPool](adr/0005-chat-session-pool.md)
 - [ADR 0006 — Agent-events binding](adr/0006-agent-events-binding.md)
+- [ADR 0007 — Chat and ingest models](adr/0007-chat-and-ingest-models.md)

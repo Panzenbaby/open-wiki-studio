@@ -26,6 +26,7 @@ export function FirstRun(): JSX.Element {
             setLlmConfigured(true);
             setScreen("app");
           }}
+          allowSeparateIngestModel={false}
         />
       </div>
     </main>

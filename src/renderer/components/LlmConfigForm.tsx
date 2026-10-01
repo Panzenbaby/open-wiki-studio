@@ -3,6 +3,8 @@ import { useSetAtom } from "jotai";
 import { api } from "../ipc.ts";
 import { useT } from "../i18n.ts";
 import { llmConfiguredAtom, toastAtom } from "../store.ts";
+import { IngestModelField } from "./IngestModelField.tsx";
+import { ModelPicker } from "./ModelPicker.tsx";
 import { RemoveApiKeyModal } from "./RemoveApiKeyModal.tsx";
 import type { CopilotLoginEvent, LlmConfig, LlmConfigView, ModelOption, ProviderId } from "../../shared/ipc-types.ts";
 
@@ -29,24 +31,23 @@ const PROVIDERS: ReadonlyArray<ProviderDef> = [
 
 type CopilotStatus = "idle" | "logging-in" | "logged-in";
 
-function filterModels(models: readonly ModelOption[], query: string): readonly ModelOption[] {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) return models;
-  return models.filter((model) =>
-    `${model.name} ${model.id}`.toLowerCase().includes(normalizedQuery),
-  );
-}
-
 interface LlmConfigFormProps {
   readonly initial: LlmConfigView | null;
   readonly submitLabel: string;
   readonly onSaved: () => void;
+  /** Offer a separate ingest model (Settings). The first-run setup picks one
+   *  model for chat and ingest (ADR 0007). */
+  readonly allowSeparateIngestModel: boolean;
 }
 
 export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   const t = useT();
   const [provider, setProvider] = useState<ProviderId>(props.initial?.provider ?? "anthropic");
   const [modelId, setModelId] = useState(props.initial?.modelId ?? "");
+  // Ingest model: follows the chat model unless a separate one is chosen.
+  // The chosen ID is kept while the checkbox toggles so it is not lost.
+  const [ingestUsesChatModel, setIngestUsesChatModel] = useState(props.initial?.ingestModelId === undefined);
+  const [ingestModelId, setIngestModelId] = useState(props.initial?.ingestModelId ?? "");
   // Always starts empty: the stored key never reaches the renderer. An empty
   // field means "keep whatever is stored".
   const [apiKey, setApiKey] = useState("");
@@ -82,6 +83,8 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
     if (!props.initial) return;
     setProvider(props.initial.provider);
     setModelId(props.initial.modelId);
+    setIngestUsesChatModel(props.initial.ingestModelId === undefined);
+    setIngestModelId(props.initial.ingestModelId ?? "");
     setApiKey("");
     setBaseUrl(props.initial.baseUrl ?? "");
     setStoredKeyRemoved(false);
@@ -172,13 +175,20 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
 
   // Save gate: required-key providers need an apiKey; OAuth (Copilot) needs a
   // completed login + selected model; other providers need a loaded model
-  // list + a selected model.
+  // list + a selected model. A separate ingest model must be chosen too.
   const missingRequiredKey = selected.keyMode === "required" && !apiKey.trim() && !hasStoredKey;
   const copilotMissingModel = isCopilot && (copilotStatus !== "logged-in" || !modelId.trim());
   const nonCopilotMissingModel = !isCopilot && (!modelsLoaded || !modelId.trim());
+  const availableModels = isCopilot ? copilotModels : models;
+  const separateIngestModel = props.allowSeparateIngestModel && !ingestUsesChatModel;
+  // A chosen ingest model the loaded list does not offer counts as missing:
+  // the user picks again instead of being switched to another model silently.
+  const ingestMissingModel =
+    separateIngestModel && !availableModels.some((model) => model.id === ingestModelId);
   const canSave =
     !busy &&
     !missingRequiredKey &&
+    !ingestMissingModel &&
     (isCopilot ? !copilotMissingModel : !nonCopilotMissingModel);
 
   // Load-models gate: required-key providers need an apiKey; base-URL
@@ -261,8 +271,9 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
   /**
    * Switch provider and reset credentials/model selection for it: reuse the
    * saved config when re-selecting the persisted provider, else start clean
-   * (Ollama gets its default base URL). Always clears the loaded model list
-   * so a stale dropdown from another provider never leaks.
+   * (Ollama gets its default base URL; the ingest follows the chat model).
+   * Always clears the loaded model list so a stale dropdown from another
+   * provider never leaks.
    */
   function selectProvider(next: ProviderId): void {
     setProvider(next);
@@ -271,9 +282,13 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
     if (props.initial && props.initial.provider === next) {
       setBaseUrl(props.initial.baseUrl ?? "");
       setModelId(props.initial.modelId);
+      setIngestUsesChatModel(props.initial.ingestModelId === undefined);
+      setIngestModelId(props.initial.ingestModelId ?? "");
     } else {
       setBaseUrl(next === "ollama" ? "http://localhost:11434/v1" : "");
       setModelId("");
+      setIngestUsesChatModel(true);
+      setIngestModelId("");
     }
     setModels([]);
     setModelsLoaded(false);
@@ -358,10 +373,17 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
       setToast({ message: t("llf.noModels"), kind: "error" });
       return;
     }
+    if (ingestMissingModel) {
+      setToast({ message: t("llf.ingestModelRequired"), kind: "error" });
+      return;
+    }
     setBusy(true);
     const config: LlmConfig = {
       provider,
       modelId,
+      // Absent = the ingest follows the chat model, now and after later
+      // changes to it.
+      ingestModelId: separateIngestModel ? ingestModelId : undefined,
       apiKey: apiKey || undefined,
       baseUrl: baseUrl || undefined,
     };
@@ -375,6 +397,42 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
     // successful save (FirstRun and Settings share this form).
     setLlmConfigured(true);
     props.onSaved();
+  }
+
+  const chatModelLabel = t(props.allowSeparateIngestModel ? "llf.chatModel" : "llf.selectModel");
+
+  /** The chat model picker plus — where offered — the ingest model choice,
+   *  both fed by the same provider model list. */
+  function renderModelSelection(): JSX.Element {
+    return (
+      <>
+        <div className="field">
+          <label>{chatModelLabel}</label>
+          <ModelPicker
+            models={availableModels}
+            modelId={modelId}
+            onModelChange={setModelId}
+            searchQuery={modelSearchQuery}
+            onSearchQueryChange={setModelSearchQuery}
+            label={chatModelLabel}
+          />
+          {!props.allowSeparateIngestModel && (
+            <span className="hint">{t("llf.modelUsedForChatAndIngest")}</span>
+          )}
+        </div>
+        {props.allowSeparateIngestModel && (
+          <IngestModelField
+            key={provider}
+            models={availableModels}
+            usesChatModel={ingestUsesChatModel}
+            modelId={ingestModelId}
+            missingModel={ingestMissingModel}
+            onUsesChatModelChange={setIngestUsesChatModel}
+            onModelChange={setIngestModelId}
+          />
+        )}
+      </>
+    );
   }
 
   return (
@@ -400,11 +458,7 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
       {isCopilot ? (
         <CopilotSection
           status={copilotStatus}
-          models={copilotModels}
-          modelId={modelId}
-          onModelChange={setModelId}
-          searchQuery={modelSearchQuery}
-          onSearchQueryChange={setModelSearchQuery}
+          modelSelection={copilotModels.length > 0 ? renderModelSelection() : null}
           deviceCode={copilotDeviceCode}
           busy={busy}
           onLogin={() => void loginCopilot()}
@@ -467,22 +521,11 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
             </div>
           )}
 
-          {modelsLoaded && (
+          {modelsLoaded && (models.length > 0 ? renderModelSelection() : (
             <div className="field">
-              <label>{t("llf.selectModel")}</label>
-              {models.length > 0 ? (
-                <ModelPicker
-                  models={models}
-                  modelId={modelId}
-                  onModelChange={setModelId}
-                  searchQuery={modelSearchQuery}
-                  onSearchQueryChange={setModelSearchQuery}
-                />
-              ) : (
-                <div className="hint">{t("llf.noModels")}</div>
-              )}
+              <div className="hint">{t("llf.noModels")}</div>
             </div>
-          )}
+          ))}
         </>
       )}
 
@@ -513,11 +556,9 @@ export function LlmConfigForm(props: LlmConfigFormProps): JSX.Element {
 // ── Copilot OAuth section (inline in the form) ──────────────────────
 interface CopilotSectionProps {
   readonly status: CopilotStatus;
-  readonly models: readonly ModelOption[];
-  readonly modelId: string;
-  readonly onModelChange: (id: string) => void;
-  readonly searchQuery: string;
-  readonly onSearchQueryChange: (query: string) => void;
+  /** Model pickers shown once signed in; `null` when the account offers no
+   *  models. Composed by the form, which owns the model selection state. */
+  readonly modelSelection: JSX.Element | null;
   readonly deviceCode: { userCode: string; verificationUri: string } | null;
   readonly busy: boolean;
   readonly onLogin: () => void;
@@ -527,83 +568,18 @@ interface CopilotSectionProps {
   readonly onCopyCode: (code: string) => void;
 }
 
-interface ModelPickerProps {
-  readonly models: readonly ModelOption[];
-  readonly modelId: string;
-  readonly onModelChange: (id: string) => void;
-  readonly searchQuery: string;
-  readonly onSearchQueryChange: (query: string) => void;
-}
-
-function ModelPicker(props: ModelPickerProps): JSX.Element {
-  const t = useT();
-  const matchingModels = filterModels(props.models, props.searchQuery);
-  const selectedModel = props.models.find((model) => model.id === props.modelId);
-  const selectedModelMatches = matchingModels.some((model) => model.id === props.modelId);
-
-  return (
-    <div className="model-picker">
-      <input
-        className="input model-picker-search"
-        type="search"
-        value={props.searchQuery}
-        onChange={(event) => props.onSearchQueryChange(event.target.value)}
-        placeholder={t("llf.searchModels")}
-        aria-label={t("llf.searchModels")}
-      />
-      {matchingModels.length > 0 ? (
-        <div className="model-picker-options" aria-label={t("llf.selectModel")}>
-          {matchingModels.map((model) => (
-            <button
-              key={model.id}
-              type="button"
-              className={`model-picker-option${model.id === props.modelId ? " selected" : ""}`}
-              aria-pressed={model.id === props.modelId}
-              onClick={() => props.onModelChange(model.id)}
-            >
-              <span className="model-picker-option-name">{model.name || model.id}</span>
-              {model.name && model.name !== model.id && (
-                <span className="model-picker-option-id">{model.id}</span>
-              )}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="hint model-picker-empty" role="status">
-          {t("llf.modelSearchNoResults")}
-        </div>
-      )}
-      {!selectedModelMatches && selectedModel && (
-        <div className="model-picker-current">
-          <span>{t("llf.selectedModel")}</span>
-          <strong>{selectedModel.name || selectedModel.id}</strong>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function CopilotSection(props: CopilotSectionProps): JSX.Element {
   const t = useT();
-  const { status, models, modelId, searchQuery, deviceCode, busy } = props;
+  const { status, deviceCode, busy } = props;
 
   if (status === "logged-in") {
     return (
       <>
-        <div className="field">
-          <label>{t("copilot.selectModel")}</label>
-          {models.length > 0 ? (
-            <ModelPicker
-              models={models}
-              modelId={modelId}
-              onModelChange={props.onModelChange}
-              searchQuery={searchQuery}
-              onSearchQueryChange={props.onSearchQueryChange}
-            />
-          ) : (
+        {props.modelSelection ?? (
+          <div className="field">
             <div className="hint">{t("copilot.noModels")}</div>
-          )}
-        </div>
+          </div>
+        )}
         <div className="row between">
           <span className="hint">{t("copilot.loggedIn")}</span>
           <button className="btn btn-ghost" onClick={props.onLogout}>

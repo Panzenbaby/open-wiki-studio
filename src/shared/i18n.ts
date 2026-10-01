@@ -95,6 +95,14 @@ export const messages: Record<Locale, Dict> = {
     "llf.loadModelsFailed": "Could not load models",
     "llf.noModels": "No models available. Check your key / endpoint and try again.",
     "llf.selectModel": "Model",
+    "llf.chatModel": "Chat model",
+    "llf.modelUsedForChatAndIngest":
+      "Used for chat and ingest. You can choose a separate ingest model later in Settings.",
+    "llf.ingestModel": "Ingest model",
+    "llf.ingestUsesChatModel": "Use the same model as chat",
+    "llf.ingestModelHint":
+      "The ingest reads your documents and writes the wiki — a stronger model can improve the result. Image files need a vision-capable model.",
+    "llf.ingestModelRequired": "Choose an ingest model, or use the same model as chat.",
     "llf.searchModels": "Search models",
     "llf.modelSearchNoResults": "No models match your search.",
     "llf.selectedModel": "Current selection",
@@ -121,7 +129,6 @@ export const messages: Record<Locale, Dict> = {
     "copilot.loginFailed": "GitHub login failed",
     "copilot.loginCancelled": "Login cancelled",
     "copilot.noModels": "No Copilot models are available for your account.",
-    "copilot.selectModel": "Model",
 
     // ── auto-update ───────────────────────────────────────────────
     "update.tooltipAvailable": "A new version is available",
@@ -148,7 +155,7 @@ export const messages: Record<Locale, Dict> = {
     // ── settings ──────────────────────────────────────────────────
     "settings.title": "Settings",
     "settings.llm": "LLM",
-    "settings.desc": "Change the provider. Applies globally to all workspaces.",
+    "settings.desc": "Change the provider and models. Applies globally to all workspaces.",
     "settings.save": "Save",
     "settings.loading": "Loading configuration…",
     "settings.cancel": "Cancel",
@@ -566,6 +573,14 @@ export const messages: Record<Locale, Dict> = {
     "llf.loadModelsFailed": "Modelle konnten nicht geladen werden",
     "llf.noModels": "Keine Modelle verfügbar. Schlüssel / Endpunkt prüfen und erneut versuchen.",
     "llf.selectModel": "Modell",
+    "llf.chatModel": "Chat-Modell",
+    "llf.modelUsedForChatAndIngest":
+      "Wird für Chat und Ingest verwendet. Ein separates Ingest-Modell kannst du später in den Einstellungen wählen.",
+    "llf.ingestModel": "Ingest-Modell",
+    "llf.ingestUsesChatModel": "Dasselbe Modell wie im Chat verwenden",
+    "llf.ingestModelHint":
+      "Der Ingest liest deine Dokumente und schreibt das Wiki — ein stärkeres Modell kann das Ergebnis verbessern. Bilddateien brauchen ein Modell mit Bildverständnis.",
+    "llf.ingestModelRequired": "Wähle ein Ingest-Modell oder verwende dasselbe Modell wie im Chat.",
     "llf.searchModels": "Modelle suchen",
     "llf.modelSearchNoResults": "Keine Modelle entsprechen der Suche.",
     "llf.selectedModel": "Aktuelle Auswahl",
@@ -592,7 +607,6 @@ export const messages: Record<Locale, Dict> = {
     "copilot.loginFailed": "GitHub-Anmeldung fehlgeschlagen",
     "copilot.loginCancelled": "Anmeldung abgebrochen",
     "copilot.noModels": "Für dein Konto sind keine Copilot-Modelle verfügbar.",
-    "copilot.selectModel": "Modell",
 
     // ── auto-update ───────────────────────────────────────────────
     "update.tooltipAvailable": "Eine neue Version ist verfügbar",
@@ -620,7 +634,7 @@ export const messages: Record<Locale, Dict> = {
     "settings.title": "Einstellungen",
     "settings.llm": "LLM",
     "settings.desc":
-      "Provider ändern. Gilt global für alle Workspaces.",
+      "Provider und Modelle ändern. Gilt global für alle Workspaces.",
     "settings.save": "Speichern",
     "settings.loading": "Lade Konfiguration…",
     "settings.cancel": "Abbrechen",

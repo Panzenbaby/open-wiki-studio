@@ -316,6 +316,7 @@ export function Settings(): JSX.Element {
               initial={initial}
               submitLabel={t("settings.save")}
               onSaved={() => setView("dashboard")}
+              allowSeparateIngestModel
             />
           )}
         </section>

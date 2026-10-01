@@ -28,13 +28,20 @@ export type UnencryptedKeyDecider = () => Promise<UnencryptedKeyChoice>;
  *  guessing from the value itself. */
 interface StoredLlmConfig {
   readonly provider: ProviderId;
+  /** The chat model; also the ingest model unless `ingestModelId` is set. */
   readonly modelId: string;
+  /** Separate ingest model. Absent in configs saved before ADR 0007, which
+   *  therefore keep using one model for chat and ingest. */
+  readonly ingestModelId?: string;
   readonly baseUrl?: string;
   /** Legacy plaintext key; migrated to `apiKeyEncrypted` on first read. */
   readonly apiKey?: string;
   /** Base64 of `safeStorage.encryptString(apiKey)`. */
   readonly apiKeyEncrypted?: string;
 }
+
+/** The parts of an LLM config that carry no key material. */
+type LlmConnection = Pick<LlmConfig, "provider" | "modelId" | "ingestModelId" | "baseUrl">;
 
 interface ConfigShape {
   readonly recentWorkspaces: readonly WorkspaceInfo[];
@@ -194,11 +201,23 @@ function decryptApiKey(encrypted: string): string | undefined {
 }
 
 function toLlmConfig(stored: StoredLlmConfig, apiKey: string | undefined): LlmConfig {
+  return { ...toLlmConnection(stored), apiKey };
+}
+
+/** A model ID from config.json, which is read without schema validation:
+ *  anything but a non-empty string counts as "not set". */
+function optionalModelId(value: unknown): string | undefined {
+  return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+/** Copy only the key-free connection fields, so no code path that rewrites
+ *  the LLM section can forget one of them (e.g. the separate ingest model). */
+function toLlmConnection(config: LlmConnection): LlmConnection {
   return {
-    provider: stored.provider,
-    modelId: stored.modelId,
-    baseUrl: stored.baseUrl,
-    apiKey,
+    provider: config.provider,
+    modelId: config.modelId,
+    ingestModelId: optionalModelId(config.ingestModelId),
+    baseUrl: config.baseUrl,
   };
 }
 
@@ -239,6 +258,7 @@ export function toLlmConfigView(config: LlmConfig): LlmConfigView {
   return {
     provider: config.provider,
     modelId: config.modelId,
+    ingestModelId: config.ingestModelId,
     baseUrl: config.baseUrl,
     hasApiKey: !!config.apiKey,
   };
@@ -254,9 +274,7 @@ export async function getLlmConfig(): Promise<LlmConfig | undefined> {
     // writer cannot lose the rewrite.
     if (stored.apiKey !== undefined && safeStorage.isEncryptionAvailable()) {
       const migrated: StoredLlmConfig = {
-        provider: stored.provider,
-        modelId: stored.modelId,
-        baseUrl: stored.baseUrl,
+        ...toLlmConnection(stored),
         apiKeyEncrypted: safeStorage.encryptString(stored.apiKey).toString("base64"),
       };
       await writeConfig({ ...current, llm: migrated });
@@ -274,11 +292,7 @@ async function toStoredLlmConfig(
   config: LlmConfig,
   decideUnencrypted: UnencryptedKeyDecider,
 ): Promise<StoredLlmConfig> {
-  const base: StoredLlmConfig = {
-    provider: config.provider,
-    modelId: config.modelId,
-    baseUrl: config.baseUrl,
-  };
+  const base: StoredLlmConfig = toLlmConnection(config);
   if (!config.apiKey) {
     sessionApiKey = undefined;
     return base;
@@ -297,7 +311,7 @@ async function toStoredLlmConfig(
 }
 
 /** Revoke the stored API key: drops it from disk and from the session,
- *  keeping the rest of the LLM config (provider, model, base URL). */
+ *  keeping the rest of the LLM config (provider, models, base URL). */
 export async function removeLlmApiKey(): Promise<Result<void>> {
   return withConfigLock(async () => {
     try {
@@ -305,11 +319,7 @@ export async function removeLlmApiKey(): Promise<Result<void>> {
       const current = await readConfig();
       const stored = current.llm;
       if (!stored) return ok(undefined);
-      const llm: StoredLlmConfig = {
-        provider: stored.provider,
-        modelId: stored.modelId,
-        baseUrl: stored.baseUrl,
-      };
+      const llm: StoredLlmConfig = toLlmConnection(stored);
       await writeConfig({ ...current, llm });
       return ok(undefined);
     } catch (error) {

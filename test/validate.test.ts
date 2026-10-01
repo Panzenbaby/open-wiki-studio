@@ -40,6 +40,15 @@ describe("isLlmConfig", () => {
     expect(isLlmConfig({ provider: "openai", modelId: "" })).toBe(false);
   });
 
+  it("accepts a separate ingest model", () => {
+    expect(isLlmConfig({ provider: "openai", modelId: "gpt-5-mini", ingestModelId: "gpt-5" })).toBe(true);
+  });
+
+  it("rejects an empty or non-string ingest model", () => {
+    expect(isLlmConfig({ provider: "openai", modelId: "gpt-5-mini", ingestModelId: "" })).toBe(false);
+    expect(isLlmConfig({ provider: "openai", modelId: "gpt-5-mini", ingestModelId: 5 })).toBe(false);
+  });
+
   it("rejects a non-string apiKey", () => {
     expect(isLlmConfig({ provider: "openai", modelId: "x", apiKey: 42 })).toBe(false);
   });

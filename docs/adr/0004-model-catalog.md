@@ -8,6 +8,11 @@ Accepted. Implemented in `src/main/model-catalog.ts`. Aligns with (does not
 contradict) the model-fetch graceful-degradation behaviour documented as
 ADR 0001 — that behaviour is preserved byte-for-byte, only relocated.
 
+> Amended by ADR 0007 (chat and ingest models): `resolveModel(config)` became
+> `resolveModels(config)`, which resolves a chat and an ingest model, and
+> `configureLlm` applies a model per role. The interface below shows the
+> original extraction.
+
 > ADR 0001 (model-fetch graceful degradation) and ADR 0002 (OKF wiki studio
 > architecture) are referenced in source comments but not present in
 > `docs/adr/`. This ADR, like ADR 0003, cites ADR 0001 by behaviour; the 0001

@@ -79,10 +79,17 @@ export type ProviderId =
   | "github-copilot";
 
 /** Main-process shape. Carries the plaintext key and must never be sent to
- *  the renderer — use `LlmConfigView` for that. */
+ *  the renderer — use `LlmConfigView` for that.
+ *
+ *  Chat and ingest share the provider, key, and base URL; only the model can
+ *  differ per role (ADR 0007). */
 export interface LlmConfig {
   readonly provider: ProviderId;
+  /** The chat model. The ingest uses it too unless `ingestModelId` is set. */
   readonly modelId: string;
+  /** A separately chosen ingest model of the same provider. Absent: the
+   *  ingest follows the chat model, including later changes to it. */
+  readonly ingestModelId?: string;
   readonly apiKey?: string;
   readonly baseUrl?: string;
 }
@@ -91,7 +98,10 @@ export interface LlmConfig {
  *  the fact that one is stored. */
 export interface LlmConfigView {
   readonly provider: ProviderId;
+  /** The chat model; see `LlmConfig.modelId`. */
   readonly modelId: string;
+  /** See `LlmConfig.ingestModelId`. */
+  readonly ingestModelId?: string;
   readonly hasApiKey: boolean;
   readonly baseUrl?: string;
 }

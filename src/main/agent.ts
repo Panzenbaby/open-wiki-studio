@@ -30,8 +30,9 @@ type PiModule = typeof import("@earendil-works/pi-coding-agent");
 
 /**
  * Model resolved from the registry, kept on the repo so a recreated ingest
- * session re-applies the same model without re-resolving (which would drop
- * dynamically registered providers like ollama/openai-compatible).
+ * session (and every newly created chat session) re-applies the configured
+ * model without re-resolving (which would drop dynamically registered
+ * providers like ollama/openai-compatible).
  */
 type ResolvedModel = ReturnType<AgentSessionServices["modelRegistry"]["getAll"]>[number];
 
@@ -78,6 +79,11 @@ export class AgentRepository {
   private copilotLoginListener: ((event: CopilotLoginEvent) => void) | null = null;
   private copilotAbort: AbortController | null = null;
   private ingestUnsub: (() => void) | null = null;
+  /** Model for chat sessions (ADR 0007). Applied to every pooled session and
+   *  to each newly created one. */
+  private chatModel: ResolvedModel | null = null;
+  /** Model for the ingest session: the chat model unless the config chooses
+   *  a separate ingest model. Applied when the ingest session is recreated. */
   private ingestModel: ResolvedModel | null = null;
   /** Deep module that owns model discovery + provider registration. Built
    *  from the same services as the repo; the repo keeps the policy of applying
@@ -99,7 +105,7 @@ export class AgentRepository {
       authStorage: services.authStorage,
     });
     // The pool is constructed here (after services + pi exist) using arrow deps
-    // that read repo state lazily — `chatListener`/`ingestModel` are null now
+    // that read repo state lazily — `chatListener`/`chatModel` are null now
     // but read at call time, after the listeners are wired from ipc.ts.
     this.pool = new ChatSessionPool({
       pi,
@@ -108,7 +114,7 @@ export class AgentRepository {
       forwardEvents: forwardAgentEvents,
       onChatEvent: (event) => this.chatListener?.(event),
       attachNotify: attachNotifyForwarding,
-      getIngestModel: () => this.ingestModel,
+      getChatModel: () => this.chatModel,
     });
   }
 
@@ -223,24 +229,22 @@ export class AgentRepository {
       // dynamically registered providers above.
       this.catalog.registerProvider(config);
 
-      const model = this.catalog.resolveModel(config);
-      if (model) {
-        this.ingestModel = model;
-        await this.ingestSession.setModel(model);
-        // Apply to the whole chat pool (best-effort — streaming sessions may
-        // reject; the pool swallows per-session errors).
-        await this.pool.applyModelToAll(model);
-      } else {
-        // Model not found in registry — surface an error so the config form
-        // can warn the user immediately. The previously configured model (if
-        // any) stays active.
-        return err<void>(
-          mainT("error.modelNotFound", {
-            provider: config.provider,
-            modelId: config.modelId,
-          }),
-        );
-      }
+      // Resolve both roles before applying either: when a model is missing
+      // from the registry the config form warns immediately, and the
+      // previously configured models (if any) stay active.
+      const models = this.catalog.resolveModels(config);
+      if (!models.success) return err<void>(models.error.message);
+
+      this.ingestModel = models.data.ingest;
+      this.chatModel = models.data.chat;
+      // Every ingest starts in a fresh session created with `ingestModel`, so
+      // the next ingest uses it at the latest. Applying it to the current
+      // session as well keeps that session in sync and surfaces missing auth
+      // as a save error right away.
+      await this.ingestSession.setModel(models.data.ingest);
+      // Apply to the whole chat pool (best-effort — streaming sessions may
+      // reject; the pool swallows per-session errors).
+      await this.pool.applyModelToAll(models.data.chat);
       return ok(undefined);
     } catch (error) {
       return err<void>(errorMessage(error));

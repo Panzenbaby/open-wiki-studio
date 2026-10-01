@@ -10,12 +10,14 @@
 //   - the auth-gated static catalog projection for anthropic/openai/google
 //   - provider registration into modelRegistry (ollama/openai-compatible) and
 //     API-key storage into authStorage (anthropic/openai/google)
-//   - model resolution from the registry (by provider+modelId, falling back to
-//     modelId alone)
+//   - model resolution from the registry for both roles — the chat model and
+//     the ingest model, which follows the chat model unless chosen separately
+//     (ADR 0007) — by provider+modelId, falling back to modelId alone
 //
 // What the agent keeps (its own policies, not model discovery):
-//   - applying the resolved model to its session pool (ingest + live chats) —
-//     that is agent state, not catalog state
+//   - applying the resolved models to its sessions (ingest model -> ingest
+//     session, chat model -> live chats) — that is agent state, not catalog
+//     state
 //   - Copilot OAuth (loginCopilot / cancel / logout) — an auth flow entangled
 //     with abort + listeners, not model discovery
 //
@@ -61,6 +63,25 @@ export interface ModelCatalogDeps {
   readonly authStorage: ModelCatalogAuthStorage;
   /** Injectable so tests can fake HTTP without a network. Default: global fetch. */
   readonly fetch?: typeof fetch;
+}
+
+/** The registry models a config runs with, one per role. Both are the same
+ *  model unless the config chooses a separate ingest model. */
+export interface ResolvedLlmModels {
+  readonly chat: ResolvedModel;
+  readonly ingest: ResolvedModel;
+}
+
+/** The model ID the ingest runs with: the separately chosen ingest model, or
+ *  else the chat model (ADR 0007). */
+export function effectiveIngestModelId(config: Pick<LlmConfig, "modelId" | "ingestModelId">): string {
+  return config.ingestModelId ?? config.modelId;
+}
+
+/** Every model ID a config uses, chat model first, without duplicates. */
+function configuredModelIds(config: LlmConfig): readonly string[] {
+  const ingestModelId = effectiveIngestModelId(config);
+  return ingestModelId === config.modelId ? [config.modelId] : [config.modelId, ingestModelId];
 }
 
 /** Per-request timeout for model-list fetches. */
@@ -151,7 +172,7 @@ export class ModelCatalog {
   /** Register a provider into the registry (ollama/openai-compatible) and/or
    *  store an API key (anthropic/openai/google). No-op for copilot. This is the
    *  side-effecting half of the old `configureLlm`; the agent still applies the
-   *  resolved model to its sessions afterwards. */
+   *  resolved models to its sessions afterwards. */
   registerProvider(config: LlmConfig): void {
     const providerName =
       config.provider === "openai-compatible" ? "openai-compatible" : config.provider;
@@ -168,17 +189,18 @@ export class ModelCatalog {
         // "openai-completions" is the OpenAI chat completions wire protocol,
         // spoken by Ollama and OpenAI-compatible endpoints.
         api: "openai-completions",
-        models: [
-          {
-            id: config.modelId,
-            name: config.modelId,
-            reasoning: false,
-            input: ["text"],
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-            contextWindow: 128000,
-            maxTokens: 8192,
-          },
-        ],
+        // Registering a provider with models REPLACES all of its models, so
+        // the chat and the ingest model must be registered in one call — a
+        // second call would drop the first model again.
+        models: configuredModelIds(config).map((modelId) => ({
+          id: modelId,
+          name: modelId,
+          reasoning: false,
+          input: ["text"],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 128000,
+          maxTokens: 8192,
+        })),
       });
     } else if (config.apiKey) {
       this.deps.authStorage.set(config.provider, { type: "api_key", key: config.apiKey });
@@ -186,17 +208,29 @@ export class ModelCatalog {
     // github-copilot: no-op — auth flows through loginCopilot().
   }
 
-  /** Find the model in the registry matching the config (by provider+modelId,
-   *  falling back to modelId alone). null when not found — the agent turns
-   *  that into the modelNotFound error. */
-  resolveModel(config: LlmConfig): ResolvedModel | null {
-    const providerName =
-      config.provider === "openai-compatible" ? "openai-compatible" : config.provider;
+  /** Find the chat and the ingest model of a config in the registry (each by
+   *  provider+modelId, falling back to modelId alone). Fails as a whole when
+   *  either is missing, so the agent never applies only half of a config; the
+   *  error names the missing model. */
+  resolveModels(config: LlmConfig): Result<ResolvedLlmModels> {
+    const chat = this.findModel(config.provider, config.modelId);
+    if (!chat) return this.modelNotFound(config.provider, config.modelId);
+    const ingestModelId = effectiveIngestModelId(config);
+    const ingest = ingestModelId === config.modelId ? chat : this.findModel(config.provider, ingestModelId);
+    if (!ingest) return this.modelNotFound(config.provider, ingestModelId);
+    return ok({ chat, ingest });
+  }
+
+  private findModel(provider: ProviderId, modelId: string): ResolvedModel | null {
     const all = this.deps.modelRegistry.getAll();
     const model =
-      all.find((m) => m.provider === providerName && m.id === config.modelId) ??
-      all.find((m) => m.id === config.modelId);
+      all.find((m) => m.provider === provider && m.id === modelId) ??
+      all.find((m) => m.id === modelId);
     return model ?? null;
+  }
+
+  private modelNotFound(provider: ProviderId, modelId: string): Result<ResolvedLlmModels> {
+    return err<ResolvedLlmModels>(mainT("error.modelNotFound", { provider, modelId }));
   }
 
   // ─── HTTP model-list fetch helpers (Ollama / openai-compatible) ──────────

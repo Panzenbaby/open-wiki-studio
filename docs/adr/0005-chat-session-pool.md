@@ -13,6 +13,10 @@ behind a deep interface.
 > (ModelCatalog, C2). Like them, this is a pure internal extraction — only
 > `src/main/agent.ts` changed and `src/main/chat-session-pool.ts` was added.
 
+> Amended by ADR 0007 (chat and ingest models): the dep `getIngestModel` became
+> `getChatModel`, because chat sessions now get the chat model, which may
+> differ from the ingest model. The code below shows the original extraction.
+
 ## Context
 
 `src/main/agent.ts` remained a god module even after C2 extracted model

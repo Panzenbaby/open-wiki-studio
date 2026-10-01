@@ -3,7 +3,7 @@
 //
 // What lives here (the deep implementation):
 //   - creating a live chat session (resourceLoader.reload, pi session
-//     creation, bindExtensions, ingest-model apply, forward-events + streaming
+//     creation, bindExtensions, chat-model apply, forward-events + streaming
 //     text subscribe),
 //   - the liveSessions map keyed by session-file path,
 //   - the LRU touch/drop/evict policy (never the current, never a streaming one),
@@ -122,9 +122,10 @@ export interface ChatSessionPoolDeps {
     sessionPath: string,
     emit: (event: AgentEvent) => void,
   ) => void;
-  /** Resolved model to apply to newly created sessions (read lazily, after
-   *  reload + creation, so a configureLlm that races creation still applies). */
-  readonly getIngestModel: () => ResolvedModel | null;
+  /** Resolved chat model to apply to newly created sessions (read lazily,
+   *  after reload + creation, so a configureLlm that races creation still
+   *  applies). The ingest model may differ and never reaches the pool. */
+  readonly getChatModel: () => ResolvedModel | null;
   /** LRU eviction cap. Default 8 (preserves MAX_LIVE_SESSIONS behaviour). */
   readonly maxLiveSessions?: number;
 }
@@ -250,7 +251,7 @@ export class ChatSessionPool {
    * Build a LiveChatSession for a reason: resourceLoader.reload (fresh
    * extension runtime; other live sessions keep theirs and stream
    * undisturbed), pi session creation with a `session_start` event carrying
-   * `reason` + `previousSessionFile`, bindExtensions, apply the ingest model
+   * `reason` + `previousSessionFile`, bindExtensions, apply the chat model
    * (best-effort, logged on failure), then wire `forwardEvents` (the pi->
    * AgentEvent channel) and a second handler tracking
    * `streamingAssistantText` from `message_update` partials (cleared on
@@ -287,7 +288,7 @@ export class ChatSessionPool {
     // after bind so concurrent pooled sessions route to the chat listener with
     // their own sessionPath. (Ingest uses the same helper with path "".)
     this.deps.attachNotify(session, sessionPath, this.deps.onChatEvent);
-    const model = this.deps.getIngestModel();
+    const model = this.deps.getChatModel();
     if (model) {
       try {
         await session.setModel(model);

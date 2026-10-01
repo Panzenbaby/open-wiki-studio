@@ -24,6 +24,10 @@ export function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === "string";
 }
 
+export function isOptionalNonEmptyString(value: unknown): value is string | undefined {
+  return value === undefined || isNonEmptyString(value);
+}
+
 export function isBoolean(value: unknown): value is boolean {
   return typeof value === "boolean";
 }
@@ -46,6 +50,7 @@ export function isLlmConfig(value: unknown): value is LlmConfig {
   return (
     isProviderId(candidate.provider) &&
     isNonEmptyString(candidate.modelId) &&
+    isOptionalNonEmptyString(candidate.ingestModelId) &&
     isOptionalString(candidate.apiKey) &&
     isOptionalString(candidate.baseUrl)
   );

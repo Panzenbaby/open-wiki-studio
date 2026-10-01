@@ -83,6 +83,15 @@ opportunities within it.)
 concepts + archive inputs, snapshot again, diff. The ingest summary
 (created/updated/leftover) is computed from the before/after snapshots.
 
+**Chat model** — the model that answers chat questions (`LlmConfig.modelId`).
+It is also the ingest model unless a separate one is chosen.
+
+**Ingest model** — the model an ingest runs with: the chat model by default
+("use the same model as chat", which follows later chat-model changes), or a
+separately chosen model of the same provider (`LlmConfig.ingestModelId`).
+Both roles share one connection — provider, credentials, base URL. See
+ADR 0007.
+
 **Ingest file result** — the per-input-file outcome of an ingest: `processed`
 (the file left `input/` and its archived original is cited by N created / M
 updated concepts) or `leftover` (still in `input/`). Reconstructed from the

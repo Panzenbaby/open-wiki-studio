@@ -123,7 +123,7 @@ class TestPool extends ChatSessionPool {
       // helper itself is covered by test/agent.test.ts; the pool→helper wiring
       // call is a one-liner kept simple enough for review to catch drift.
       attachNotify: () => {},
-      getIngestModel: () => null,
+      getChatModel: () => null,
       maxLiveSessions,
     });
   }
