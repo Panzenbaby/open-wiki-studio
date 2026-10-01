@@ -367,10 +367,34 @@ export function Browser(): JSX.Element {
               </div>
             )}
             {folder === "input" && (
-              <div className="side-head browser-add-actions">
-                <button className="btn btn-sm btn-primary btn-block" onClick={() => void addFiles()}><Plus size={14} /> {t("browser.addFiles")}</button>
-                <span className="drop-hint"><Upload size={14} aria-hidden="true" />{t("files.dragDropHint")}</span>
-              </div>
+              <>
+                <details className="browser-format-info" open>
+                  <summary>{t("browser.supportedFormats.title")}</summary>
+                  <div className="browser-format-list">
+                    <div>
+                      <span>{t("browser.supportedFormats.documents")}</span>
+                      <code>{t("browser.supportedFormats.documentsExtensions")}</code>
+                    </div>
+                    <div>
+                      <span>{t("browser.supportedFormats.spreadsheets")}</span>
+                      <code>{t("browser.supportedFormats.spreadsheetsExtensions")}</code>
+                    </div>
+                    <div>
+                      <span>{t("browser.supportedFormats.webMarkup")}</span>
+                      <code>{t("browser.supportedFormats.webMarkupExtensions")}</code>
+                    </div>
+                    <div>
+                      <span>{t("browser.supportedFormats.images")}</span>
+                      <code>{t("browser.supportedFormats.imagesExtensions")}</code>
+                    </div>
+                    <p>{t("browser.supportedFormats.imageModelNote")}</p>
+                  </div>
+                </details>
+                <div className="side-head browser-add-actions">
+                  <button className="btn btn-sm btn-primary btn-block" onClick={() => void addFiles()}><Plus size={14} /> {t("browser.addFiles")}</button>
+                  <span className="drop-hint"><Upload size={14} aria-hidden="true" />{t("files.dragDropHint")}</span>
+                </div>
+              </>
             )}
           </>
         )}
